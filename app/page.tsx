@@ -1,65 +1,172 @@
-import Image from "next/image";
+// app/page.tsx (top of file)
+export const dynamic = "force-static";
+
+import type { Metadata } from "next";
+import Reveal from "./components/Reveal";
+import CountUp from "./components/CountUp";
+
+export const metadata: Metadata = {
+  title: "Unison Alberta — Senior Support in Alberta",
+  description:
+    "Empowering seniors 50+ to live their best lives through resources, directories and community programs across Alberta.",
+  openGraph: {
+    title: "Unison Alberta — Senior Support in Alberta",
+    description:
+      "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
+    url: "https://unisonalberta.online/",
+    siteName: "Unison Alberta",
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Unison Alberta" }],
+    locale: "en_CA",
+    type: "website",
+  },
+};
+
+const OFFICIAL = "https://unisonalberta.com";
+const DONATE = "https://unisonalberta.com/donate";
+const CONTACT = "https://unisonalberta.com/contact";
+const ABOUT = "https://unisonalberta.com/about";
 
 export default function Home() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Unison Alberta",
+    url: "https://unisonalberta.online/",
+    logo: "https://unisonalberta.com/hubfs/Unison%20Logo.svg",
+    sameAs: [OFFICIAL],
+    department: [
+      {
+        "@type": "Organization",
+        name: "Unison Alberta Directory",
+        url: "https://unisonalberta.online/directory/2025",
+      },
+    ],
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      <main>
+        {/* ===== HEADER ===== */}
+        <header className="ua-header">
+          <div className="ua-container ua-header__in">
+            <a href="/" className="ua-header__brand" aria-label="Unison Alberta — Home">
+              <img
+                src="https://unisonalberta.com/hubfs/Unison%20Logo.svg"
+                alt="Unison logo"
+                className="ua-header__logo"
+                loading="eager"
+                width={140}
+                height={40}
+              />
+            </a>
+
+            <nav className="ua-header__nav">
+              <a href={DONATE} className="ua-btn ua-btn--accent" style={{ color: "#fff" }}>
+                Donate now
+              </a>
+            </nav>
+          </div>
+        </header>
+
+        {/* ===== HERO ===== */}
+        <section className="ua-hero">
+          <div className="ua-hero__container ua-hero__grid">
+            <div className="ua-hero__left">
+              <h1 className="ua-hero__title">
+                Senior Support
+                <br />
+                in Alberta
+              </h1>
+              <p className="ua-hero__lead">
+                Empowering seniors 50+ to live their best lives through a series of programs and services.
+              </p>
+
+              <div className="ua-hero__cta">
+                <a href={OFFICIAL} className="ua-btn ua-btn--dark">
+                  Official Website →
+                </a>
+              </div>
+            </div>
+
+            <figure className="ua-heroCard" aria-label="Community highlight">
+              <img
+                src="/hero-portrait.png"
+                alt=""
+                className="ua-heroCard__img"
+                loading="eager"
+                decoding="async"
+                draggable={false}
+              />
+              <figcaption className="ua-heroCard__metrics">
+                <div className="ua-metric">
+                  <div className="ua-metric__num">
+                    <CountUp end={790} decimals={0} suffix="+" />
+                  </div>
+                  <div className="ua-metric__label">Volunteers</div>
+                </div>
+
+                <span className="ua-dot" />
+
+                <div className="ua-metric">
+                  <div className="ua-metric__num">
+                    <CountUp end={1.4} decimals={1} suffix="M" />
+                  </div>
+                  <div className="ua-metric__label">Total Donations</div>
+                </div>
+
+                <span className="ua-dot" />
+
+                <div className="ua-metric">
+                  <div className="ua-metric__num">
+                    <CountUp end={5.9} decimals={1} suffix="K" />
+                  </div>
+                  <div className="ua-metric__label">Unison Members</div>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        {/* ===== DIRECTORY ===== */}
+        <section className="dir-wrap">
+          <div className="container">
+            <Reveal>
+              <h2 className="dir-title">Annual Directory</h2>
+              <p className="dir-lead">Browse the 2025 directory and preview the 2026 structure.</p>
+
+              <div className="cards-dark">
+                <article className="card-dark">
+                  <span className="year">2025</span>
+                  <div className="ctitle">Directory 2025</div>
+                  <p>
+                    Live collection. Clean URLs like <code>/directory/2025/[slug]</code>.
+                  </p>
+                  <p style={{ marginTop: 12 }}>
+                    <a className="link-light" href="/directory/2025">
+                      Explore →
+                    </a>
+                  </p>
+                </article>
+
+                <article className="card-dark">
+                  <span className="year">2026</span>
+                  <div className="ctitle">Directory 2026 (layout ready)</div>
+                  <p>
+                    Slugs and SEO sections are ready. Content will be added later. URLs will be{" "}
+                    <code>/directory/2026/[slug]</code>.
+                  </p>
+                  <p style={{ marginTop: 12, color: "var(--text-dim)" }}>Coming soon</p>
+                </article>
+              </div>
+            </Reveal>
+          </div>
+        </section>
       </main>
-    </div>
+    </>
   );
 }
