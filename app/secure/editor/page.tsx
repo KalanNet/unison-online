@@ -1,6 +1,6 @@
 // app/secure/editor/page.tsx
 import type { Metadata } from "next";
-import nextDynamic from "next/dynamic"; // <-- переіменували імпорт
+import ClientEditor from "./ClientEditor"; // <— просто імпорт клієнтського компонента
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +9,6 @@ export const metadata: Metadata = {
   title: "Flipbook Editor",
   robots: { index: false, follow: false, nocache: true },
 };
-
-// Клієнтський редактор (форма публікації)
-const ClientEditor = nextDynamic(() => import("app/secure/editor/ClientEditor"), { ssr: false });
 
 export default function EditorPage() {
   return <ClientEditor />;
