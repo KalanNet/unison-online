@@ -70,12 +70,13 @@ export default function RootLayout({
 
   return (
     <html lang="en-CA" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
-      >
+      <head>
+        {/* Speed up first connection to external assets (logo, etc.) */}
+        <link rel="preconnect" href="https://unisonalberta.com" crossOrigin="" />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
         <main className="flex-1">{children}</main>
 
-        {/* Minimal footer (стилі та змінні — як у попередньому проєкті) */}
         <footer
           className="border-t py-3"
           style={{
@@ -103,3 +104,4 @@ export default function RootLayout({
     </html>
   );
 }
+
