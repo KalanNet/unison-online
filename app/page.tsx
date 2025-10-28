@@ -2,6 +2,9 @@
 export const dynamic = "force-static";
 
 import type { Metadata } from "next";
+import Image from "next/image";
+import nextDynamic from "next/dynamic"; // ← уникаємо конфлікту з export const dynamic
+
 import Reveal from "./components/Reveal";
 import CountUp from "./components/CountUp";
 
@@ -48,14 +51,7 @@ export default function Home() {
         <header className="ua-header">
           <div className="ua-container ua-header__in">
             <a href="/" className="ua-header__brand" aria-label="Unison Alberta — Home">
-              <img
-                src="https://unisonalberta.com/hubfs/Unison%20Logo.svg"
-                alt="Unison logo"
-                className="ua-header__logo"
-                loading="eager"
-                width={140}
-                height={40}
-              />
+              Unison Alberta
             </a>
 
             <nav className="ua-header__nav">
@@ -76,8 +72,7 @@ export default function Home() {
                 in Alberta
               </h1>
               <p className="ua-hero__lead">
-                Empowering seniors 50+ to live their best lives through
-                a series of programs and services.
+                Empowering seniors 50+ to live their best lives through a series of programs and services.
               </p>
 
               <div className="ua-hero__cta">
@@ -88,12 +83,15 @@ export default function Home() {
             </div>
 
             <figure className="ua-heroCard" aria-label="Community highlight">
-              <img
-                src="/hero-portrait.webp"  // ← тут виправлено
+              {/* LCP image with priority + responsive sizes */}
+              <Image
+                src="/hero-portrait.webp"
                 alt=""
+                width={1200}
+                height={630}
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="ua-heroCard__img"
-                loading="eager"
-                decoding="async"
                 draggable={false}
               />
               <figcaption className="ua-heroCard__metrics">
