@@ -1,137 +1,173 @@
 // app/secure/editor/ClientEditor.tsx
+
 "use client";
 
-import { useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import { GlobalWorkerOptions, getDocument, PDFDocumentProxy } from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker.entry";
 
-type PublishResponse = { ok?: boolean; urlPath?: string; error?: string };
+// Вказуємо pdfjs використовувати worker
+GlobalWorkerOptions.workerSrc = workerSrc;
+
+// Тип для закладок
+type Bookmark = {
+  id: string;
+  page: number;
+  title: string;
+  color: string;
+};
 
 export default function ClientEditor() {
-  const [pdfUrl, setPdfUrl] = useState("");
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<PublishResponse | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<number[]>([]);
 
-  async function onPublish(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSubmitting(true);
-    setResult(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    try {
-      const res = await fetch("/api/publish", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pdfUrl, title, slug, description }),
-      });
-
-      const data = (await res.json()) as PublishResponse;
-      setResult(data);
-    } catch (err) {
-      setResult({ error: "Network error" });
-    } finally {
-      setSubmitting(false);
+  // Завантаження PDF
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPdfFile(file);
+      const reader = new FileReader();
+      reader.onload = async function () {
+        const typedArray = new Uint8Array(this.result as ArrayBuffer);
+        const loadingTask = getDocument({ data: typedArray });
+        const doc = await loadingTask.promise;
+        setPdfDoc(doc);
+        setNumPages(doc.numPages);
+        setPageNumber(1);
+        renderPage(doc, 1);
+        setBookmarks([]);
+        setSearchHits([]);
+      };
+      reader.readAsArrayBuffer(file);
     }
-  }
+  };
 
-  const previewHref =
-    pdfUrl ? `/viewer?file=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(title || "Preview")}` : "";
+  // Рендер сторінки в Canvas
+  const renderPage = async (doc: PDFDocumentProxy, pageNum: number) => {
+  const page = await doc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 1.25 });
+  const canvas = canvasRef.current;
+  if (canvas) {
+    const context = canvas.getContext("2d");
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    await page.render({
+      canvasContext: context!,
+      viewport,
+      canvas
+    }).promise;
+  }
+};
+
+
+  // Перехід між сторінками
+  const goToPage = (num: number) => {
+    if (pdfDoc && num > 0 && num <= numPages) {
+      setPageNumber(num);
+      renderPage(pdfDoc, num);
+    }
+  };
+
+  // Додавання закладки
+  const addBookmark = () => {
+    const title = prompt("Назва закладки:", `Сторінка ${pageNumber}`);
+    if (title) {
+      setBookmarks([
+        ...bookmarks,
+        {
+          id: `${Date.now()}`,
+          page: pageNumber,
+          title,
+          color: "#00647b",
+        },
+      ]);
+    }
+  };
+
+  // Пошук по сторінках
+  const handleSearch = async () => {
+    if (!pdfDoc || !searchQuery.trim()) return;
+    let hits: number[] = [];
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = (textContent.items as any[]).map(it => it.str).join(" ");
+      if (pageText.toLowerCase().includes(searchQuery.toLowerCase())) {
+        hits.push(i);
+      }
+    }
+    setSearchHits(hits);
+    if (hits.length) goToPage(hits[0]);
+  };
+
+  // Перерендер сторінки при переході
+  useEffect(() => {
+    if (pdfDoc) {
+      renderPage(pdfDoc, pageNumber);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdfDoc, pageNumber]);
 
   return (
-    <div className="mx-auto max-w-2xl p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Flipbook Editor</h1>
-
-      <form onSubmit={onPublish} className="space-y-4">
-        <div>
-          <label className="block text-sm mb-1">PDF URL *</label>
-          <input
-            className="w-full border rounded px-3 py-2"
-            placeholder="https://.../source.pdf"
-            value={pdfUrl}
-            onChange={(e) => setPdfUrl(e.target.value)}
-            required
-            inputMode="url"
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Тимчасово використовуємо вже доступний URL PDF (без аплоаду). Пізніше можна підключити R2.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
+    <div className="flipbook-editor-wrapper" style={{ maxWidth: 920, margin: "0 auto", padding: "2rem" }}>
+      <h1>Flipbook Editor</h1>
+      <div>
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+        />
+      </div>
+      {pdfDoc && (
+        <div style={{ marginTop: "1rem", display: "flex", gap: 24 }}>
           <div>
-            <label className="block text-sm mb-1">Title</label>
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="Directory 2025 — Health Services"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
+            <canvas ref={canvasRef} style={{ border: "1px solid #aaa", width: 600, height: 800, background: "#fff" }} />
 
-          <div>
-            <label className="block text-sm mb-1">Slug *</label>
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="health-services"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              required
-              pattern="^[a-z0-9-]+$"
-              title="Тільки a-z, 0-9, дефіс"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1">Meta description</label>
-          <textarea
-            className="w-full border rounded px-3 py-2"
-            rows={3}
-            placeholder="Short SEO description for the published page"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div className="flex gap-3 items-center">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded bg-black text-white px-4 py-2 disabled:opacity-60"
-          >
-            {submitting ? "Publishing..." : "Publish"}
-          </button>
-
-          {pdfUrl && (
-            <a
-              href={previewHref}
-              target="_blank"
-              rel="noopener"
-              className="rounded border px-4 py-2"
-            >
-              Preview in Viewer
-            </a>
-          )}
-        </div>
-      </form>
-
-      {result && (
-        <div className="rounded border p-4 bg-neutral-50">
-          {result.error ? (
-            <p className="text-red-600">Error: {result.error}</p>
-          ) : result.ok ? (
-            <div className="space-y-2">
-              <p className="text-green-700 font-medium">Published successfully.</p>
-              {result.urlPath && (
-                <p>
-                  URL:&nbsp;
-                  <a className="text-blue-700 underline" href={result.urlPath} target="_blank" rel="noopener">
-                    {result.urlPath}
-                  </a>
-                </p>
+            <div style={{ marginTop: 10 }}>
+              <button onClick={() => goToPage(1)} disabled={pageNumber === 1}>Перша</button>
+              <button onClick={() => goToPage(pageNumber - 1)} disabled={pageNumber === 1}>Назад</button>
+              <span style={{ margin: "0 16px" }}>
+                Сторінка {pageNumber} із {numPages}
+              </span>
+              <button onClick={() => goToPage(pageNumber + 1)} disabled={pageNumber === numPages}>Вперед</button>
+              <button onClick={() => goToPage(numPages)} disabled={pageNumber === numPages}>Остання</button>
+              <button onClick={addBookmark}>Закладка</button>
+            </div>
+            <div style={{ marginTop: 15 }}>
+              <input
+                type="text"
+                placeholder="Пошук по PDF"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: 180 }}
+              />
+              <button onClick={handleSearch}>Пошук</button>
+              {searchHits.length > 0 && (
+                <span style={{ marginLeft: 12 }}>
+                  Знайдено на сторінках: {searchHits.join(", ")}
+                </span>
               )}
             </div>
-          ) : null}
+          </div>
+          <div>
+            <h3>Закладки</h3>
+            <ul>
+              {bookmarks.map(bm => (
+                <li key={bm.id}>
+                  <button style={{ color: bm.color }} onClick={() => goToPage(bm.page)}>
+                    {bm.title} (стор. {bm.page})
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>
