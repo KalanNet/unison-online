@@ -1,14 +1,10 @@
-// app/secure/editor/ClientEditor.tsx
-
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
 import { GlobalWorkerOptions, getDocument, PDFDocumentProxy } from "pdfjs-dist";
 
-// Ось тут ми явно задаємо шлях до воркера
 GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
-// Тип для закладок
 type Bookmark = {
   id: string;
   page: number;
@@ -105,7 +101,6 @@ export default function ClientEditor() {
     if (hits.length) goToPage(hits[0]);
   };
 
-  // Перерендер сторінки при переході
   useEffect(() => {
     if (pdfDoc) {
       renderPage(pdfDoc, pageNumber);

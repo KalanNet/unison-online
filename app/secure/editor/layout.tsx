@@ -1,19 +1,16 @@
 "use client";
-
+import type { ReactNode } from "react";
 import { useEffect } from "react";
 
-export default function DirectoryLayout({ children }: { children: React.ReactNode }) {
-  // Splash logic — БЕЗ Script!
+export default function DirectoryLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
-      // Lock scroll and splash
       var s = document.createElement('style');
       s.id = 'pv-lock-style';
       s.textContent = 'html{overflow:hidden !important}';
       document.head.appendChild(s);
     } catch (e) {}
 
-    // Splash hide logic
     try {
       var splash = document.getElementById('pv-boot-splash');
       function unlock() {
@@ -27,11 +24,10 @@ export default function DirectoryLayout({ children }: { children: React.ReactNod
         var img = splash.querySelector('.pv-logo');
         if (img) {
           img.addEventListener('animationend', function(ev){
-  if (ev && (ev as AnimationEvent).animationName === 'logo-scan') {
-    setTimeout(close, 400);
-  }
-}, { once:true });
-
+            if (ev && (ev as AnimationEvent).animationName === 'logo-scan') {
+              setTimeout(close, 400);
+            }
+          }, { once:true });
         }
         setTimeout(close, 2200);
       } else {
