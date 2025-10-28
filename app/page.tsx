@@ -3,7 +3,6 @@ export const dynamic = "force-static";
 
 import type { Metadata } from "next";
 import Image from "next/image";
-import nextDynamic from "next/dynamic"; // ← уникаємо конфлікту з export const dynamic
 
 import Reveal from "./components/Reveal";
 import CountUp from "./components/CountUp";

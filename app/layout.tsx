@@ -16,7 +16,6 @@ const geistMono = Geist_Mono({
 });
 
 /* ---------- Site URLs ---------- */
-// Укажи домен у .env: NEXT_PUBLIC_SITE_URL=https://unison-online-dev.pages.dev
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://unison-online-dev.pages.dev";
 
@@ -46,9 +45,7 @@ export const metadata: Metadata = {
       "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
     images: ["/og.jpg"],
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
+  icons: { icon: "/favicon.ico" },
 };
 
 /* ---------- Viewport / theme ---------- */
@@ -57,7 +54,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   colorScheme: "light dark",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#111827" }, // zinc-900
+    { media: "(prefers-color-scheme: light)", color: "#111827" },
     { media: "(prefers-color-scheme: dark)", color: "#0b0b0b" },
   ],
 };
@@ -71,12 +68,15 @@ export default function RootLayout({
   return (
     <html lang="en-CA" suppressHydrationWarning>
       <head>
-        {/* Speed up first connection to external assets (logo, etc.) */}
-        <link rel="preconnect" href="https://unisonalberta.com" crossOrigin="" />
+        {/* швидший TLS рукостиск з доменом логотипів/зовнішніх ресурсів */}
+        <link rel="preconnect" href="https://unisonalberta.com" crossOrigin="anonymous" />
+        {/* Не додаємо ручний preload картинки: Next/Image з `priority` зробить це сам */}
       </head>
+
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
         <main className="flex-1">{children}</main>
 
+        {/* мінімальний футер */}
         <footer
           className="border-t py-3"
           style={{
@@ -104,4 +104,3 @@ export default function RootLayout({
     </html>
   );
 }
-
