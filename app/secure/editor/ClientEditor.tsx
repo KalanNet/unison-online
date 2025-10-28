@@ -4,11 +4,9 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { GlobalWorkerOptions, getDocument, PDFDocumentProxy } from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.js";
 
-
-// Вказуємо pdfjs використовувати worker
-GlobalWorkerOptions.workerSrc = workerSrc;
+// Ось тут ми явно задаємо шлях до воркера
+GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 // Тип для закладок
 type Bookmark = {
@@ -52,21 +50,20 @@ export default function ClientEditor() {
 
   // Рендер сторінки в Canvas
   const renderPage = async (doc: PDFDocumentProxy, pageNum: number) => {
-  const page = await doc.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 1.25 });
-  const canvas = canvasRef.current;
-  if (canvas) {
-    const context = canvas.getContext("2d");
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    await page.render({
-      canvasContext: context!,
-      viewport,
-      canvas
-    }).promise;
-  }
-};
-
+    const page = await doc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.25 });
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const context = canvas.getContext("2d");
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      await page.render({
+        canvasContext: context!,
+        viewport,
+        canvas
+      }).promise;
+    }
+  };
 
   // Перехід між сторінками
   const goToPage = (num: number) => {
