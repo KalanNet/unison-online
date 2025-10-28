@@ -1,14 +1,16 @@
 // app/secure/editor/page.tsx
 import type { Metadata } from "next";
-import ClientEditor from "./ClientEditor"; // <— просто імпорт клієнтського компонента
 
-export const dynamic = "force-dynamic";
+export const runtime = "edge";           // <— ДОДАТИ
+export const dynamic = "force-dynamic";  // лишаємо як є
 
-// noindex — внутрішня сторінка
 export const metadata: Metadata = {
   title: "Flipbook Editor",
   robots: { index: false, follow: false, nocache: true },
 };
+
+// Імпортуємо клієнтський компонент напряму — ок
+import ClientEditor from "./ClientEditor";
 
 export default function EditorPage() {
   return <ClientEditor />;
