@@ -1,4 +1,4 @@
-// app/page.tsx (top of file)
+// app/page.tsx
 export const dynamic = "force-static";
 
 import type { Metadata } from "next";
@@ -35,20 +35,13 @@ export default function Home() {
     logo: "https://unisonalberta.com/hubfs/Unison%20Logo.svg",
     sameAs: [OFFICIAL],
     department: [
-      {
-        "@type": "Organization",
-        name: "Unison Alberta Directory",
-        url: "https://unisonalberta.online/directory/2025",
-      },
+      { "@type": "Organization", name: "Unison Alberta Directory", url: "https://unisonalberta.online/directory/2025" },
     ],
   };
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main>
         {/* ===== HEADER ===== */}
@@ -83,7 +76,8 @@ export default function Home() {
                 in Alberta
               </h1>
               <p className="ua-hero__lead">
-                Empowering seniors 50+ to live their best lives through a series of programs and services.
+                Empowering seniors 50+ to live their best lives through
+                a series of programs and services.
               </p>
 
               <div className="ua-hero__cta">
@@ -95,7 +89,7 @@ export default function Home() {
 
             <figure className="ua-heroCard" aria-label="Community highlight">
               <img
-                src="/hero-portrait.png"
+                src="/hero-portrait.webp"  // ← тут виправлено
                 alt=""
                 className="ua-heroCard__img"
                 loading="eager"
