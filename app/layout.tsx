@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 /* ---------- Site URLs ---------- */
-/** Укажи домен у .env: NEXT_PUBLIC_SITE_URL=https://unison-online-dev.pages.dev */
+// Укажи домен у .env: NEXT_PUBLIC_SITE_URL=https://unison-online-dev.pages.dev
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://unison-online-dev.pages.dev";
 
@@ -66,10 +66,39 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const year = new Date().getFullYear();
+
   return (
     <html lang="en-CA" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
+      >
+        <main className="flex-1">{children}</main>
+
+        {/* Minimal footer (стилі та змінні — як у попередньому проєкті) */}
+        <footer
+          className="border-t py-3"
+          style={{
+            background: "linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%)",
+            borderColor: "rgba(255,255,255,.08)",
+            color: "var(--ua-text-inv)",
+          }}
+        >
+          <div className="container flex items-center justify-between gap-2">
+            <span style={{ color: "var(--ua-text-inv)", opacity: 0.9 }}>
+              © {year} Unison Alberta — All rights reserved.
+            </span>
+            <a
+              href="https://skyronis.com"
+              className="credit"
+              rel="noopener"
+              target="_blank"
+              style={{ color: "var(--ua-text-inv)" }}
+            >
+              Built by <strong>Skyron Intelligent Solutions</strong>.
+            </a>
+          </div>
+        </footer>
       </body>
     </html>
   );

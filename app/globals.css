@@ -1,26 +1,229 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+
+
+/* ======= Базові змінні ======= */
+:root{
+  --uni-ink: #2d3018;
+  --uni-orange: #f47e20;
+  --uni-orange-2:#ff9a3a;
+  --uni-cream:#fff4e7;
+
+  --uni-teal:#00647b;
+  --uni-teal-1:#0b585b;
+  --uni-teal-2:#21353a;     /* банер */
+  --uni-teal-3:#0d2f33;
+  --uni-teal-4:#145056;
+
+  --text-light: rgba(255,255,255,.88);
+  --text-dim:   rgba(255,255,255,.66);
+
+  /* HERO palette */
+  --ua-deep: var(--uni-teal-2);
+  --ua-deep-2: #21353a;
+  --ua-accent: var(--uni-orange);
+  --ua-accent-2: #f47e20;
+  --ua-text-inv: #f8faf9;
+
+  /* font weight helpers (Poppins) */
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ===== Base ===== */
+html, body { height: 100%; }
+body{
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  color:var(--uni-ink);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  /* глобально міняємо шрифт на Poppins */
+  font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol", sans-serif;
+}
+main{ flex:1 0 auto; }
+
+/* Утиліти ваги (за потреби в розмітці) */
+.fw-light{ font-weight: var(--fw-light); }
+.fw-regular{ font-weight: var(--fw-regular); }
+.fw-semibold{ font-weight: var(--fw-semibold); }
+.fw-bold{ font-weight: var(--fw-bold); }
+
+/* ===== Helpers ===== */
+.container{ max-width: 1280px; margin-inline:auto; padding-inline: clamp(16px, 3vw, 32px); }
+.ua-container{ max-width: 1560px; margin-inline:auto; padding-inline: clamp(16px, 3vw, 32px); }
+.reveal{ opacity:0; transform: translateY(14px) scale(.98); transition: .6s ease; }
+.reveal.reveal-in{ opacity:1; transform:none; }
+
+/* ===== HEADER (білий) ===== */
+.ua-header{ position:sticky; top:0; z-index:30; background:#fff; border-bottom:1px solid #e9eceb; }
+.ua-header__in{ display:flex; align-items:center; gap:24px; height:68px; }
+.ua-header__brand{ display:inline-flex; align-items:center; gap:12px; text-decoration:none; }
+.ua-header__logo{ height:38px; width:auto; }
+.ua-header__nav{ margin-left:auto; display:flex; gap:16px; }
+.ua-link{ color:#1b1f21; font-weight:var(--fw-semibold); text-decoration:none; }
+.ua-link:hover{ opacity:.85; }
+
+/* ===== HERO ===== */
+.ua-hero{
+  color: #eaf4f2;
+  padding: clamp(72px, 8vw, 122px) 0;
+  background: linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%);
+  position:relative; overflow:hidden;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ширший контейнер ТІЛЬКИ для героя */
+.ua-hero__container{
+  max-width: 1560px;                 /* ширина як у референсі */
+  margin-inline:auto;
+  padding-inline: clamp(16px, 3vw, 32px);
+  overflow: visible;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* сітка: ліворуч копі — 1fr; праворуч арт — auto (натягується своєю шириною) */
+.ua-hero__grid{
+  display:grid;
+  grid-template-columns: minmax(360px, 1.35fr) auto;
+  gap: clamp(28px, 4.6vw, 72px);
+  align-items:center;
 }
+
+@media (max-width: 1100px){
+  .ua-hero__grid{ grid-template-columns: 1fr; }
+}
+
+/* Ліва колонка */
+.ua-hero__left{ padding-block: 6px; }
+.ua-hero__title{
+  font-weight: 900; letter-spacing: -.02em; line-height: 1.03;
+  font-size: clamp(40px, 6.6vw, 68px); margin: 0 0 14px;
+}
+.ua-hero__lead{ max-width: 62ch; color: #d7e6e4; font-size: clamp(15px, 1.6vw, 18px); }
+.ua-hero__cta{ display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; }
+.ua-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  height:46px; padding:0 20px; border-radius:12px; font-weight:var(--fw-bold); border:1px solid transparent; text-decoration:none;
+  box-shadow: 0 10px 26px rgba(0,0,0,.18);
+}
+.ua-btn--dark   { background:#6b7034; color:#fff; }
+.ua-btn--dark:hover{ filter:brightness(1.06); }
+.ua-btn--accent { background: var(--ua-accent); color:#1b0e00; }
+.ua-btn--accent:hover{ background: var(--uni-orange-2); }
+
+/* ===== Правий великий блок (шейп із картинкою) =====
+   — без %; явні піксельні ширини по брейкпоінтах
+   — «виліт» вправо на десктопі */
+.ua-heroCard{
+  position: relative;
+  margin: 0;
+  width: 880px;                      /* було ~1180 — робимо менше */
+  aspect-ratio: 1134 / 409;
+  border-radius: 0 84px 0 84px;
+  overflow: hidden;
+  background: #2a3f3d;
+  box-shadow: 0 22px 56px rgba(0,0,0,.36);
+  isolation: isolate;
+  justify-self: end;
+  margin-right: -24px;               /* легкий “bleed” вправо, менший */
+}
+
+@media (max-width: 1600px){
+  .ua-heroCard{ width: 1080px; margin-right: -56px; }
+}
+@media (max-width: 1440px){
+  .ua-heroCard{ width: 980px;  margin-right: -40px; }
+}
+@media (max-width: 1280px){
+  .ua-heroCard{ width: 880px;  margin-right: -28px; }
+}
+@media (max-width: 1100px){
+  .ua-heroCard{ width: 100%; margin-right: 0; }  /* у стовпчик — зайвих вилітів нема */
+}
+
+/* чітка помаранчева рамка зверху та зліва */
+.ua-heroCard::before{
+  content:"";
+  position:absolute; inset:0;
+  border-top: 8px solid var(--ua-accent-2);
+  border-left: 8px solid var(--ua-accent-2);
+  border-right: 0; border-bottom: 0;
+  border-radius: 0 84px 0 84px;
+  pointer-events:none; z-index:2;
+}
+.ua-heroCard__img{
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover; object-position:center;
+  filter: saturate(1.05) contrast(1.02);
+  z-index:1;
+}
+
+/* смужка метрик (як у референсі) */
+.ua-heroCard__metrics{
+  position:absolute; left:0; right:0; bottom:0;
+  display:flex; align-items:center; justify-content:space-evenly; gap:28px;
+  min-height: 100px;
+  background: linear-gradient(0deg, rgba(22,22,22,.72), rgba(22,22,22,.36));
+  color: #fff; z-index:3;
+}
+.ua-metric{ display:grid; gap:4px; text-align:center; }
+.ua-metric__num{ font-weight:900; font-size: clamp(24px, 3.2vw, 34px); letter-spacing:.2px; }
+.ua-metric__label{ font-size:16px; color: rgba(255,255,255,.85); }
+.ua-dot{ width:6px; height:6px; border-radius:50%; background: rgba(255,153,51,.9); display:inline-block; }
+
+/* ===== DIRECTORY ===== */
+.dir-wrap{
+  background:#fff;
+  color:#2a2e2c;
+  padding: clamp(48px, 6.5vw, 88px) 0;
+}
+.dir-title{
+  font-size: clamp(28px, 4.4vw, 46px);
+  font-weight: 900;
+  color: #1d2b2a;
+  letter-spacing:-.01em;
+}
+.dir-lead{ color: #596163; margin-top: 8px; margin-bottom: 22px; }
+
+.cards-dark{ display:grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 24px; }
+@media (max-width: 960px){ .cards-dark{ grid-template-columns: 1fr; } }
+
+.card-dark{
+  background: #fff4e7;
+  border: 1px solid #e3ecea;
+  border-radius: 16px;
+  padding: 20px 20px 22px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.06);
+}
+.card-dark .year{
+  display:inline-block;
+  background: #f47e20; color:#ffffff; border-radius: 999px;
+  font-weight: 900; padding:.28rem .7rem; margin-bottom:10px; font-size:1rem;
+}
+.card-dark .ctitle{
+  color:#122; font-weight: 900; font-size: clamp(18px, 2.6vw, 26px);
+}
+.card-dark p{ color:#4f5a59; margin-top: 10px; }
+.card-dark code{ color:#0b585b; }
+
+.link-light{ color:#0b585b; font-weight:900; text-decoration:none; }
+.link-light:hover{ text-decoration: underline; }
+
+/* ===== About ===== */
+.about-row{
+  border:1px solid #e9ede3; background:#fff; border-radius:16px; padding:18px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.about-title{ font-weight:900; color: var(--uni-ink); font-size: clamp(18px, 2.6vw, 22px); }
+.btn-ghost{ background:#f7f7f4; border:1px solid #ecefe7; color: var(--uni-ink); padding:.7rem 1rem; border-radius:.8rem; font-weight:var(--fw-semibold); }
+.btn-ghost:hover{ border-color:#d8ddcf; }
+
+/* ===== Footer ===== */
+.site-footer{ margin-top: clamp(32px, 6vw, 56px); border-top:1px solid #ecefe7; background:#fafbf8; }
+.footer-grid{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0; }
+.credit{ color: var(--uni-orange); text-decoration:none; font-weight:var(--fw-bold); }
+.credit:hover{ text-decoration: underline; }
