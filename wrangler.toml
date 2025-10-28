@@ -9,6 +9,8 @@ compatibility_flags = ["nodejs_compat"]
 NEXT_PUBLIC_SITE_URL = "https://unison-online-dev.pages.dev"
 
 # для логіну/міドルвару
+AUTH_COOKIE_NAME = "ua_auth"
+AUTH_COOKIE_TTL_DAYS = "
 AUTH_ALLOWED_HOSTS = "unison-online-dev.pages.dev,unisonalberta.online"
 
 # необов’язково, але корисно
