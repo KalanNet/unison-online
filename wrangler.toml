@@ -3,14 +3,11 @@ pages_build_output_dir = ".vercel/output/static"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
-# ---------- PLAIN TEXT VARS (і для build, і для runtime) ----------
 [vars]
-# для <head> метаданих, посилань тощо
 NEXT_PUBLIC_SITE_URL = "https://unison-online-dev.pages.dev"
 
-# для логіну/міドルвару
 AUTH_COOKIE_NAME = "ua_auth"
-AUTH_COOKIE_TTL_DAYS = "
+AUTH_COOKIE_TTL_DAYS = "7"
 AUTH_ALLOWED_HOSTS = "unison-online-dev.pages.dev,unisonalberta.online"
 
 # необов’язково, але корисно
