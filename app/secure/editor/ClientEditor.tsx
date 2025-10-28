@@ -4,7 +4,8 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { GlobalWorkerOptions, getDocument, PDFDocumentProxy } from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.entry";
+import workerSrc from "pdfjs-dist/build/pdf.worker.js";
+
 
 // Вказуємо pdfjs використовувати worker
 GlobalWorkerOptions.workerSrc = workerSrc;
