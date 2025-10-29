@@ -216,7 +216,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   color: #fff;
   background: #21353a;
   overflow: hidden;
-  padding-top: var(--hdr);
+
   padding-bottom: var(--ftr);
 }
 
