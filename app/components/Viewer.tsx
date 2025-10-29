@@ -1,9 +1,10 @@
 // app/components/Viewer.tsx
-// Fixed header/footer, full-bleed stage (100% W/H), centered cover, links overlay
+// Fixed header/footer, full-bleed stage, responsive FlipBook sized by stage,
+// centered cover on page 1, link overlays, no scrollbars.
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
 import { useViewerController } from "app/secure/editor/useEditorController";
@@ -12,6 +13,8 @@ import EditorFooter from "app/secure/editor/EditorFooter";
 
 // react-pageflip (no SSR)
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
+
+type BookSize = { w: number; h: number };
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // валідація
+  // ---- guards
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -32,7 +35,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       </div>
     );
   }
-
   if (error) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -41,7 +43,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       </div>
     );
   }
-
   if (!ctrl || !ctrl.pdfDoc) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -50,9 +51,56 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     );
   }
 
+  // ============= Responsive sizing driven by STAGE =============
+  // base page aspect (single page)
+  const pageRatio = ctrl.baseSize.w / ctrl.baseSize.h || 0.707; // ~A4 fallback
+
+  // size computed from stage rect
+  const [bookSize, setBookSize] = useState<BookSize>(() => ({ w: ctrl.baseSize.w, h: ctrl.baseSize.h }));
+  const stageEl = useRef<HTMLElement | null>(null);
+
+  // expose ctrl.stageRef -> also store as local ref
+  const setStageRef = (node: HTMLElement | null) => {
+    stageEl.current = node;
+    if (node) (ctrl!.stageRef as any).current = node;
+  };
+
+  useLayoutEffect(() => {
+    if (!stageEl.current) return;
+
+    const ro = new ResizeObserver(() => {
+      const el = stageEl.current!;
+      const cw = el.clientWidth;
+      const ch = el.clientHeight;
+
+      // desired aspect: single page OR spread (two pages next to each other)
+      const isSpread = !ctrl!.single && ctrl!.currentIndex > 0; // after page 1
+      const desiredRatio = isSpread ? pageRatio * 2 : pageRatio;
+
+      // fit-to-contain: max area fitting into stage
+      let width = cw;
+      let height = Math.floor(cw / desiredRatio);
+      if (height > ch) {
+        height = ch;
+        width = Math.floor(ch * desiredRatio);
+      }
+
+      // protect from zeros
+      const w = Math.max(200, Math.floor(width));
+      const h = Math.max(200, Math.floor(height));
+      setBookSize((prev) => (prev.w !== w || prev.h !== h ? { w, h } : prev));
+    });
+
+    ro.observe(stageEl.current);
+    return () => ro.disconnect();
+  }, [ctrl?.single, ctrl?.currentIndex, pageRatio]);
+
+  // Center cover: first page centered as single; when move to page > 0, spread.
+  const showCover = !ctrl.single && ctrl.currentIndex > 0; // only after leaving the cover
+
   return (
     <div className="viewer-app">
-      {/* FIXED HEADER (тільки title + іконки + Publish) */}
+      {/* HEADER (fixed; title + icons + Publish) */}
       <EditorHeader
         title={ctrl.title}
         onSearch={(q) => ctrl!.runSearch(q)}
@@ -64,20 +112,16 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         onPublish={(ctrl as any).openPublish ?? (ctrl as any).handlePublish ?? (() => ctrl!.handleShare())}
       />
 
-      {/* FULL-BLEED STAGE (100% W/H, без відступів) */}
-      <main
-        ref={ctrl.stageRef}
-        className={`stage${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
-        aria-label="Flipbook stage"
-      >
-        <div className="book-wrap">
+      {/* FULL-BLEED STAGE (no padding; owns the sizing) */}
+      <main ref={setStageRef} className={`stage${ctrl.currentIndex === 0 ? " is-cover" : ""}`} aria-label="Flipbook stage">
+        <div className="book-wrap" style={{ width: bookSize.w, height: bookSize.h }}>
           <FlipBook
             ref={ctrl.bookRef}
-            width={ctrl.baseSize.w}
-            height={ctrl.baseSize.h}
-            size="stretch"
-            usePortrait={ctrl.single}
-            showCover={!ctrl.single}
+            width={bookSize.w}
+            height={bookSize.h}
+            size="fixed"               // we pass exact w/h computed from stage
+            usePortrait={ctrl.single || ctrl.currentIndex === 0}
+            showCover={showCover}
             flippingTime={600}
             maxShadowOpacity={0.2}
             drawShadow
@@ -100,12 +144,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                 >
                   {bmp ? (
                     <>
-                      <img
-                        src={bmp.url}
-                        alt={`p${pageNum}`}
-                        data-page-img="true"
-                        className="page-img"
-                      />
+                      <img src={bmp.url} alt={`p${pageNum}`} data-page-img="true" className="page-img" />
                       {links.length
                         ? links.map((L, idx) =>
                             L.href ? (
@@ -139,7 +178,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       </main>
 
-      {/* FIXED FOOTER / TOOLBAR */}
+      {/* FOOTER / TOOLBAR (fixed) */}
       <EditorFooter
         refEl={ctrl.toolbarRef}
         isNarrow={ctrl.isNarrow}
@@ -161,81 +200,65 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* LAYOUT CSS */}
+      {/* Layout CSS */}
       <style jsx global>{`
-        /* Глобальний reset + блокування скролу */
-        html, body { margin:0; height:100%; overflow:hidden; background:#21353a; }
+        /* Hard lock global scroll; we manage everything inside stage */
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #21353a; }
         * { box-sizing: border-box; }
 
         :root { --hdr: 56px; --ftr: 64px; }
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
 
-        .viewer-app { height:100svh; width:100vw; color:#fff; background:#21353a; }
+        .viewer-app { height: 100svh; width: 100vw; color: #fff; background: #21353a; }
 
-        /* Fixed header/footer (компоненти вже мають класи, тут — позиціювання) */
-        .local-header { position:fixed; top:0; left:0; right:0; z-index:100; }
-        .local-footer { position:fixed; bottom:0; left:0; right:0; z-index:90; }
+        /* fixed header/footer */
+        .local-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+        .local-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 90; }
 
-        /* FULL-BLEED STAGE (вся доступна область, без відступів) */
-        .stage{
-          position:fixed;
-          top:var(--hdr);
-          bottom:var(--ftr);
-          left:0; right:0;
-          overflow:hidden;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          /* без падінгів — рівно від хедера до футера і на всю ширину */
+        /* stage occupies exactly the space between them */
+        .stage {
+          position: fixed;
+          top: var(--hdr);
+          bottom: var(--ftr);
+          left: 0; right: 0;
+          overflow: hidden;
+          display: grid;
+          place-items: center;     /* keeps cover perfectly centered */
+          background: #21353a;
+          contain: strict;         /* prevents hover jitters / scrollbars */
         }
 
-        /* Контейнер книги масштабується під stage */
-        .book-wrap{
-          width:100%;
-          height:100%;
-          display:flex;
-          align-items:center;
-          justify-content:center; /* центрує обкладинку */
-          max-width: 1400px; /* запобігає розтягуванню на ультрашироких */
-          margin:0 auto;
+        /* book container gets exact computed size; no padding, no gaps */
+        .book-wrap {
+          display: grid;
+          place-items: center;
+          will-change: width, height;
         }
 
-        /* Сторінка всередині FlipBook */
-        .page{
-          position:relative;
-          width:100%;
-          height:100%;
-          background:#fff;
+        .page { position: relative; width: 100%; height: 100%; background: #fff; }
+        .page-img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          display: block;
+          pointer-events: none;
+          border-radius: 2px;
         }
-        .page-img{
-          width:100%;
-          height:100%;
-          object-fit:contain;
-          pointer-events:none;
-          border-radius:2px;
-          display:block;
-        }
-        .page-loader{ text-align:center; line-height:350px; color:#bbb; }
+        .page-loader { text-align: center; line-height: 350px; color: #bbb; }
 
-        /* Клікабельні зони лінків */
-        .pdf-link{
-          position:absolute;
-          border:0; background:transparent;
-          cursor:pointer; display:block;
-          z-index:3; /* вище за bitmap */
-          /* без outline, щоб не спричиняти скрол модальними ефектами */
+        /* click areas for links */
+        .pdf-link {
+          position: absolute;
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+          display: block;
+          z-index: 3;
         }
-        .pdf-link:focus-visible{ outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
-
-        /* Центрування обкладинки в режимі cover (деякі теми pageflip зміщують вправо) */
-        .stage.is-cover .book-wrap{
-          justify-content:center;
-        }
-        /* усуває випадкові субпіксельні скролбари при hover/анім. */
-        .stage, .book-wrap { contain: layout paint; }
+        .pdf-link:focus-visible { outline: 2px dashed rgba(28,121,228,.6); outline-offset: 1px; }
       `}</style>
 
-      {/* CSS з контролера (рядок) */}
+      {/* controller CSS (string) */}
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );
