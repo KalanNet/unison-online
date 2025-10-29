@@ -1,4 +1,5 @@
-// Source: https://nextjs.org/docs/messages/invalid-styled-jsx-children (fix) + parity with useViewerController
+// app/components/Viewer.tsx
+// Flipbook viewer with sticky header/footer and responsive stage
 
 "use client";
 
@@ -9,7 +10,6 @@ import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
 
-// Динамічний імпорт FlipBook (react-pageflip)
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
@@ -22,15 +22,14 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // Валідність URL
-  if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
-    return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Файл не знайдено або неправильний формат!</h2>
-        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>Будь ласка, передайте коректний PDF через upload або URL.</div>
-      </div>
-    );
-  }
+  const Invalid = (
+    <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
+      <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Файл не знайдено або неправильний формат!</h2>
+      <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>Будь ласка, передайте коректний PDF через upload або URL.</div>
+    </div>
+  );
+
+  if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) return Invalid;
 
   if (error) {
     return (
@@ -53,8 +52,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   const total = ctrl.totalPages;
 
   return (
-    <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "60px 0 0 0" }} className="viewer-root">
-      {/* Header — використовуємо існуючий EditorHeader з валідними пропсами */}
+    <div className="viewer-root">
+      {/* STICKY HEADER */}
       <EditorHeader
         title={ctrl.title}
         page={page}
@@ -71,14 +70,14 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         handleShare={ctrl.handleShare}
       />
 
-      {/* Сцена FlipBook */}
-      <section ref={ctrl.stageRef} style={{ margin: "0 auto", maxWidth: 1060 }}>
-        <div className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
+      {/* RESPONSIVE STAGE */}
+      <section ref={ctrl.stageRef} className="viewer-stage">
+        <div className={`book-outer${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
           <FlipBook
             ref={ctrl.bookRef}
             width={ctrl.baseSize.w}
             height={ctrl.baseSize.h}
-            size="stretch"
+            size="stretch"              // FlipBook підлаштовується під розміри контейнера
             usePortrait={ctrl.single}
             showCover={!ctrl.single}
             flippingTime={600}
@@ -115,7 +114,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       </section>
 
-      {/* Footer / toolbar — використовуємо toolbarRef (а не неіснуючий localFooterRef) */}
+      {/* STICKY FOOTER / TOOLBAR */}
       <ViewerFooter
         refEl={ctrl.toolbarRef}
         isNarrow={ctrl.isNarrow}
@@ -137,7 +136,66 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* Глобальні стилі з контролера — замість styled-jsx */}
+      {/* 1) наші layout-стилі як літерал (styled-jsx ok) */}
+      <style jsx global>{`
+        :root {
+          --hdr: 56px;
+          --ftr: 64px;
+        }
+
+        @media (max-width: 680px) {
+          :root {
+            --hdr: 60px; /* трішки вищий header на мобільних */
+            --ftr: 72px;
+          }
+        }
+
+        .viewer-root {
+          background: #21353a;
+          color: #fff;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* sticky елементи використовують спільні класи з header/footer */
+        .local-header {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+        }
+        .local-footer {
+          position: sticky;
+          bottom: 0;
+          z-index: 40;
+        }
+
+        /* сцена займає весь простір між header і footer */
+        .viewer-stage {
+          flex: 1 1 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px 12px;
+          /* висота не фіксована — flex сам розраховує між sticky блоками */
+        }
+
+        /* контейнер для книги: обмежує ширину і підлаштовує висоту */
+        .book-outer {
+          width: min(100%, 1060px);
+          height: calc(100vh - var(--hdr) - var(--ftr) - 16px); /* 16px = вертикальні padding .viewer-stage */
+          display: flex;
+        }
+
+        /* коли дуже низьке вікно — не вилазимо за край */
+        @media (max-height: 520px) {
+          .book-outer {
+            height: calc(100vh - var(--hdr) - var(--ftr) - 8px);
+          }
+        }
+      `}</style>
+
+      {/* 2) глобальні стилі з контролера (рядок, тому через dangerouslySetInnerHTML) */}
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );
