@@ -1,5 +1,5 @@
 // app/components/Viewer.tsx
-// Sticky header/footer, responsive stage, working pageflip, link overlays
+// Fixed header/footer, centered cover with old is-cover trick, working links & flip animation
 
 "use client";
 
@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 
 import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
-import ViewerFooter from "app/secure/editor/EditorFooter";
+import EditorFooter from "app/secure/editor/EditorFooter";
 
 // react-pageflip (no SSR)
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
@@ -26,48 +26,55 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   // базова перевірка
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Файл не знайдено або неправильний формат!</h2>
-        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>Передай коректний PDF через upload або URL.</div>
+      <div className="viewer-fallback">
+        <h2>Файл не знайдено або неправильний формат!</h2>
+        <div>Передай коректний PDF через upload або URL.</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Помилка перегляду PDF!</h2>
-        <div style={{ color: "#aaa", marginTop: 12 }}>{error}</div>
+      <div className="viewer-fallback">
+        <h2>Помилка перегляду PDF!</h2>
+        <div>{error}</div>
       </div>
     );
   }
 
   if (!ctrl || !ctrl.pdfDoc) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження Flipbook…</h2>
+      <div className="viewer-fallback">
+        <h2>Завантаження Flipbook…</h2>
       </div>
     );
   }
 
-  const page = ctrl.currentIndex + 1;
-  const total = ctrl.totalPages;
+  const linksFor = (pageNum: number) => {
+    const bmp = ctrl!.cacheRef.current.get(pageNum);
+    return {
+      bmp,
+      links: ((bmp?.links as any) ?? []) as Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>,
+    };
+  };
 
   return (
     <div className="viewer-root">
-      {/* ── STICKY HEADER: лише title + іконки + Publish ───────────────────────── */}
-      <EditorHeader
-        title={ctrl.title}
-        onSearch={(q) => ctrl!.runSearch(q)}
-        isSearching={(ctrl as any).searching ?? false}
-        file={file}
-        isFs={ctrl.isFs}
-        toggleFullscreen={ctrl.toggleFullscreen}
-        handleShare={ctrl.handleShare}
-        onPublish={(ctrl as any).openPublish ?? (ctrl as any).handlePublish ?? (() => ctrl!.handleShare())}
-      />
+      {/* FIXED HEADER (без ніяких sticky) */}
+      <div className="fixed-header">
+        <EditorHeader
+          title={ctrl.title}
+          onSearch={(q) => ctrl!.runSearch(q)}
+          isSearching={(ctrl as any).searching ?? false}
+          file={file}
+          isFs={ctrl.isFs}
+          toggleFullscreen={ctrl.toggleFullscreen}
+          handleShare={ctrl.handleShare}
+          onPublish={(ctrl as any).openPublish ?? (ctrl as any).handlePublish ?? (() => ctrl!.handleShare())}
+        />
+      </div>
 
-      {/* ── STAGE (між sticky header/footer) ──────────────────────────────────── */}
+      {/* Сцена рівно між fixed header/footer */}
       <section ref={ctrl.stageRef} className="viewer-stage">
         <div className={`book-outer${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
           <FlipBook
@@ -86,10 +93,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
               const pageNum = i + 1;
-              const bmp = ctrl!.cacheRef.current.get(pageNum);
-              const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
-                (bmp?.links as any) ?? [];
-
+              const { bmp, links } = linksFor(pageNum);
               return (
                 <div
                   key={i}
@@ -105,42 +109,27 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                         data-page-img="true"
                         style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", borderRadius: 2 }}
                       />
-                      {/* overlay для клікабельних посилань */}
-                      {links?.length
-                        ? links.map((L, idx) => {
-                            // L-координати вже у відносних px під розмір рендеру
-                            return L.href ? (
+                      {links.length
+                        ? links.map((L, idx) =>
+                            L.href ? (
                               <a
                                 key={idx}
                                 href={L.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="pdf-link"
-                                style={{
-                                  position: "absolute",
-                                  left: L.x,
-                                  top: L.y,
-                                  width: L.w,
-                                  height: L.h,
-                                }}
+                                style={{ left: L.x, top: L.y, width: L.w, height: L.h }}
                               />
                             ) : (
-                              // внутрішня навігація по PDF
                               <button
                                 key={idx}
                                 className="pdf-link"
                                 title="Go to"
                                 onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                                style={{
-                                  position: "absolute",
-                                  left: L.x,
-                                  top: L.y,
-                                  width: L.w,
-                                  height: L.h,
-                                }}
+                                style={{ left: L.x, top: L.y, width: L.w, height: L.h }}
                               />
-                            );
-                          })
+                            )
+                          )
                         : null}
                     </>
                   ) : (
@@ -153,32 +142,34 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       </section>
 
-      {/* ── STICKY FOOTER / TOOLBAR ──────────────────────────────────────────── */}
-      <ViewerFooter
-        refEl={ctrl.toolbarRef}
-        isNarrow={ctrl.isNarrow}
-        numPages={ctrl.totalPages}
-        currentIndex={ctrl.currentIndex}
-        canPrev={ctrl.canPrev}
-        canNext={ctrl.canNext}
-        goFirst={ctrl.goFirst}
-        goPrev={ctrl.goPrev}
-        goNext={ctrl.goNext}
-        goLast={ctrl.goLast}
-        pageJump={ctrl.pageJump}
-        setPageJump={ctrl.setPageJump}
-        submitJump={ctrl.submitJump}
-        loupeOn={ctrl.loupeOn}
-        setLoupeOn={ctrl.setLoupeOn}
-        loupeState={ctrl.loupe}
-        LOUPE_SIZE={ctrl.LOUPE_SIZE}
-        LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
-      />
+      {/* FIXED FOOTER (без sticky) */}
+      <div className="fixed-footer">
+        <EditorFooter
+          refEl={ctrl.toolbarRef}
+          isNarrow={ctrl.isNarrow}
+          numPages={ctrl.totalPages}
+          currentIndex={ctrl.currentIndex}
+          canPrev={ctrl.canPrev}
+          canNext={ctrl.canNext}
+          goFirst={ctrl.goFirst}
+          goPrev={ctrl.goPrev}
+          goNext={ctrl.goNext}
+          goLast={ctrl.goLast}
+          pageJump={ctrl.pageJump}
+          setPageJump={ctrl.setPageJump}
+          submitJump={ctrl.submitJump}
+          loupeOn={ctrl.loupeOn}
+          setLoupeOn={ctrl.setLoupeOn}
+          loupeState={ctrl.loupe}
+          LOUPE_SIZE={ctrl.LOUPE_SIZE}
+          LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
+        />
+      </div>
 
-      {/* ── Layout CSS + reset ───────────────────────────────────────────────── */}
+      {/* Layout/CSS */}
       <style jsx global>{`
-        /* reset + fix top/bottom gaps */
-        html, body { margin: 0; height: 100%; background: #21353a; }
+        html, body { margin: 0; background:#21353a; }
+        html { scrollbar-gutter: stable both-edges; }
         * { box-sizing: border-box; }
 
         :root {
@@ -190,44 +181,61 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         }
 
         .viewer-root {
-          min-height: 100svh; /* мобільні без адресбару */
-          display: flex;
-          flex-direction: column;
+          min-height: 100vh;
           color: #fff;
           background: #21353a;
         }
 
-        /* sticky */
-        .local-header { position: sticky; top: 0; z-index: 50; }
-        .local-footer { position: sticky; bottom: 0; z-index: 40; }
+        .fixed-header { position: fixed; top: 0; left: 0; right: 0; z-index: 50; }
+        .fixed-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; }
 
-        /* сцена між ними */
         .viewer-stage {
-          flex: 1 1 auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 8px 12px;
+          /* рівно між fixed header/footer */
+          padding-top: var(--hdr);
+          padding-bottom: var(--ftr);
+          min-height: calc(100vh - var(--hdr) - var(--ftr));
+          display: grid;
+          place-items: center;
         }
 
         .book-outer {
           width: min(100%, 1060px);
-          height: calc(100svh - var(--hdr) - var(--ftr) - 16px);
+          height: calc(100vh - var(--hdr) - var(--ftr));
           display: flex;
         }
 
-        /* клікабельні зони посилань */
+        /* Центрована обкладинка — як у старому проекті: контейнер з модифікатором is-cover */
+        .book-outer.is-cover {
+          /* не даємо лівій «порожній» сторінці з'являтись: першу сторінку вирівнюємо по центру */
+        }
+        .book-outer.is-cover .page {
+          margin-left: auto !important;
+          margin-right: auto !important;
+          left: 0 !important;
+          transform: none !important;
+        }
+
+        /* overlay клікабельних лінків над зображенням */
         .pdf-link {
+          position: absolute;
+          z-index: 3;
           border: 0;
           background: transparent;
           cursor: pointer;
           display: block;
+          pointer-events: auto;
         }
         .pdf-link:focus-visible { outline: 2px dashed rgba(28,121,228,.6); outline-offset: 1px; }
+
+        /* fallback blocks */
+        .viewer-fallback {
+          background:#21353a; min-height:100vh; color:#fff;
+          padding:80px 12px; text-align:center;
+        }
+        .viewer-fallback h2 { color:#f4ce69; font-weight:900; font-size:22px; }
       `}</style>
 
-      {/* ctrl.globalCss — це уже готовий CSS-текст з контролера */
-      /* styled-jsx дозволяє <style> з literal; тут — без jsx, бо це plain string */}
+      {/* Глобальний CSS з контролера (оригінальні стилі flipbook, включаючи анімацію) */}
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );

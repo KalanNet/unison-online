@@ -4,7 +4,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-/* ---------- Types ---------- */
 type LoupeState = {
   visible: boolean;
   clientX: number;
@@ -46,37 +45,14 @@ type Props = {
 export default function EditorFooter(p: Props) {
   return (
     <>
-      {/* sticky footer */}
-      <footer
-        ref={p.refEl as any}
-        className="local-footer viewer-toolbar shrink-0 z-20"
-        style={{ position: "sticky", bottom: 0, zIndex: 40 }}
-        role="toolbar"
-        aria-label="Flipbook controls"
-      >
+      <footer ref={p.refEl as any} className="local-footer viewer-toolbar shrink-0 z-20" role="toolbar" aria-label="Flipbook controls">
         <div className="toolbar-inner">
-          <button
-            className={`toolbtn ${p.currentIndex === 0 ? "disabled" : ""}`}
-            onClick={p.goFirst}
-            disabled={p.currentIndex === 0}
-            title="First page"
-            aria-label="First page"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 5v14M20 6l-9 6 9 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <button className={`toolbtn ${p.currentIndex === 0 ? "disabled" : ""}`} onClick={p.goFirst} disabled={p.currentIndex === 0} title="First page" aria-label="First page">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M20 6l-9 6 9 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
 
-          <button
-            className={`toolbtn ${!p.canPrev ? "disabled" : ""}`}
-            onClick={p.goPrev}
-            disabled={!p.canPrev}
-            title="Previous"
-            aria-label="Previous page"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <button className={`toolbtn ${!p.canPrev ? "disabled" : ""}`} onClick={p.goPrev} disabled={!p.canPrev} title="Previous" aria-label="Previous page">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
 
           <div className="page-jump">
@@ -91,73 +67,35 @@ export default function EditorFooter(p: Props) {
               title="Enter page number"
               aria-label="Enter page number"
             />
-            <div className="jump-total">
-              / <span className="jump-total-strong">{p.numPages}</span>
-            </div>
+            <div className="jump-total">/ <span className="jump-total-strong">{p.numPages}</span></div>
             {!p.isNarrow && (
-              <button
-                className="toolbtn slim"
-                onClick={p.submitJump}
-                title="Go"
-                aria-label="Go to page"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M5 12h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                  <path d="M13 5l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <button className="toolbtn slim" onClick={p.submitJump} title="Go" aria-label="Go to page">
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/><path d="M13 5l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             )}
           </div>
 
-          <button
-            className={`toolbtn ${!p.canNext ? "disabled" : ""}`}
-            onClick={p.goNext}
-            disabled={!p.canNext}
-            title="Next"
-            aria-label="Next page"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <button className={`toolbtn ${!p.canNext ? "disabled" : ""}`} onClick={p.goNext} disabled={!p.canNext} title="Next" aria-label="Next page">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
 
-          <button
-            className={`toolbtn ${!p.canNext ? "disabled" : ""}`}
-            onClick={p.goLast}
-            disabled={!p.canNext}
-            title="Last page"
-            aria-label="Last page"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M18 19V5M4 18l9-6-9-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <button className={`toolbtn ${!p.canNext ? "disabled" : ""}`} onClick={p.goLast} disabled={!p.canNext} title="Last page" aria-label="Last page">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 19V5M4 18l9-6-9-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
 
-          <button
-            className={`toolbtn tool-zoom ${p.loupeOn ? "active" : ""}`}
-            onClick={() => p.setLoupeOn((v) => !v)}
-            aria-pressed={p.loupeOn}
-            title={p.loupeOn ? "Disable magnifier" : "Enable magnifier"}
-            aria-label="Toggle magnifier"
-          >
+          <button className={`toolbtn tool-zoom ${p.loupeOn ? "active" : ""}`} onClick={() => p.setLoupeOn((v) => !v)} aria-pressed={p.loupeOn} title={p.loupeOn ? "Disable magnifier" : "Enable magnifier"} aria-label="Toggle magnifier">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" fill="none" />
-              <path d="M20.5 20.5l-4.2-4.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" fill="none"/>
+              <path d="M20.5 20.5l-4.2-4.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
       </footer>
 
       {/* Loupe Portal (desktop only) */}
-      <LoupePortal
-        enabled={!p.isNarrow && p.loupeOn}
-        state={p.loupeState}
-        size={p.LOUPE_SIZE}
-        zoom={p.LOUPE_ZOOM}
-      />
+      <LoupePortal enabled={!p.isNarrow && p.loupeOn} state={p.loupeState} size={p.LOUPE_SIZE} zoom={p.LOUPE_ZOOM} />
 
-      {/* локальні стилі тулбара */}
       <style jsx global>{`
         .viewer-toolbar { background:#ffffffef; backdrop-filter: blur(6px); border-top:1px solid #ecefe7; }
         .toolbar-inner { max-width:980px; margin:0 auto; display:flex; gap:.5rem; align-items:center; justify-content:center; padding:8px 12px; overflow-x:auto; }
@@ -183,26 +121,19 @@ export default function EditorFooter(p: Props) {
   );
 }
 
-/* ---------- Loupe (private) ---------- */
 function LoupePortal(props: { enabled: boolean; state: LoupeState; size: number; zoom: number }) {
   if (typeof document === "undefined") return null;
-
   const { enabled, state, size, zoom } = props;
   if (!enabled || !state.visible || !state.imgRect) return null;
 
   const { clientX, clientY, imgRect, contentW, contentH, offsetX, offsetY, url } = state;
-
   const imgX = Math.max(0, Math.min(contentW, clientX - (imgRect.left + offsetX)));
   const imgY = Math.max(0, Math.min(contentH, clientY - (imgRect.top + offsetY)));
-
   const innerLeft = -(imgX * zoom - size / 2);
   const innerTop  = -(imgY * zoom - size / 2);
 
   return createPortal(
-    <div
-      className="portal-loupe"
-      style={{ left: clientX - size / 2, top: clientY - size / 2, width: size, height: size }}
-    >
+    <div className="portal-loupe" style={{ left: clientX - size / 2, top: clientY - size / 2, width: size, height: size }}>
       <img
         src={url}
         alt=""
