@@ -3,7 +3,6 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-
 import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
@@ -20,7 +19,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // базова перевірка
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -49,46 +47,73 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
   return (
     <div className="viewer-root">
-      {/* ── STICKY HEADER: тільки title + search + fullscreen + share */}
       <EditorHeader
-  title={ctrl.title}
-  onSearch={ctrl.runSearch}
-  isSearching={(ctrl as any).searching ?? false}
-  file={file}
-  isFs={ctrl.isFs}
-  toggleFullscreen={ctrl.toggleFullscreen}
-  handleShare={ctrl.handleShare}
-  onPublish={(ctrl as any).openPublish ?? (ctrl as any).handlePublish ?? (() => ctrl.handleShare())}
-/>
+        title={ctrl.title}
+        onSearch={ctrl.runSearch}
+        isSearching={(ctrl as any).searching ?? false}
+        file={file}
+        isFs={ctrl.isFs}
+        toggleFullscreen={ctrl.toggleFullscreen}
+        handleShare={ctrl.handleShare}
+        onPublish={(ctrl as any).openPublish ?? (ctrl as any).handlePublish ?? (() => ctrl.handleShare())}
+      />
 
-      {/* ── STAGE (між sticky header/footer) ────────────────────── */}
-      <section ref={ctrl.stageRef} className="viewer-stage">
-  <div className={`book-outer${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
-    <FlipBook
-      ref={ctrl.bookRef}
-      width={ctrl.baseSize.w}
-      height={ctrl.baseSize.h}
-      size="stretch"
-      usePortrait={ctrl.single}
-      showCover={!ctrl.single}
-      flippingTime={600}
-      maxShadowOpacity={0.2}
-      drawShadow
-      mobileScrollSupport
-      startPage={ctrl.currentIndex}
-      onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-      style={{ width: "100%", height: "100%" }} // Оновлено!
-    >
+      {/* Сцена між header/footer */}
+      <section
+        ref={ctrl.stageRef}
+        className="viewer-stage"
+        style={{ minHeight: 0, minWidth: 0, display: "flex", flex: "1 1 0", alignItems: "center", justifyContent: "center", overflow: "hidden" }}
+      >
+        <div
+          className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+          style={{
+            transition: "transform 500ms ease-in-out",
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+            height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+            maxWidth: "100vw",
+            maxHeight: "100vh",
+            position: "relative",
+          }}
+        >
+          <FlipBook
+            ref={ctrl.bookRef}
+            width={ctrl.baseSize.w}
+            height={ctrl.baseSize.h}
+            size="stretch"
+            usePortrait={ctrl.single}
+            showCover={!ctrl.single}
+            flippingTime={600}
+            maxShadowOpacity={0.2}
+            drawShadow
+            mobileScrollSupport
+            startPage={ctrl.currentIndex}
+            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+            style={{
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+            }}
+          >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
               const pageNum = i + 1;
               const bmp = ctrl!.cacheRef.current.get(pageNum);
-              const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
-                (bmp?.links as any) ?? [];
+              const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
 
               return (
                 <div
                   key={i}
-                  style={{ width: "100%", height: "100%", background: "#fff", position: "relative" }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: "#fff",
+                    position: "relative"
+                  }}
                   onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
                   onMouseLeave={ctrl!.handlePageMouseLeave}
                 >
@@ -98,9 +123,16 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                         src={bmp.url}
                         alt={`p${pageNum}`}
                         data-page-img="true"
-                        style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", borderRadius: 2 }}
+                        draggable={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          pointerEvents: "none",
+                          borderRadius: 2,
+                          display: "block"
+                        }}
                       />
-                      {/* overlay для клікабельних посилань */}
                       {links?.length
                         ? links.map((L, idx) =>
                             L.href ? (
@@ -146,7 +178,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       </section>
 
-      {/* ── STICKY FOOTER / TOOLBAR ───────────────────────────── */}
       <ViewerFooter
         refEl={ctrl.toolbarRef}
         isNarrow={ctrl.isNarrow}
@@ -168,87 +199,86 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* ── Layout CSS + reset ───────────────────────────── */}
+      {/* СТИЛІ */}
       <style jsx global>{`
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: #21353a;
-    overflow-x: hidden !important;
-  }
-  * { box-sizing: border-box; }
-  :root {
-    --hdr: 56px;
-    --ftr: 64px;
-  }
-  @media (max-width: 680px) {
-    :root { --hdr: 56px; --ftr: 72px; }
-  }
-  .viewer-root {
-    min-height: 100svh;
-    display: flex;
-    flex-direction: column;
-    color: #fff;
-    background: #21353a;
-    padding-top: var(--hdr);
-    padding-bottom: var(--ftr);
-    overflow-x: hidden;
-  }
-  .local-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 102;
-  }
-  .local-footer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 101;
-  }
-  .book-outer {
-  flex: 1 1 0;
-  width: 100%;
-  max-width: 1060px;
-  margin: auto;
-  align-items: center;
-  justify-content: center;
-  display: flex;
-  aspect-ratio: 1.414; /* A4 landscape, змінюй як треба */
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.viewer-stage {
-  position: absolute;
-  top: var(--hdr);
-  bottom: var(--ftr);
-  left: 0; right: 0;
-  width: 100vw;
-  height: calc(100svh - var(--hdr) - var(--ftr));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  overflow: hidden;
-}
-
-  .pdf-link {
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    display: block;
-  }
-  .pdf-link:focus-visible {
-    outline: 2px dashed rgba(28,121,228,.6);
-    outline-offset: 1px;
-  }
-`}
-</style>
-
+        html, body {
+          margin: 0;
+          height: 100%;
+          background: #21353a;
+          overflow: hidden !important;
+        }
+        * { box-sizing: border-box; }
+        :root { --hdr: 56px; --ftr: 64px; }
+        @media (max-width: 680px) {
+          :root { --hdr: 56px; --ftr: 72px; }
+        }
+        .viewer-root {
+          min-height: 100svh;
+          min-width: 100vw;
+          width: 100vw;
+          color: #fff;
+          background: #21353a;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        .local-header {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: var(--hdr);
+          z-index: 120;
+        }
+        .local-footer {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: var(--ftr);
+          z-index: 101;
+        }
+        .viewer-stage {
+          position: absolute;
+          left: 0; right: 0;
+          top: var(--hdr); bottom: var(--ftr);
+          min-height: 0;
+          min-width: 0;
+          width: 100vw;
+          height: calc(100svh - var(--hdr) - var(--ftr));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .book-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto;
+          min-width: 0;
+          min-height: 0;
+          transition: transform 500ms cubic-bezier(.7,0,.2,1);
+        }
+        .book-container.is-cover {
+          transform: translateX(-24%);
+        }
+        @keyframes book-opening {
+          0% { transform: translateX(-24%); }
+          100% { transform: translateX(0); }
+        }
+        .pdf-link {
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+          display: block;
+        }
+        .pdf-link:focus-visible {
+          outline: 2px dashed rgba(28,121,228,.6);
+          outline-offset: 1px;
+        }
+      `}</style>
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );
