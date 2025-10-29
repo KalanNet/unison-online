@@ -30,7 +30,7 @@ export default function ClientEditor() {
   };
 
   return (
-    <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "60px 0 0 0" }}>
+    <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "0 0 0 0" }}>
       {!fileUrl ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 80 }}>
           <h1 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 28, marginBottom: 32 }}>Flipbook Editor</h1>
