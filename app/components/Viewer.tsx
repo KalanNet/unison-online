@@ -59,11 +59,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       />
 
       {/* Сцена між header/footer */}
-      <section
-        ref={ctrl.stageRef}
-        className="viewer-stage"
-        style={{ minHeight: 0, minWidth: 0, display: "flex", flex: "1 1 0", alignItems: "center", justifyContent: "center", overflow: "hidden" }}
-      >
+      <section ref={ctrl.stageRef} className="viewer-stage">
         <div
           className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
           style={{
@@ -213,45 +209,39 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           :root { --hdr: 56px; --ftr: 72px; }
         }
         .viewer-root {
-          min-height: 100svh;
-          min-width: 100vw;
-          width: 100vw;
-          color: #fff;
-          background: #21353a;
-          position: relative;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
+  min-height: 100svh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background: #21353a;
+  overflow: hidden;
+  padding-top: var(--hdr);
+  padding-bottom: var(--ftr);
+}
+
         .local-header {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: var(--hdr);
-          z-index: 120;
-        }
-        .local-footer {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          height: var(--ftr);
-          z-index: 101;
-        }
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--hdr);
+  z-index: 120;
+}
+.local-footer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: var(--ftr);
+  z-index: 101;
+}
         .viewer-stage {
-          position: absolute;
-          left: 0; right: 0;
-          top: var(--hdr); bottom: var(--ftr);
-          min-height: 0;
-          min-width: 0;
-          width: 100vw;
-          height: calc(100svh - var(--hdr) - var(--ftr));
-          display: flex;
-          align-items: flex-start;
-          justify-content: center;
-          overflow: hidden;
-        }
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
         .book-container {
           display: flex;
           align-items: center;
