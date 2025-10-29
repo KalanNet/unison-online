@@ -172,8 +172,9 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   html, body {
     margin: 0;
     height: 100%;
+    width: 100vw;
     background: #21353a;
-    overflow-x: hidden !important;
+    overflow: hidden !important; /* Заборона скролу всюди */
   }
   * { box-sizing: border-box; }
   :root {
@@ -183,42 +184,58 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   @media (max-width: 680px) {
     :root { --hdr: 56px; --ftr: 72px; }
   }
+
   .viewer-root {
-    min-height: 100svh;
-    display: flex;
-    flex-direction: column;
+    height: 100svh;
+    width: 100vw;
     color: #fff;
     background: #21353a;
-    padding-top: var(--hdr);
-    padding-bottom: var(--ftr);
-    overflow-x: hidden;
+    position: relative;
+    overflow: hidden;
   }
+
   .local-header {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 102;
+    top: 0; left: 0; right: 0;
+    height: var(--hdr);
+    z-index: 110;
+    background: #fafbf8;
+    border-bottom: 1px solid #e9ede3;
   }
+
   .local-footer {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
+    height: var(--ftr);
     z-index: 101;
+    background: #fafbf8;
+    border-top: 1px solid #e9ede3;
   }
+
+  /* Сцена рівно між хедером і футером */
   .viewer-stage {
-    flex: 1 1 auto;
+    position: absolute;
+    top: var(--hdr);
+    bottom: var(--ftr);
+    left: 0; right: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 12px;
+    padding: 0;
+    width: 100vw;
+    height: calc(100svh - var(--hdr) - var(--ftr));
+    overflow: hidden; /* Заборона скролу всередині сцени */
   }
+
   .book-outer {
     width: min(100%, 1060px);
-    height: calc(100svh - var(--hdr) - var(--ftr) - 16px);
+    height: 100%; /* Тільки обмеження сцени */
     display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
+
   .pdf-link {
     border: 0;
     background: transparent;
@@ -231,6 +248,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   }
 `}
 </style>
+
 
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
