@@ -1,5 +1,4 @@
-// components/Viewer.tsx
-// Source: migrated from old PublicViewer.tsx / ClientPublicViewer.tsx (flipbook viewer parity)
+// Source: https://nextjs.org/docs/messages/invalid-styled-jsx-children (fix) + parity with useViewerController
 
 "use client";
 
@@ -23,37 +22,19 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // Базова валідація URL
+  // Валідність URL
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
-      <div
-        style={{
-          background: "#21353a",
-          minHeight: "100vh",
-          color: "#fff",
-          padding: "80px 12px",
-          textAlign: "center",
-        }}
-      >
+      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
         <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Файл не знайдено або неправильний формат!</h2>
-        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>
-          Будь ласка, передайте коректний PDF через upload або URL.
-        </div>
+        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>Будь ласка, передайте коректний PDF через upload або URL.</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div
-        style={{
-          background: "#21353a",
-          minHeight: "100vh",
-          color: "#fff",
-          padding: "80px 12px",
-          textAlign: "center",
-        }}
-      >
+      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
         <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Помилка перегляду PDF!</h2>
         <div style={{ color: "#aaa", marginTop: 12 }}>{error}</div>
       </div>
@@ -62,15 +43,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
   if (!ctrl || !ctrl.pdfDoc) {
     return (
-      <div
-        style={{
-          background: "#21353a",
-          minHeight: "100vh",
-          color: "#fff",
-          padding: "80px 12px",
-          textAlign: "center",
-        }}
-      >
+      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
         <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження Flipbook...</h2>
       </div>
     );
@@ -80,11 +53,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   const total = ctrl.totalPages;
 
   return (
-    <div
-      style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "60px 0 0 0" }}
-      className="viewer-root"
-    >
-      {/* Header — використовуємо існуючий EditorHeader з узгодженими пропсами */}
+    <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "60px 0 0 0" }} className="viewer-root">
+      {/* Header — використовуємо існуючий EditorHeader з валідними пропсами */}
       <EditorHeader
         title={ctrl.title}
         page={page}
@@ -113,7 +83,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             showCover={!ctrl.single}
             flippingTime={600}
             maxShadowOpacity={0.2}
-            drawShadow={true}
+            drawShadow
             mobileScrollSupport
             startPage={ctrl.currentIndex}
             onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
@@ -133,20 +103,11 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                       src={bmp.url}
                       alt={`p${pageNum}`}
                       data-page-img="true"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        pointerEvents: "none",
-                        borderRadius: 2,
-                      }}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", borderRadius: 2 }}
                     />
                   ) : (
-                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
-                      Рендер сторінки...
-                    </div>
+                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки...</div>
                   )}
-                  {/* TODO: лінки/підсвітка/закладки (за потреби) */}
                 </div>
               );
             })}
@@ -154,7 +115,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       </section>
 
-      {/* Footer / toolbar */}
+      {/* Footer / toolbar — використовуємо toolbarRef (а не неіснуючий localFooterRef) */}
       <ViewerFooter
         refEl={ctrl.toolbarRef}
         isNarrow={ctrl.isNarrow}
@@ -176,8 +137,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* Глобальні стилі з контролера */}
-      <style jsx global>{ctrl.globalCss}</style>
+      {/* Глобальні стилі з контролера — замість styled-jsx */}
+      <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );
 }
