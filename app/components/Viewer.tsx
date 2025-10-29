@@ -216,32 +216,33 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   color: #fff;
   background: #21353a;
   overflow: hidden;
-
-  padding-bottom: var(--ftr);
 }
 
-        .local-header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
+.local-header {
+  /* ! Немає position: fixed ! */
   height: var(--hdr);
+  min-height: var(--hdr);
   z-index: 120;
 }
+
 .local-footer {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
+  /* ! Немає position: fixed ! */
   height: var(--ftr);
+  min-height: var(--ftr);
   z-index: 101;
 }
-        .viewer-stage {
+
+.viewer-stage {
   flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 0;
-  min-width: 0;
   overflow: hidden;
-  width: 100%;
 }
+
         .book-container {
           display: flex;
           align-items: center;
