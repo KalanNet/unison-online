@@ -248,7 +248,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           width: 100vw;
           height: calc(100svh - var(--hdr) - var(--ftr));
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           overflow: hidden;
         }
