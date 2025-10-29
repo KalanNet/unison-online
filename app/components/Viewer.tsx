@@ -169,44 +169,69 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
       {/* ── Layout CSS + reset ───────────────────────────── */}
       <style jsx global>{`
-        html, body { margin: 0; height: 100%; background: #21353a; }
-        * { box-sizing: border-box; }
-        :root {
-          --hdr: 56px;
-          --ftr: 64px;
-        }
-        @media (max-width: 680px) {
-          :root { --hdr: 56px; --ftr: 72px; }
-        }
-        .viewer-root {
-          min-height: 100svh;
-          display: flex;
-          flex-direction: column;
-          color: #fff;
-          background: #21353a;
-        }
-        .local-header { position: sticky; top: 0; z-index: 50; }
-        .local-footer { position: sticky; bottom: 0; z-index: 40; }
-        .viewer-stage {
-          flex: 1 1 auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 8px 12px;
-        }
-        .book-outer {
-          width: min(100%, 1060px);
-          height: calc(100svh - var(--hdr) - var(--ftr) - 16px);
-          display: flex;
-        }
-        .pdf-link {
-          border: 0;
-          background: transparent;
-          cursor: pointer;
-          display: block;
-        }
-        .pdf-link:focus-visible { outline: 2px dashed rgba(28,121,228,.6); outline-offset: 1px; }
-      `}</style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #21353a;
+    overflow-x: hidden !important;
+  }
+  * { box-sizing: border-box; }
+  :root {
+    --hdr: 56px;
+    --ftr: 64px;
+  }
+  @media (max-width: 680px) {
+    :root { --hdr: 56px; --ftr: 72px; }
+  }
+  .viewer-root {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    color: #fff;
+    background: #21353a;
+    padding-top: var(--hdr);
+    padding-bottom: var(--ftr);
+    overflow-x: hidden;
+  }
+  .local-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 102;
+  }
+  .local-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 101;
+  }
+  .viewer-stage {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+  .book-outer {
+    width: min(100%, 1060px);
+    height: calc(100svh - var(--hdr) - var(--ftr) - 16px);
+    display: flex;
+  }
+  .pdf-link {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    display: block;
+  }
+  .pdf-link:focus-visible {
+    outline: 2px dashed rgba(28,121,228,.6);
+    outline-offset: 1px;
+  }
+`}
+</style>
+
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
   );
