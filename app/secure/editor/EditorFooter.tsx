@@ -1,5 +1,4 @@
-//app/secure/editor/EditorFooter.tsx
-
+// app/secure/editor/EditorFooter.tsx
 "use client";
 
 import React from "react";
@@ -40,15 +39,21 @@ type Props = {
   setLoupeOn: React.Dispatch<React.SetStateAction<boolean>>;
   loupeState: LoupeState;
 
-  // приймаємо від контролера точні імена
   LOUPE_SIZE: number;
   LOUPE_ZOOM: number;
 };
 
-export default function ViewerFooter(p: Props) {
+export default function EditorFooter(p: Props) {
   return (
     <>
-      <footer ref={p.refEl as any} className="viewer-toolbar shrink-0 z-20" role="toolbar" aria-label="Flipbook controls">
+      {/* sticky footer */}
+      <footer
+        ref={p.refEl as any}
+        className="local-footer viewer-toolbar shrink-0 z-20"
+        style={{ position: "sticky", bottom: 0, zIndex: 40 }}
+        role="toolbar"
+        aria-label="Flipbook controls"
+      >
         <div className="toolbar-inner">
           <button
             className={`toolbtn ${p.currentIndex === 0 ? "disabled" : ""}`}
@@ -82,17 +87,20 @@ export default function ViewerFooter(p: Props) {
               className="jump-inp"
               value={p.pageJump}
               onChange={(e) => p.setPageJump(e.target.value.replace(/[^\d]/g, ""))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") p.submitJump();
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") p.submitJump(); }}
               title="Enter page number"
               aria-label="Enter page number"
             />
             <div className="jump-total">
-              / <span className="font-bold text-black">{p.numPages}</span>
+              / <span className="jump-total-strong">{p.numPages}</span>
             </div>
             {!p.isNarrow && (
-              <button className="toolbtn slim" onClick={p.submitJump} title="Go" aria-label="Go to page">
+              <button
+                className="toolbtn slim"
+                onClick={p.submitJump}
+                title="Go"
+                aria-label="Go to page"
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M5 12h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
                   <path d="M13 5l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -141,7 +149,7 @@ export default function ViewerFooter(p: Props) {
         </div>
       </footer>
 
-      {/* Loupe Portal (desktop only — вимикаємо на вузьких) */}
+      {/* Loupe Portal (desktop only) */}
       <LoupePortal
         enabled={!p.isNarrow && p.loupeOn}
         state={p.loupeState}
@@ -149,7 +157,7 @@ export default function ViewerFooter(p: Props) {
         zoom={p.LOUPE_ZOOM}
       />
 
-      {/* CSS локально до тулбара */}
+      {/* локальні стилі тулбара */}
       <style jsx global>{`
         .viewer-toolbar { background:#ffffffef; backdrop-filter: blur(6px); border-top:1px solid #ecefe7; }
         .toolbar-inner { max-width:980px; margin:0 auto; display:flex; gap:.5rem; align-items:center; justify-content:center; padding:8px 12px; overflow-x:auto; }
@@ -161,6 +169,7 @@ export default function ViewerFooter(p: Props) {
         .page-jump { display:flex; align-items:center; gap:.4rem; background:#fff; border:1px solid #e7ebdf; border-radius:.8rem; padding:.2rem .35rem; }
         .jump-inp { width:72px; text-align:center; font-weight:800; border:1px solid #e7ebdf; border-radius:.5rem; padding:.3rem .35rem; color:#2d3018; height:32px; }
         .jump-total { color:#5c6750; }
+        .jump-total-strong { font-weight:800; color:#000; }
 
         @media (max-width: 600px) { .tool-zoom { display:none !important; } }
 
@@ -174,25 +183,26 @@ export default function ViewerFooter(p: Props) {
   );
 }
 
-/* ---------- Loupe (private to footer) ---------- */
-function LoupePortal(props: {
-  enabled: boolean;
-  state: LoupeState;
-  size: number;
-  zoom: number;
-}) {
+/* ---------- Loupe (private) ---------- */
+function LoupePortal(props: { enabled: boolean; state: LoupeState; size: number; zoom: number }) {
   if (typeof document === "undefined") return null;
+
   const { enabled, state, size, zoom } = props;
   if (!enabled || !state.visible || !state.imgRect) return null;
 
   const { clientX, clientY, imgRect, contentW, contentH, offsetX, offsetY, url } = state;
+
   const imgX = Math.max(0, Math.min(contentW, clientX - (imgRect.left + offsetX)));
   const imgY = Math.max(0, Math.min(contentH, clientY - (imgRect.top + offsetY)));
+
   const innerLeft = -(imgX * zoom - size / 2);
   const innerTop  = -(imgY * zoom - size / 2);
 
   return createPortal(
-    <div className="portal-loupe" style={{ left: clientX - size / 2, top: clientY - size / 2, width: size, height: size }}>
+    <div
+      className="portal-loupe"
+      style={{ left: clientX - size / 2, top: clientY - size / 2, width: size, height: size }}
+    >
       <img
         src={url}
         alt=""
