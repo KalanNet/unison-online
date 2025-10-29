@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Viewer from "../../components/Viewer";
+import Viewer from "app/components/Viewer";
  
 export default function ClientEditor() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
