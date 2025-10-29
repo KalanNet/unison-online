@@ -63,21 +63,22 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
       {/* ── STAGE (між sticky header/footer) ────────────────────── */}
       <section ref={ctrl.stageRef} className="viewer-stage">
-        <div className={`book-outer${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
-          <FlipBook
-            ref={ctrl.bookRef}
-            width={ctrl.baseSize.w}
-            height={ctrl.baseSize.h}
-            size="stretch"
-            usePortrait={ctrl.single}
-            showCover={!ctrl.single}
-            flippingTime={600}
-            maxShadowOpacity={0.2}
-            drawShadow
-            mobileScrollSupport
-            startPage={ctrl.currentIndex}
-            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-          >
+  <div className={`book-outer${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}>
+    <FlipBook
+      ref={ctrl.bookRef}
+      width={ctrl.baseSize.w}
+      height={ctrl.baseSize.h}
+      size="stretch"
+      usePortrait={ctrl.single}
+      showCover={!ctrl.single}
+      flippingTime={600}
+      maxShadowOpacity={0.2}
+      drawShadow
+      mobileScrollSupport
+      startPage={ctrl.currentIndex}
+      onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+      style={{ width: "100%", height: "100%" }} // Оновлено!
+    >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
               const pageNum = i + 1;
               const bmp = ctrl!.cacheRef.current.get(pageNum);
@@ -172,9 +173,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   html, body {
     margin: 0;
     height: 100%;
-    width: 100vw;
     background: #21353a;
-    overflow: hidden !important; /* Заборона скролу всюди */
+    overflow-x: hidden !important;
   }
   * { box-sizing: border-box; }
   :root {
@@ -184,57 +184,57 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   @media (max-width: 680px) {
     :root { --hdr: 56px; --ftr: 72px; }
   }
-
   .viewer-root {
-    height: 100svh;
-    width: 100vw;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
     color: #fff;
     background: #21353a;
-    position: relative;
-    overflow: hidden;
+    padding-top: var(--hdr);
+    padding-bottom: var(--ftr);
+    overflow-x: hidden;
   }
-
   .local-header {
     position: fixed;
-    top: 0; left: 0; right: 0;
-    height: var(--hdr);
-    z-index: 110;
-    background: #fafbf8;
-    border-bottom: 1px solid #e9ede3;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 102;
   }
-
   .local-footer {
     position: fixed;
-    left: 0; right: 0; bottom: 0;
-    height: var(--ftr);
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 101;
-    background: #fafbf8;
-    border-top: 1px solid #e9ede3;
   }
-
-  /* Сцена рівно між хедером і футером */
-  .viewer-stage {
-    position: absolute;
-    top: var(--hdr);
-    bottom: var(--ftr);
-    left: 0; right: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    width: 100vw;
-    height: calc(100svh - var(--hdr) - var(--ftr));
-    overflow: hidden; /* Заборона скролу всередині сцени */
-  }
-
   .book-outer {
-    width: min(100%, 1060px);
-    height: 100%; /* Тільки обмеження сцени */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
+  flex: 1 1 0;
+  width: 100%;
+  max-width: 1060px;
+  margin: auto;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+  aspect-ratio: 1.414; /* A4 landscape, змінюй як треба */
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.viewer-stage {
+  position: absolute;
+  top: var(--hdr);
+  bottom: var(--ftr);
+  left: 0; right: 0;
+  width: 100vw;
+  height: calc(100svh - var(--hdr) - var(--ftr));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
 
   .pdf-link {
     border: 0;
@@ -248,7 +248,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   }
 `}
 </style>
-
 
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
