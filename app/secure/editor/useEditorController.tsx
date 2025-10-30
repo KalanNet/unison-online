@@ -441,6 +441,43 @@ useEffect(() => {
     } catch {}
   }
 
+  /* ---------- bookmarks & meta ---------- */
+type Bookmark = { id: string; page: number; label: string };
+
+const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+const [meta, setMetaState] = useState<{ title: string; description: string; featuredUrl?: string | null }>({
+  title: (title || "").trim(),
+  description: "",
+  featuredUrl: null,
+});
+
+// helpers
+function setMeta(next: Partial<typeof meta>) { setMetaState((m) => ({ ...m, ...next })); }
+function setFeatured(url?: string | null)     { setMetaState((m) => ({ ...m, featuredUrl: url ?? null })); }
+
+function addBookmark(page?: number, label?: string) {
+  const p = page ?? (currentIndex + 1);
+  const safe = pdfDoc ? Math.max(1, Math.min(pdfDoc.numPages, p)) : p;
+  setBookmarks((list) => [...list, { id: genId(), page: safe, label: (label || `Page ${safe}`).trim() }]);
+}
+function removeBookmark(id: string) { setBookmarks((list) => list.filter((b) => b.id !== id)); }
+function goToBookmark(id: string)   { const b = bookmarks.find((x) => x.id === id); if (b) goToPage(b.page); }
+
+/** Публікація: відправляє meta.json у R2 (через ваш API) */
+async function publishMetaAndBookmarks() {
+  const payload = {
+    file,  // PDF URL (бекенд сам визначить ключ для R2 за вашим правилом)
+    meta: { title: meta.title?.trim() || "", description: meta.description?.trim() || "", featuredUrl: meta.featuredUrl || null },
+    bookmarks: bookmarks.map((b) => ({ id: b.id, page: b.page, label: b.label })),
+  };
+  await fetch("/api/publish-meta", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+
   /* ---------- derived ---------- */
   const totalPages = pdfDoc?.numPages ?? 0;
   const baseSize = useMemo(() => ({ w: pageW, h: pageH }), [pageW, pageH]);
@@ -502,7 +539,12 @@ return {
   toggleFullscreen, handleShare,
   // css
   globalCss,
+  bookmarks, addBookmark, removeBookmark, goToBookmark,
+  meta, setMeta, setFeatured,
+  publishMetaAndBookmarks,
+  
   title: title || file || "",   // --- ось цей рядок!
+  
 };
 
 }
