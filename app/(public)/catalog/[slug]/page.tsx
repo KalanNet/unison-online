@@ -1,11 +1,11 @@
-// app/(public)/catalog/[slug]/page.tsx
+// app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
-const R2_ALIAS   = `${R2_PUBLIC}/_catalog/slug`;
+const R2_PUBLIC =
+  process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
 type MetaPayload = {
@@ -25,20 +25,18 @@ async function fetchJson<T = unknown>(url: string): Promise<T | null> {
   }
 }
 
-/** 1) повний дубль → 2) аліас-покажчик → 3) “класичні” шляхи навколо PDF */
+/** Основна розв'язка slug -> meta.json
+ * 1) /directory/<slug>/meta.json (новий стандарт)
+ * 2) легасі-фолбеки на випадок старих публікацій
+ */
 async function resolveBySlug(slug: string): Promise<MetaPayload | null> {
-  // ① full-мета, яку ми теж пишемо в /api/publish
-  const full = await fetchJson<MetaPayload>(`${R2_ALIAS}/${slug}.full.json`);
-  if (full?.file) return full;
+  // ① новий стандарт
+  const primary = await fetchJson<MetaPayload>(
+    `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`
+  );
+  if (primary?.file) return primary;
 
-  // ② легкий аліас → { href } → справжній meta.json
-  const alias = await fetchJson<{ href?: string }>(`${R2_ALIAS}/${slug}.json`);
-  if (alias?.href) {
-    const meta = await fetchJson<MetaPayload>(alias.href);
-    if (meta?.file) return meta;
-  }
-
-  // ③ резервні варіанти як у попередній версії
+  // ② легасі-фолбеки (залишаємо на випадок старих завантажень)
   const candidates = [
     `${R2_PUBLIC}/catalog/${slug}/meta.json`,
     `${R2_PUBLIC}/${slug}/meta.json`,
@@ -64,10 +62,13 @@ export async function generateMetadata({
 
   const titleBase =
     data?.meta?.title ||
-    (typeof searchParams.title === "string" ? (searchParams.title as string) : `Catalog — ${params.slug}`);
+    (typeof searchParams.title === "string"
+      ? (searchParams.title as string)
+      : `Directory — ${params.slug}`);
 
   const description = data?.meta?.description || "Unison Alberta directory viewer.";
-  const ogImg = data?.meta?.featuredUrl || "https://unison-online-dev.pages.dev/og.jpg";
+  const ogImg =
+    data?.meta?.featuredUrl || "https://unison-online-dev.pages.dev/og.jpg";
 
   return {
     title: titleBase,
@@ -78,7 +79,7 @@ export async function generateMetadata({
 }
 
 /* ---------- page ---------- */
-export default async function CatalogPublicPage({
+export default async function DirectoryPublicPage({
   params,
   searchParams,
 }: {
@@ -87,7 +88,7 @@ export default async function CatalogPublicPage({
 }) {
   const data = await resolveBySlug(params.slug);
 
-  // фолбек: дозволяємо ?file=<pdf-url> навіть без meta.json
+  // Фолбек: ?file=<pdf-url> дозволений навіть без meta.json
   if (!data && typeof searchParams.file === "string" && searchParams.file) {
     const PublicViewer = (await import("app/public/PublicViewer")).default;
     return <PublicViewer file={searchParams.file} title="Preview" />;
@@ -107,7 +108,5 @@ export default async function CatalogPublicPage({
 
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title || params.slug;
-
-  // ВАЖЛИВО: передаємо лише підтримувані пропси
   return <PublicViewer file={data.file} title={title} />;
 }
