@@ -1,13 +1,12 @@
-// app/public/PublicViewer.tsx
 "use client";
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { useViewerController } from "app/secure/editor/useEditorController";
-import EditorHeader from "app/secure/editor/EditorHeader";
-import ViewerFooter from "app/secure/editor/EditorFooter";
+import { useViewerController } from "../secure/editor/useEditorController";
+import EditorHeader from "../secure/editor/EditorHeader";
+import ViewerFooter from "../secure/editor/EditorFooter";
 
-// Використовуємо той же FlipBook, що й в редакторі
+// той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 export default function PublicViewer({ file, title }: { file: string; title?: string }) {
@@ -20,7 +19,6 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // Базові стани/помилки
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -47,22 +45,17 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
 
   return (
     <div className="viewer-root">
-      {/* Хедер без кнопки Publish: просто не передаємо onPublish */}
       <EditorHeader
-  title={ctrl.title}
-  onSearch={ctrl.runSearch}
-  isSearching={(ctrl as any).searching ?? false}
-  file={file}
-  isFs={ctrl.isFs}
-  toggleFullscreen={ctrl.toggleFullscreen}
-  handleShare={ctrl.handleShare}
-  onPublish={() => { /* no-op on public page */ }}   // ← додано, щоб задовольнити типи
-/>
+        title={ctrl.title}
+        onSearch={ctrl.runSearch}
+        isSearching={(ctrl as any).searching ?? false}
+        file={file}
+        isFs={ctrl.isFs}
+        toggleFullscreen={ctrl.toggleFullscreen}
+        handleShare={ctrl.handleShare}
+        onPublish={() => {}} // прибито на публічній сторінці
+      />
 
-
-      {/* НІЯКОЇ лівої панелі/закладок тут немає */}
-
-      {/* Сцена між header/footer */}
       <section ref={ctrl.stageRef} className="viewer-stage">
         <div
           className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
@@ -187,7 +180,6 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* Глобальні стилі для публічного в’ювера */}
       <style jsx global>{`
         html, body { margin: 0; height: 100%; background: #21353a; overflow: hidden !important; }
         * { box-sizing: border-box; }
@@ -195,11 +187,9 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
         .viewer-root { min-height: 100svh; width: 100vw; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
         .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
-        /* Приховати Publish на публічному в'ювері */
-button[aria-label="Publish"] { display: none !important; }
-
+        button[aria-label="Publish"] { display: none !important; }
         .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
-        .viewer-stage { flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justifyContent: center; overflow: hidden; }
+        .viewer-stage { flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
         .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }

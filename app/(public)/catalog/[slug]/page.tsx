@@ -1,46 +1,58 @@
 // app/(public)/catalog/[slug]/page.tsx
 import type { Metadata } from "next";
+
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
+const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
+const R2_ALIAS   = `${R2_PUBLIC}/_catalog/slug`;
 
-/* ---------- helpers ---------- */
+type Bookmark = { id: string; page: number; label: string; color?: string | null };
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
-  bookmarks?: Array<{ id: string; page: number; label: string; color?: string | null }>;
-  file?: string;
+  bookmarks?: Bookmark[];
+  file?: string;                 // PDF public URL
+  publishedAt?: string;
 };
 
-async function tryFetch(url: string) {
+async function fetchJson<T = unknown>(url: string): Promise<T | null> {
   try {
-    const r = await fetch(url, { next: { revalidate: 0 } });
+    const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) return null;
-    return (await r.json()) as MetaPayload;
+    return (await r.json()) as T;
   } catch {
     return null;
   }
 }
 
-/** Спроба розв’язати slug у кілька шаблонів шляхів */
-async function resolveBySlug(slug: string): Promise<{ payload: MetaPayload | null; source: string | null }> {
-  const candidates = [
-    // 1) /catalog/<slug>/meta.json
-    `${R2_PUBLIC_URL}/catalog/${slug}/meta.json`,
-    // 2) /<slug>/meta.json
-    `${R2_PUBLIC_URL}/${slug}/meta.json`,
-    // 3) /<slug>.meta.json (кейс, коли meta лежить поряд із PDF на корені)
-    `${R2_PUBLIC_URL}/${slug}.meta.json`,
-  ];
+/** 1) повний дубль → 2) аліас-покажчик → 3) “класичні” шляхи навколо PDF */
+async function resolveBySlug(slug: string): Promise<MetaPayload | null> {
+  // ① full-мета, яку ми теж пишемо в /api/publish
+  const full = await fetchJson<MetaPayload>(`${R2_ALIAS}/${slug}.full.json`);
+  if (full?.file) return full;
 
-  for (const url of candidates) {
-    const payload = await tryFetch(url);
-    if (payload?.file) return { payload, source: url };
+  // ② легкий аліас → { href } → справжній meta.json
+  const alias = await fetchJson<{ href?: string }>(`${R2_ALIAS}/${slug}.json`);
+  if (alias?.href) {
+    const meta = await fetchJson<MetaPayload>(alias.href);
+    if (meta?.file) return meta;
   }
-  return { payload: null, source: null };
+
+  // ③ резервні варіанти як у попередній версії
+  const candidates = [
+    `${R2_PUBLIC}/catalog/${slug}/meta.json`,
+    `${R2_PUBLIC}/${slug}/meta.json`,
+    `${R2_PUBLIC}/${slug}.meta.json`,
+  ];
+  for (const url of candidates) {
+    const payload = await fetchJson<MetaPayload>(url);
+    if (payload?.file) return payload;
+  }
+
+  return null;
 }
 
-/* ---------- generateMetadata ---------- */
+/* ---------- metadata ---------- */
 export async function generateMetadata({
   params,
   searchParams,
@@ -48,64 +60,54 @@ export async function generateMetadata({
   params: { slug: string };
   searchParams: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const slug = params.slug;
-  // спробувати отримати meta.json
-  const { payload } = await resolveBySlug(slug);
+  const data = await resolveBySlug(params.slug);
 
-  const title =
-    payload?.meta?.title ||
-    (typeof searchParams["title"] === "string" ? (searchParams["title"] as string) : undefined) ||
-    `Catalog — ${slug}`;
+  const titleBase =
+    data?.meta?.title ||
+    (typeof searchParams.title === "string" ? (searchParams.title as string) : `Catalog — ${params.slug}`);
 
-  const description =
-    payload?.meta?.description ||
-    "Unison Alberta directory viewer.";
-
-  const openGraphImages: string[] = [];
-  if (payload?.meta?.featuredUrl) openGraphImages.push(payload.meta.featuredUrl);
+  const description = data?.meta?.description || "Unison Alberta directory viewer.";
+  const ogImg = data?.meta?.featuredUrl || "https://unison-online-dev.pages.dev/og.jpg";
 
   return {
-    title,
+    title: titleBase,
     description,
-    openGraph: {
-      title,
-      description,
-      images: openGraphImages.length ? openGraphImages.map((u) => ({ url: u })) : undefined,
-    },
+    openGraph: { title: titleBase, description, images: [ogImg] },
+    twitter: { card: "summary_large_image", title: titleBase, description, images: [ogImg] },
   };
 }
 
-/* ---------- Page ---------- */
-export default async function Page({
+/* ---------- page ---------- */
+export default async function CatalogPublicPage({
   params,
   searchParams,
 }: {
   params: { slug: string };
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const slug = params.slug;
+  const data = await resolveBySlug(params.slug);
 
-  // 1) спроба знайти meta.json за slug
-  const { payload } = await resolveBySlug(slug);
+  // фолбек: дозволяємо ?file=<pdf-url> навіть без meta.json
+  if (!data && typeof searchParams.file === "string" && searchParams.file) {
+    const PublicViewer = (await import("app/public/PublicViewer")).default;
+    return <PublicViewer file={searchParams.file} title="Preview" />;
+  }
 
-  // 2) якщо meta.json не знайдено — дозволяємо ручний ?file=
-  const fallbackFile = typeof searchParams["file"] === "string" ? (searchParams["file"] as string) : "";
-  const file = payload?.file || fallbackFile;
-
-  if (!file) {
+  if (!data?.file) {
     return (
       <div style={{ padding: 24 }}>
         <h2>Not found</h2>
-        <p>No meta.json found for slug “{slug}”. You can still pass <code>?file=&lt;pdf-url&gt;</code>.</p>
+        <p>
+          No meta.json found for slug “{params.slug}”. You can still pass{" "}
+          <code>?file=&lt;pdf-url&gt;</code>.
+        </p>
       </div>
     );
   }
 
-  const title = payload?.meta?.title || (typeof searchParams["title"] === "string" ? (searchParams["title"] as string) : undefined) || slug;
+  const PublicViewer = (await import("app/public/PublicViewer")).default;
+  const title = data.meta?.title || params.slug;
 
-  // Імпортуємо клієнтський в’ювер лише тут (уникаємо SSR помилок)
-  const PublicViewer = (await import("@/app/public/PublicViewer")).default;
-
-  // ВАЖЛИВО: не передаємо metaFromJson / bookmarksFromJson, щоб не ламати існуючий компонент
-  return <PublicViewer file={file} title={title} />;
+  // ВАЖЛИВО: передаємо лише підтримувані пропси
+  return <PublicViewer file={data.file} title={title} />;
 }

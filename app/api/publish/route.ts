@@ -35,10 +35,10 @@ function extractFromPdfUrl(pdfUrl: string) {
   if (!key) return null;
 
   const lastSlash = key.lastIndexOf("/");
-  const dir = lastSlash >= 0 ? key.slice(0, lastSlash) : "";            // "" якщо на корені
-  const fileName = lastSlash >= 0 ? key.slice(lastSlash + 1) : key;     // "file.pdf"
+  const dir = lastSlash >= 0 ? key.slice(0, lastSlash) : ""; // "" якщо на корені
+  const fileName = lastSlash >= 0 ? key.slice(lastSlash + 1) : key; // "file.pdf"
   const dot = fileName.lastIndexOf(".");
-  const baseNoExt = dot >= 0 ? fileName.slice(0, dot) : fileName;       // "file"
+  const baseNoExt = dot >= 0 ? fileName.slice(0, dot) : fileName; // "file"
 
   return { key, dir, baseNoExt };
 }
@@ -57,10 +57,11 @@ function slugify(input: string): string {
 
 function inferExtFromMime(mime: string | undefined | null) {
   if (!mime) return ".png";
-  if (mime.includes("png")) return ".png";
-  if (mime.includes("jpeg") || mime.includes("jpg")) return ".jpg";
-  if (mime.includes("webp")) return ".webp";
-  if (mime.includes("gif")) return ".gif";
+  const m = mime.toLowerCase();
+  if (m.includes("png")) return ".png";
+  if (m.includes("jpeg") || m.includes("jpg")) return ".jpg";
+  if (m.includes("webp")) return ".webp";
+  if (m.includes("gif")) return ".gif";
   return ".png";
 }
 
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
       file = body?.file || body?.pdfUrl || "";
       meta = body?.meta || {};
       bookmarks = Array.isArray(body?.bookmarks) ? body.bookmarks : [];
-      // у JSON режимі зображення не прикріплюємо — очікуємо готовий URL у meta.featuredUrl
+      // у JSON режимі очікуємо готовий URL у meta.featuredUrl (featuredFile не передаємо)
     } else if (ctype.includes("multipart/form-data")) {
       const fd = await req.formData();
       file = String(fd.get("file") || fd.get("pdfUrl") || "");
@@ -131,6 +132,7 @@ export async function POST(req: NextRequest) {
           Key: featuredKey,
           Body: new Uint8Array(arr), // Edge-safe
           ContentType: featuredFile.type || "image/png",
+          CacheControl: "public, max-age=31536000, immutable",
         })
       );
       featuredPublicUrl = `${R2_PUBLIC_URL}/${featuredKey}`;
@@ -149,14 +151,16 @@ export async function POST(req: NextRequest) {
       bookmarks: Array.isArray(bookmarks)
         ? bookmarks.map((b) => ({
             id: String(b.id || ""),
-            page: Number(b.page || 1),
+            page: Number.isFinite(Number(b.page)) ? Number(b.page) : 1,
             label: String(b.label || "").trim() || `Page ${Number(b.page || 1)}`,
             color: b.color ?? null,
           }))
         : [],
       file, // PDF public URL
+      publishedAt: new Date().toISOString(),
     };
 
+    // Записуємо meta.json (основний артефакт)
     await s3.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET,
@@ -167,12 +171,41 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    /* ---------- АЛІАСИ ДЛЯ ПУБЛІЧНОЇ СТОРІНКИ /catalog/[slug] ---------- */
+    // ① легкий покажчик -> посилання на справжній meta.json
+    const aliasKey = `_catalog/slug/${finalSlug}.json`;
+    const aliasBody = JSON.stringify({ href: `${R2_PUBLIC_URL}/${metaJsonKey}` }, null, 2);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: aliasKey,
+        Body: aliasBody,
+        ContentType: "application/json; charset=utf-8",
+        CacheControl: "no-cache",
+      })
+    );
+
+    // ② (необов’язково) повний дубль мета-даних — зручно як кеш або фолбек
+    const aliasFullKey = `_catalog/slug/${finalSlug}.full.json`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: aliasFullKey,
+        Body: JSON.stringify(metaPayload, null, 2),
+        ContentType: "application/json; charset=utf-8",
+        CacheControl: "no-cache",
+      })
+    );
+
+    /* --- Відповідь --- */
     return ok({
       ok: true,
       stored: {
         metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
         featuredUrl: featuredPublicUrl,
         slug: finalSlug,
+        aliasUrl: `${R2_PUBLIC_URL}/${aliasKey}`,
+        aliasFullUrl: `${R2_PUBLIC_URL}/${aliasFullKey}`,
       },
     });
   } catch (e: any) {
