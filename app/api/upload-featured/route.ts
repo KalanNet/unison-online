@@ -42,13 +42,11 @@ function getExt(nameOrType: string, fallback = ".png") {
   return fallback;
 }
 
-/** простий safe name:  timestamp + random + ext */
-function safeName(origName: string, mime: string) {
-  const ext = getExt(origName || mime);
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+function safeName(prefix = "featured", nameOrMime = ".png") {
+  const ext = getExt(nameOrMime);
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
 }
 
-/** опц. підтека, якщо захочеш класти в папку; інакше на корінь бакета */
 function joinKey(dir: string | null, fileName: string) {
   const d = (dir || "").trim().replace(/^\/+|\/+$/g, "");
   return d ? `${d}/${fileName}` : fileName;
@@ -57,7 +55,7 @@ function joinKey(dir: string | null, fileName: string) {
 /* ---------- POST ---------- */
 export async function POST(req: NextRequest) {
   try {
-    // auth за cookie (ідентично до інших роутів)
+    // auth за cookie
     const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "ua_sid";
     const cookieHeader = req.headers.get("cookie") || "";
     const authed = cookieHeader.split(/;\s*/).some((c) => c.startsWith(`${COOKIE_NAME}=`));
@@ -65,31 +63,32 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
 
-    // приймаємо поле "image" (так само дозволимо "file" про всяк)
+    // приймаємо "image" (або "file")
     const image = (form.get("image") || form.get("file")) as File | null;
     if (!image) return err("Missing image file", 400);
     if (!image.type || !image.type.startsWith("image/")) {
       return err("Only image/* allowed", 415);
     }
 
-    // опційно можна передати "dir" щоб покласти у підтеку
-    const dir = (form.get("dir") as string | null) || null;
+    // бажаний таргет: directory/<slug>/...
+    const slug = (form.get("slug") as string | null)?.trim() || null;
+    const dir = slug ? `directory/${slug}` : ((form.get("dir") as string | null) || null);
 
-    const key = joinKey(dir, safeName(image.name || "", image.type));
-    const buf = Buffer.from(await image.arrayBuffer());
+    const key = joinKey(dir, safeName("featured", image.name || image.type));
+    const arr = await image.arrayBuffer();
 
     await s3.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET,
         Key: key,
-        Body: buf,
+        Body: new Uint8Array(arr), // Edge-safe
         ContentType: image.type,
-        // ACL можна не ставити, якщо бакет public policy
+        CacheControl: "public, max-age=31536000, immutable",
       })
     );
 
     const url = `${R2_PUBLIC_URL}/${key}`;
-    return ok({ url });
+    return ok({ url, key });
   } catch (e: any) {
     return err(String(e?.message || e), 500);
   }
