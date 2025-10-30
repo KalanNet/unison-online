@@ -28,14 +28,19 @@ function err(error: string, code = 400) {
   return NextResponse.json({ error }, { status: code });
 }
 
-/** З URL PDF отримує шлях у бакеті й теку, куди класти meta.json / featured.* */
-function extractDirFromPdfUrl(pdfUrl: string) {
+/** З URL PDF отримує ключ у бакеті, теку (може бути порожня) і базове ім'я без розширення. */
+function extractFromPdfUrl(pdfUrl: string) {
   if (!pdfUrl.startsWith(R2_PUBLIC_URL + "/")) return null;
-  const key = pdfUrl.slice(R2_PUBLIC_URL.length + 1);
-  if (!key || !key.includes("/")) return null;
+  const key = pdfUrl.slice(R2_PUBLIC_URL.length + 1); // "file.pdf" або "dir/file.pdf"
+  if (!key) return null;
+
   const lastSlash = key.lastIndexOf("/");
-  const dir = key.slice(0, lastSlash);
-  return { key, dir };
+  const dir = lastSlash >= 0 ? key.slice(0, lastSlash) : "";            // "" якщо на корені
+  const fileName = lastSlash >= 0 ? key.slice(lastSlash + 1) : key;     // "file.pdf"
+  const dot = fileName.lastIndexOf(".");
+  const baseNoExt = dot >= 0 ? fileName.slice(0, dot) : fileName;       // "file"
+
+  return { key, dir, baseNoExt };
 }
 
 /** Нормалізація слагу: латиниця/цифри/- ; пробіли→- ; злиття дефісів; трим країв. */
@@ -43,10 +48,10 @@ function slugify(input: string): string {
   const base = (input || "")
     .normalize("NFKD")
     .toLowerCase()
-    .replace(/\s+/g, "-")           // пробіли → дефіси
-    .replace(/[^a-z0-9-]/g, "")     // прибрати все, крім лат/цифр/-
-    .replace(/-+/g, "-")            // звести повторні дефіси
-    .replace(/^-+|-+$/g, "");       // обрізати дефіси по краях
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return base || `item-${Date.now()}`;
 }
 
@@ -62,7 +67,7 @@ function inferExtFromMime(mime: string | undefined | null) {
 /* ---------- POST ---------- */
 export async function POST(req: NextRequest) {
   try {
-    /* --- Auth by cookie (як у тебе) --- */
+    /* --- Auth by cookie --- */
     const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "ua_sid";
     const cookieHeader = req.headers.get("cookie") || "";
     const authed = cookieHeader.split(/;\s*/).some((c) => c.startsWith(`${COOKIE_NAME}=`));
@@ -86,11 +91,15 @@ export async function POST(req: NextRequest) {
       const metaRaw = fd.get("meta");
       try {
         meta = metaRaw ? JSON.parse(String(metaRaw)) : {};
-      } catch { meta = {}; }
+      } catch {
+        meta = {};
+      }
       const bmkRaw = fd.get("bookmarks");
       try {
         bookmarks = bmkRaw ? JSON.parse(String(bmkRaw)) : [];
-      } catch { bookmarks = []; }
+      } catch {
+        bookmarks = [];
+      }
       featuredFile = (fd.get("featured") as File) || null;
     } else {
       return err("Unsupported content-type", 415);
@@ -98,9 +107,9 @@ export async function POST(req: NextRequest) {
 
     if (!file) return err("`file` (PDF public URL) is required", 422);
 
-    const parsed = extractDirFromPdfUrl(file);
+    const parsed = extractFromPdfUrl(file);
     if (!parsed) return err("Invalid `file` URL (must be within CDN origin)", 422);
-    const { dir } = parsed;
+    const { dir, baseNoExt } = parsed;
 
     /* --- Сформувати/перевірити slug --- */
     const rawSlug = (meta?.slug ?? "").toString().trim();
@@ -113,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     if (featuredFile) {
       const ext = inferExtFromMime(featuredFile.type);
-      const featuredKey = `${dir}/featured${ext}`;
+      const featuredKey = dir ? `${dir}/featured${ext}` : `${baseNoExt}.featured${ext}`;
       const arr = await featuredFile.arrayBuffer();
       await s3.send(
         new PutObjectCommand({
@@ -126,27 +135,27 @@ export async function POST(req: NextRequest) {
       featuredPublicUrl = `${R2_PUBLIC_URL}/${featuredKey}`;
     }
 
-    /* --- Зібрати payload метаданих --- */
-    const metaJsonKey = `${dir}/meta.json`;
+    /* --- meta.json поруч із PDF: у тецi або з префіксом імені файлу на корені --- */
+    const metaJsonKey = dir ? `${dir}/meta.json` : `${baseNoExt}.meta.json`;
+
     const metaPayload = {
       meta: {
         title: (meta?.title || "").trim(),
         description: (meta?.description || "").trim(),
         featuredUrl: featuredPublicUrl ?? null,
-        slug: finalSlug, // <-- ДОДАНО
+        slug: finalSlug,
       },
       bookmarks: Array.isArray(bookmarks)
-        ? bookmarks.map(b => ({
+        ? bookmarks.map((b) => ({
             id: String(b.id || ""),
             page: Number(b.page || 1),
             label: String(b.label || "").trim() || `Page ${Number(b.page || 1)}`,
-            color: b.color ?? null, // <-- ДОДАНО
+            color: b.color ?? null,
           }))
         : [],
       file, // PDF public URL
     };
 
-    /* --- Записати meta.json у R2 --- */
     await s3.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET,
@@ -157,7 +166,6 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    /* --- Відповідь --- */
     return ok({
       ok: true,
       stored: {
