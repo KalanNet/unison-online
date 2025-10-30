@@ -11,7 +11,7 @@ type Bookmark = { id: string; page: number; label: string; color?: string | null
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   bookmarks?: Bookmark[];
-  file?: string;                 // PDF public URL
+  file?: string;
   publishedAt?: string;
 };
 
@@ -25,29 +25,10 @@ async function fetchJson<T = unknown>(url: string): Promise<T | null> {
   }
 }
 
-/** Основна розв'язка slug -> meta.json
- * 1) /directory/<slug>/meta.json (новий стандарт)
- * 2) легасі-фолбеки на випадок старих публікацій
- */
+/** ЄДИНИЙ шлях: /directory/<slug>/meta.json */
 async function resolveBySlug(slug: string): Promise<MetaPayload | null> {
-  // ① новий стандарт
-  const primary = await fetchJson<MetaPayload>(
-    `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`
-  );
-  if (primary?.file) return primary;
-
-  // ② легасі-фолбеки (залишаємо на випадок старих завантажень)
-  const candidates = [
-    `${R2_PUBLIC}/catalog/${slug}/meta.json`,
-    `${R2_PUBLIC}/${slug}/meta.json`,
-    `${R2_PUBLIC}/${slug}.meta.json`,
-  ];
-  for (const url of candidates) {
-    const payload = await fetchJson<MetaPayload>(url);
-    if (payload?.file) return payload;
-  }
-
-  return null;
+  const url = `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`;
+  return await fetchJson<MetaPayload>(url);
 }
 
 /* ---------- metadata ---------- */
@@ -60,21 +41,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const data = await resolveBySlug(params.slug);
 
-  const titleBase =
-    data?.meta?.title ||
-    (typeof searchParams.title === "string"
-      ? (searchParams.title as string)
-      : `Directory — ${params.slug}`);
+  const title =
+    data?.meta?.title ??
+    (typeof searchParams.title === "string" ? (searchParams.title as string) : `Directory — ${params.slug}`);
 
-  const description = data?.meta?.description || "Unison Alberta directory viewer.";
-  const ogImg =
-    data?.meta?.featuredUrl || "https://unison-online-dev.pages.dev/og.jpg";
+  const description = data?.meta?.description ?? "Unison Alberta directory viewer.";
+  const ogImg = data?.meta?.featuredUrl ?? "https://unison-online-dev.pages.dev/og.jpg";
 
   return {
-    title: titleBase,
+    title,
     description,
-    openGraph: { title: titleBase, description, images: [ogImg] },
-    twitter: { card: "summary_large_image", title: titleBase, description, images: [ogImg] },
+    openGraph: { title, description, images: [ogImg] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
   };
 }
 
@@ -88,9 +66,9 @@ export default async function DirectoryPublicPage({
 }) {
   const data = await resolveBySlug(params.slug);
 
-  // Фолбек: ?file=<pdf-url> дозволений навіть без meta.json
+  // Фолбек: дозволяємо ?file=<pdf-url>, якщо meta.json відсутній
   if (!data && typeof searchParams.file === "string" && searchParams.file) {
-    const PublicViewer = (await import("app/public/PublicViewer")).default;
+    const PublicViewer = (await import("app/public/PublicViewer")).default; // повний шлях
     return <PublicViewer file={searchParams.file} title="Preview" />;
   }
 
@@ -99,14 +77,15 @@ export default async function DirectoryPublicPage({
       <div style={{ padding: 24 }}>
         <h2>Not found</h2>
         <p>
-          No meta.json found for slug “{params.slug}”. You can still pass{" "}
-          <code>?file=&lt;pdf-url&gt;</code>.
+          Expected meta at{" "}
+          <code>{`${R2_PUBLIC}/directory/${params.slug}/meta.json`}</code>
         </p>
       </div>
     );
   }
 
-  const PublicViewer = (await import("app/public/PublicViewer")).default;
+  const PublicViewer = (await import("app/public/PublicViewer")).default; // повний шлях
   const title = data.meta?.title || params.slug;
+
   return <PublicViewer file={data.file} title={title} />;
 }
