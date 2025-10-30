@@ -9,6 +9,17 @@ import ViewerFooter from "app/secure/editor/EditorFooter";
 
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
+/* helper: slugify for client field (сервер все одно перевіряє) */
+function slugify(input: string): string {
+  return (input || "")
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +56,9 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     );
   }
 
+  /* брендова палітра для закладок */
+  const brandColors = ["#f47e20","#00647b","#54c2bb","#ac1f23","#6b7034","#fff4e7","#eeece8","#bdcbdb","#4e667a","#2d3018"];
+
   return (
     <div className="viewer-root">
       <EditorHeader
@@ -62,14 +76,44 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       <aside className="fb-sticky-panel" role="complementary" aria-label="Bookmarks & Meta">
         <div className="fb-panel-sec">
           <div className="fb-sec-h">Meta</div>
+
           <label className="fb-field">
             <div className="fb-lab">Title</div>
-            <input className="fb-inp" value={ctrl.meta.title} onChange={(e)=>ctrl.setMeta({ title: e.target.value })}/>
+            <input
+              className="fb-inp"
+              value={ctrl.meta.title}
+              onChange={(e) => {
+                const v = e.target.value;
+                // якщо slug порожній — автогенерація зі зміненого title
+                if (!ctrl.meta.slug || ctrl.meta.slug.length === 0) {
+                  ctrl.setMeta({ title: v, slug: slugify(v) as any });
+                } else {
+                  ctrl.setMeta({ title: v });
+                }
+              }}
+            />
           </label>
+
           <label className="fb-field">
             <div className="fb-lab">Meta description</div>
-            <textarea className="fb-txt" rows={3} value={ctrl.meta.description} onChange={(e)=>ctrl.setMeta({ description: e.target.value })}/>
+            <textarea
+              className="fb-txt"
+              rows={3}
+              value={ctrl.meta.description}
+              onChange={(e) => ctrl.setMeta({ description: e.target.value })}
+            />
           </label>
+
+          <label className="fb-field">
+            <div className="fb-lab">Slug</div>
+            <input
+              className="fb-inp"
+              value={ctrl.meta.slug ?? ""}
+              onChange={(e) => ctrl.setMeta({ slug: slugify(e.target.value) as any })}
+              placeholder="auto-from-title"
+            />
+          </label>
+
           <div className="fb-field">
             <div className="fb-lab">Featured image</div>
             <div className="fb-row">
@@ -87,8 +131,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             </div>
             {ctrl.meta.featuredUrl && (
               <div className="fb-thumb">
-                <img src={ctrl.meta.featuredUrl} alt="Featured"/>
-                <button className="fb-x" onClick={()=>ctrl.setFeatured(null)} title="Remove">×</button>
+                <img src={ctrl.meta.featuredUrl} alt="Featured" />
+                <button className="fb-x" onClick={() => ctrl.setFeatured(null)} title="Remove">×</button>
               </div>
             )}
           </div>
@@ -96,30 +140,96 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
         <div className="fb-panel-sec">
           <div className="fb-sec-h">Bookmarks</div>
-          <div className="fb-row">
-            <input className="fb-inp" placeholder={`Add for page ${ctrl.currentIndex+1}`} id="fb-bmk-label"/>
+
+          {/* форма додавання: label + page (optional) */}
+          <div className="fb-row fb-row-wrap">
+            <input className="fb-inp" placeholder="Label (optional)" id="fb-bmk-label" />
+            <input className="fb-inp fb-inp-narrow" placeholder={`Page (optional)`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
+          </div>
+
+          {/* палітра кольорів + custom + add без кольору */}
+          <div className="fb-row fb-colors">
+            {brandColors.map((c) => (
+              <button
+                key={c}
+                className="fb-color-swatch"
+                title={c}
+                style={{ background: c }}
+                onClick={() => {
+                  const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+                  const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
+                  const pageVal = pageEl?.value?.trim();
+                  const pageNum = pageVal ? Number(pageVal) : undefined;
+                  ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value, color: c as any });
+                  if (labelEl) labelEl.value = "";
+                  if (pageEl) pageEl.value = "";
+                }}
+              />
+            ))}
+            <input
+              type="color"
+              className="fb-color-picker"
+              title="Custom color"
+              onChange={(e) => {
+                const custom = e.target.value || null;
+                const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+                const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
+                const pageVal = pageEl?.value?.trim();
+                const pageNum = pageVal ? Number(pageVal) : undefined;
+                ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value, color: custom as any });
+                if (labelEl) labelEl.value = "";
+                if (pageEl) pageEl.value = "";
+                (e.target as HTMLInputElement).value = "#ffffff";
+              }}
+            />
             <button
               className="lh-iconbtn"
-              onClick={()=>{
-                const el = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
-                ctrl.addBookmark(undefined, el?.value);
-                if (el) el.value = "";
+              title="Add without color"
+              onClick={() => {
+                const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+                const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
+                const pageVal = pageEl?.value?.trim();
+                const pageNum = pageVal ? Number(pageVal) : undefined;
+                ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value });
+                if (labelEl) labelEl.value = "";
+                if (pageEl) pageEl.value = "";
               }}
-              title="Add bookmark"
               aria-label="Add bookmark"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
           </div>
+
+          {/* список з редагуванням */}
           <ul className="fb-list">
-            {ctrl.bookmarks.map(b=>(
+            {ctrl.bookmarks.map((b) => (
               <li key={b.id} className="fb-item">
-                <button className="fb-link" onClick={()=>ctrl.goToBookmark(b.id)} title={`Go to page ${b.page}`}>
-                  <strong>p.{b.page}</strong>&nbsp;{b.label}
-                </button>
-                <button className="fb-del" onClick={()=>ctrl.removeBookmark(b.id)} title="Remove">✕</button>
+                <span className="fb-dot" style={{ background: (b as any).color || "#e7ebdf" }} />
+                <input
+                  className="fb-inp fb-inp-grow"
+                  value={b.label}
+                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { label: e.target.value })}
+                  title="Edit label"
+                />
+                <input
+                  className="fb-inp fb-inp-num"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={String(b.page)}
+                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { page: Number(e.target.value || 1) })}
+                  title="Edit page"
+                />
+                <input
+                  type="color"
+                  className="fb-color-picker mini"
+                  value={(b as any).color || "#ffffff"}
+                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { color: e.target.value as any })}
+                  title="Edit color"
+                />
+                <button className="fb-link" onClick={() => ctrl!.goToBookmark(b.id)} title={`Go to page ${b.page}`}>Go</button>
+                <button className="fb-del" onClick={() => ctrl!.removeBookmark(b.id)} title="Remove">✕</button>
               </li>
             ))}
           </ul>
@@ -341,7 +451,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         /* --- Sticky left panel (overlay) --- */
         .fb-sticky-panel{
           position: fixed; left: 16px; top: calc(var(--hdr) + 16px);
-          width: 280px; max-height: calc(100svh - var(--hdr) - 32px);
+          width: 320px; /* збільшено */
+          max-height: calc(100svh - var(--hdr) - 32px);
           overflow: auto; z-index: 999;
           padding: 12px; background:#ffffffef; backdrop-filter: blur(6px);
           border:1px solid #e7ebdf; border-radius:.9rem;
@@ -353,16 +464,29 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-field{ display:block; margin-bottom:8px; }
         .fb-lab{ font-size:12px; color:#5c6750; margin-bottom:4px; }
         .fb-inp, .fb-txt{ width:100%; border:1px solid #e7ebdf; border-radius:.6rem; padding:.45rem .6rem; color:#2d3018; background:#fff; }
+        .fb-inp-narrow{ width:110px; }
+        .fb-inp-num{ width:72px; text-align:center; }
+        .fb-inp-grow{ flex:1; min-width:0; }
         .fb-row{ display:flex; align-items:center; gap:8px; }
+        .fb-row-wrap{ flex-wrap:wrap; }
+
         .fb-thumb{ position:relative; margin-top:8px; }
         .fb-thumb img{ width:100%; display:block; border-radius:.6rem; border:1px solid #e7ebdf; }
         .fb-thumb .fb-x{ position:absolute; top:4px; right:4px; background:#fff; border:1px solid #e7ebdf; border-radius:.5rem; width:28px; height:28px; line-height:0; }
+
         .fb-list{ list-style:none; margin:8px 0 0; padding:0; }
-        .fb-item{ display:flex; align-items:center; gap:6px; justify-content:space-between; border-top:1px dashed #ecefe7; padding:6px 0; }
+        .fb-item{ display:flex; align-items:center; gap:6px; padding:6px 0; border-top:1px dashed #ecefe7; }
         .fb-item:first-child{ border-top:0; }
-        .fb-link{ display:inline-block; text-align:left; background:#fff; border:1px solid #e7ebdf; border-radius:.6rem; padding:.35rem .55rem; flex:1; color:#2d3018; }
+        .fb-dot{ width:14px; height:14px; border-radius:50%; border:1px solid #d7dccf; flex:0 0 14px; }
+        .fb-link{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; padding:.35rem .55rem; }
         .fb-del{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; width:28px; height:28px; }
-        @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 340px); } }
+
+        .fb-colors{ align-items:center; gap:8px; flex-wrap:wrap; }
+        .fb-color-swatch{ width:24px; height:24px; border-radius:50%; border:1px solid #d7dccf; }
+        .fb-color-picker{ width:40px; height:32px; border:1px solid #e7ebdf; border-radius:.55rem; background:#fff; padding:0; }
+        .fb-color-picker.mini{ width:32px; height:28px; }
+
+        @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 360px); } }
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>

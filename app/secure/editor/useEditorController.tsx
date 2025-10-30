@@ -441,41 +441,105 @@ useEffect(() => {
     } catch {}
   }
 
-  /* ---------- bookmarks & meta ---------- */
-type Bookmark = { id: string; page: number; label: string };
+/* ---------- bookmarks & meta ---------- */
+type Bookmark = { id: string; page: number; label: string; color?: string | null };
 
 const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-const [meta, setMetaState] = useState<{ title: string; description: string; featuredUrl?: string | null }>({
+
+const [meta, setMetaState] = useState<{
+  title: string;
+  description: string;
+  slug?: string;                 // ← додано
+  featuredUrl?: string | null;
+}>({
   title: (title || "").trim(),
   description: "",
+  slug: "",                      // ← додано
   featuredUrl: null,
 });
 
 // helpers
-function setMeta(next: Partial<typeof meta>) { setMetaState((m) => ({ ...m, ...next })); }
-function setFeatured(url?: string | null)     { setMetaState((m) => ({ ...m, featuredUrl: url ?? null })); }
-
-function addBookmark(page?: number, label?: string) {
-  const p = page ?? (currentIndex + 1);
-  const safe = pdfDoc ? Math.max(1, Math.min(pdfDoc.numPages, p)) : p;
-  setBookmarks((list) => [...list, { id: genId(), page: safe, label: (label || `Page ${safe}`).trim() }]);
+function setMeta(next: Partial<typeof meta>) {
+  setMetaState((m) => ({ ...m, ...next }));
 }
-function removeBookmark(id: string) { setBookmarks((list) => list.filter((b) => b.id !== id)); }
-function goToBookmark(id: string)   { const b = bookmarks.find((x) => x.id === id); if (b) goToPage(b.page); }
+function setFeatured(url?: string | null) {
+  setMetaState((m) => ({ ...m, featuredUrl: url ?? null }));
+}
 
-/** Публікація: відправляє meta.json у R2 (через ваш API) */
+function addBookmark(
+  arg?: number | { page?: number; label?: string; color?: string | null },
+  labelMaybe?: string
+) {
+  const fromObj = typeof arg === "object" && arg !== null ? arg : undefined;
+  const pageRaw =
+    typeof arg === "number" ? arg :
+    fromObj?.page ?? (currentIndex + 1);
+
+  const safePage = pdfDoc
+    ? Math.max(1, Math.min(pdfDoc.numPages, Number(pageRaw) || 1))
+    : Number(pageRaw) || 1;
+
+  const label =
+    (typeof arg === "number" ? labelMaybe : fromObj?.label) ||
+    `Page ${safePage}`;
+
+  const color =
+    (typeof arg === "object" ? arg?.color : undefined) ?? null;
+
+  setBookmarks((list) => [
+    ...list,
+    { id: genId(), page: safePage, label: String(label).trim(), color },
+  ]);
+}
+
+function updateBookmark(id: string, patch: Partial<Bookmark>) {
+  setBookmarks((list) =>
+    list.map((b) => {
+      if (b.id !== id) return b;
+      const next: Bookmark = { ...b, ...patch };
+      if (patch.page != null && pdfDoc) {
+        next.page = Math.max(1, Math.min(pdfDoc.numPages, Number(patch.page) || b.page));
+      }
+      return next;
+    })
+  );
+}
+
+function removeBookmark(id: string) {
+  setBookmarks((list) => list.filter((b) => b.id !== id));
+}
+
+function goToBookmark(id: string) {
+  const b = bookmarks.find((x) => x.id === id);
+  if (b) goToPage(b.page);
+}
+
+
+/** Публікація meta.json/featured: надсилає на /api/publish */
 async function publishMetaAndBookmarks() {
   const payload = {
-    file,  // PDF URL (бекенд сам визначить ключ для R2 за вашим правилом)
-    meta: { title: meta.title?.trim() || "", description: meta.description?.trim() || "", featuredUrl: meta.featuredUrl || null },
-    bookmarks: bookmarks.map((b) => ({ id: b.id, page: b.page, label: b.label })),
+    file,  // PDF public URL
+    meta: {
+      title: meta.title?.trim() || "",
+      description: meta.description?.trim() || "",
+      slug: (meta.slug || "").trim(),
+      featuredUrl: meta.featuredUrl || null,
+    },
+    bookmarks: bookmarks.map((b) => ({
+      id: b.id,
+      page: b.page,
+      label: b.label,
+      color: b.color ?? null,
+    })),
   };
-  await fetch("/api/publish-meta", {
+
+  await fetch("/api/publish", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
+
 
 
   /* ---------- derived ---------- */
