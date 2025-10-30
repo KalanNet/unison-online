@@ -43,7 +43,7 @@ function extractFromPdfUrl(pdfUrl: string) {
   return { key, dir, baseNoExt };
 }
 
-/** Нормалізація слагу: латиниця/цифри/- ; пробіли→- ; злиття дефісів; трим країв. */
+/** Нормалізація slug: латиниця/цифри/- ; пробіли→- ; злиття дефісів; обрізання країв. */
 function slugify(input: string): string {
   const base = (input || "")
     .normalize("NFKD")
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       file = body?.file || body?.pdfUrl || "";
       meta = body?.meta || {};
       bookmarks = Array.isArray(body?.bookmarks) ? body.bookmarks : [];
+      // у JSON режимі зображення не прикріплюємо — очікуємо готовий URL у meta.featuredUrl
     } else if (ctype.includes("multipart/form-data")) {
       const fd = await req.formData();
       file = String(fd.get("file") || fd.get("pdfUrl") || "");
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       } catch {
         bookmarks = [];
       }
-      featuredFile = (fd.get("featured") as File) || null;
+      featuredFile = (fd.get("featured") as File) || null; // файл картинки (не обов'язково)
     } else {
       return err("Unsupported content-type", 415);
     }
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest) {
     const finalSlug = slugify(rawSlug || titleForSlug);
     if (!/^[a-z0-9-]+$/.test(finalSlug)) return err("Invalid slug", 422);
 
-    /* --- Якщо надіслали featured як файл — заливаємо в R2 і записуємо URL у meta --- */
+    /* --- Якщо надіслали featured як файл — заливаємо в R2 і підставляємо URL --- */
     let featuredPublicUrl = meta?.featuredUrl || null;
 
     if (featuredFile) {
@@ -128,14 +129,14 @@ export async function POST(req: NextRequest) {
         new PutObjectCommand({
           Bucket: R2_BUCKET,
           Key: featuredKey,
-          Body: Buffer.from(arr),
+          Body: new Uint8Array(arr), // Edge-safe
           ContentType: featuredFile.type || "image/png",
         })
       );
       featuredPublicUrl = `${R2_PUBLIC_URL}/${featuredKey}`;
     }
 
-    /* --- meta.json поруч із PDF: у тецi або з префіксом імені файлу на корені --- */
+    /* --- meta.json поруч із PDF: у теці або з префіксом імені файлу на корені --- */
     const metaJsonKey = dir ? `${dir}/meta.json` : `${baseNoExt}.meta.json`;
 
     const metaPayload = {
