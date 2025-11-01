@@ -295,40 +295,42 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
       onMouseLeave={ctrl!.handlePageMouseLeave}
     >
-      {/* Закладки впритул до краю */}
-      {/* Закладки: рендеримо «нейтрально», бік визначить CSS за .page--left/.page--right */}
-{pageBookmarks.map((bookmark, idx) => (
-  <div
-    key={bookmark.id}
-    className="page-bookmark"
-    style={{
-      position: "absolute",
-      top: `${16 + idx * 48}px`,
-      width: "78px",
-      height: "38px",
-      background: (bookmark as any).color || "#f47e20",
-      color: "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "11px",
-      fontWeight: 700,
-      cursor: "pointer",
-      zIndex: 50,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      padding: "0 10px",
-      userSelect: "none",
-      // межі/тінь зададуться з CSS залежно від .page--left/.page--right
-    }}
-    onClick={() => ctrl!.goToBookmark(bookmark.id)}
-    title={bookmark.label}
-  >
-    {bookmark.label}
-  </div>
-))}
-
+      {/* Закладки поза сторінкою */}
+      {pageBookmarks.map((bookmark: typeof ctrl.bookmarks[0], idx: number) => (
+        <div
+          key={bookmark.id}
+          className="page-bookmark"
+          style={{
+            position: "absolute",
+            [isRightPage ? "right" : "left"]: "-84px", // Робить закладку виступаючою
+            top: `${20 + idx * 50}px`,
+            width: "80px",
+            height: "40px",
+            background: bookmark.color || "#f47e20",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isRightPage ? "flex-start" : "flex-end",
+            fontSize: "11px",
+            fontWeight: 700,
+            borderTopLeftRadius: isRightPage ? 0 : "8px",
+            borderBottomLeftRadius: isRightPage ? 0 : "8px",
+            borderTopRightRadius: isRightPage ? "8px" : 0,
+            borderBottomRightRadius: isRightPage ? "8px" : 0,
+            boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,0.2)" : "2px 2px 8px rgba(0,0,0,0.2)",
+            cursor: "pointer",
+            zIndex: 10,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            padding: "0 6px",
+          }}
+          onClick={() => ctrl!.goToBookmark(bookmark.id)}
+          title={bookmark.label}
+        >
+          {bookmark.label}
+        </div>
+      ))}
 
       {/* Сторінка */}
       {bmp ? (
@@ -391,7 +393,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
 
 
-
           </FlipBook>
         </div>
       </section>
@@ -439,10 +440,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   background: #21353a;
   overflow: hidden;
 }
-
-
-
-/* Базова анімація закладки */
 .page-bookmark {
   transition:
     transform 0.21s cubic-bezier(.7,0,.2,1),
@@ -450,39 +447,17 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     height 0.21s cubic-bezier(.7,0,.2,1),
     font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
-
-/* Коли сторінка зараз праворуч — виносимо закладку праворуч ЗА край */
-.page--right .page-bookmark {
-  right: 0;               /* притискаємо до краю сторінки */
-  transform: translateX(100%);  /* повністю «поза сторінку» */
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-top-right-radius: 8px;
-  border-bottom-right-radius: 8px;
-  box-shadow: -2px 2px 8px rgba(0,0,0,.15);
-  justify-content: flex-start;
+.page-bookmark.right:hover {
+  transform: translateX(18px) scale(1.07);
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
 }
-
-/* Коли сторінка зараз ліворуч — виносимо закладку ліворуч ЗА край */
-.page--left .page-bookmark {
-  left: 0;
-  transform: translateX(-100%);
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  box-shadow: 2px 2px 8px rgba(0,0,0,.15);
-  justify-content: flex-end;
-}
-
-/* Hover-ефекти: виїзд ще на кілька пікселів */
-.page--right .page-bookmark:hover {
-  transform: translateX(calc(100% + 20px)) scale(1.085);
-  width: 92px; height: 44px; font-size: 1.11em;
-}
-.page--left .page-bookmark:hover {
-  transform: translateX(calc(-100% - 20px)) scale(1.085);
-  width: 92px; height: 44px; font-size: 1.11em;
+.page-bookmark.left:hover {
+  transform: translateX(-18px) scale(1.07);
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
 }
 
 
