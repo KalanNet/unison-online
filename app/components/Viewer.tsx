@@ -9,31 +9,52 @@ import ViewerFooter from "app/secure/editor/EditorFooter";
 
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
-/* helper: slugify — юнікод-стійкий */
-function slugify(input: string): string {
-  const map: Record<string, string> = {
-    а:"a", б:"b", в:"v", г:"h", ґ:"g", д:"d", е:"e", є:"ie", ж:"zh",
-    з:"z", и:"y", і:"i", ї:"i", й:"i", к:"k", л:"l", м:"m", н:"n",
-    о:"o", п:"p", р:"r", с:"s", т:"t", у:"u", ф:"f", х:"kh", ц:"ts",
-    ч:"ch", ш:"sh", щ:"shch", ь:"", ю:"iu", я:"ia",
-    ъ:"", ы:"y", э:"e",
-  };
-
+/* ---------- slug helpers (Unicode-safe) ---------- */
+function _normalizeDashesSpaces(s: string) {
   const dashAll = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;           // усі юнікод-дефіси
   const spacesAll = /[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g; // усі типи пробілів
+  return s.replace(dashAll, "-").replace(spacesAll, "-");
+}
 
-  let s = (input || "")
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(dashAll, "-")                     // будь-яке тире → "-"
-    .replace(spacesAll, "-")                   // будь-який пробіл → "-"
-    .replace(/[а-яёіїєґъыэ]/g, ch => map[ch] ?? "")
-    .replace(/[^a-z0-9-]/g, "")                // лише [a-z0-9-]
-    .replace(/-+/g, "-")                       // стиснути дефіси
-    .replace(/^-+|-+$/g, "");                  // обрізати краї
+function _asciiFold(s: string) {
+  return s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+}
 
+function _cyrillicToLatin(s: string) {
+  const map: Record<string, string> = {
+    а:"a", б:"b", в:"v", г:"h", ґ:"g", д:"d", е:"e", є:"ie", ж:"zh", з:"z", и:"y", і:"i", ї:"i", й:"i",
+    к:"k", л:"l", м:"m", н:"n", о:"o", п:"p", р:"r", с:"s", т:"t", у:"u", ф:"f", х:"kh", ц:"ts", ч:"ch",
+    ш:"sh", щ:"shch", ь:"", ю:"iu", я:"ia", ъ:"", ы:"y", э:"e",
+  };
+  return s.replace(/[а-яёіїєґъыэ]/g, ch => map[ch] ?? "");
+}
+
+/** Використовується під час набору: мінімальна нормалізація, нічого не “блокує” */
+function slugLive(value: string): string {
+  let s = value.toLowerCase();
+  s = _normalizeDashesSpaces(s);
+  s = s.replace(/&/g, " and ");           // & → and (щоб не “з’їдалося” при фінальному фільтрі)
+  s = _cyrillicToLatin(s);
+  s = _asciiFold(s);
+  // дозвіл тимчасово на будь-що — далі лише прибираємо подвійні дефіси і тримаємо форму
+  s = s.replace(/[^a-z0-9-]+/g, "-");     // інше → дефіс (але не забороняє вводити “-”)
+  s = s.replace(/-+/g, "-");
   return s;
 }
+
+/** Фінальна очистка (onBlur): прибирає крайні дефіси, порожнечу */
+function slugFinal(value: string): string {
+  let s = slugLive(value);
+  s = s.replace(/^-+|-+$/g, "");
+  return s;
+}
+
+/** Автогенерація зі Title (коли користувач ще не редагував slug вручну) */
+function autoFromTitle(title?: string): string {
+  if (!title) return "";
+  return slugFinal(title);
+}
+
 
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
@@ -102,10 +123,12 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                 const v = e.target.value;
                 // якщо slug порожній — автогенерація зі зміненого title
                 if (!ctrl.meta.slug || ctrl.meta.slug.length === 0) {
-                  ctrl.setMeta({ title: v, slug: slugify(v) as any });
-                } else {
-                  ctrl.setMeta({ title: v });
-                }
+  const auto = autoFromTitle(v);
+  ctrl.setMeta({ title: v, slug: auto as any });
+} else {
+  ctrl.setMeta({ title: v });
+}
+
               }}
             />
           </label>
@@ -120,17 +143,61 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             />
           </label>
 
-          <label className="fb-field">
+          {/* --- S L U G --- */}
+<label className="fb-field">
   <div className="fb-lab">Slug</div>
-  <input
-    className="fb-inp"
-    value={ctrl.meta.slug ?? ""}
-    onChange={(e) => ctrl.setMeta({ slug: slugify(e.target.value) as any })}
-    placeholder="auto-from-title"
-    autoCapitalize="off"
-    autoCorrect="off"
-    spellCheck={false}
-  />
+  {(() => {
+    // локальний стан для м’якого набору
+    const [slugInput, setSlugInput] = React.useState<string>(ctrl.meta.slug ?? "");
+    const dirtyRef = React.useRef<boolean>(false); // true після першого ручного редагування
+
+    // якщо slug у контролері зовні змінився (наприклад, після publish/load) — підтягнемо його
+    React.useEffect(() => {
+      setSlugInput(ctrl.meta.slug ?? "");
+    }, [ctrl.meta.slug]);
+
+    // Автогенерація зі Title: лише поки користувач вручну не редагував slug
+    React.useEffect(() => {
+      if (!dirtyRef.current) {
+        const auto = autoFromTitle(ctrl.title || "");
+        if (auto && !slugInput) {
+          setSlugInput(auto);
+          ctrl.setMeta({ slug: auto as any });
+        }
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ctrl.title]);
+
+    const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      dirtyRef.current = true;
+      // "жива" нормалізація — дозволяє без блоків вводити "-",
+      // & перетвориться в "and", пробіли/юнікод-дефіси → "-"
+      const live = slugLive(raw);
+      setSlugInput(live);
+      ctrl.setMeta({ slug: live as any });
+    };
+
+    const onBlur = () => {
+      const fin = slugFinal(slugInput);
+      setSlugInput(fin);
+      ctrl.setMeta({ slug: fin as any });
+    };
+
+    return (
+      <input
+        className="fb-inp"
+        value={slugInput}
+        onChange={onChange}
+        onBlur={onBlur}
+        placeholder="auto-from-title"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="text"
+      />
+    );
+  })()}
 </label>
 
 
