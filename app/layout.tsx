@@ -45,7 +45,7 @@ export const metadata: Metadata = {
       "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
     images: ["/og.jpg"],
   },
-  icons: { icon: "/LogoLoader.png" },
+  icons: { icon: "/favicon.ico" },
 };
 
 /* ---------- Viewport / theme ---------- */
