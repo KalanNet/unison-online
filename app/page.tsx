@@ -147,10 +147,9 @@ export default function Home() {
 
                 <article className="card-dark">
                   <span className="year">2026</span>
-                  <div className="ctitle">Directory 2026 (layout ready)</div>
+                  <div className="ctitle">Unison Directory 2026 (comming soon...)</div>
                   <p>
-                    Slugs and SEO sections are ready. Content will be added later. URLs will be{" "}
-                    <code>/directory/2026/[slug]</code>.
+                    Alberta Services and Housing.
                   </p>
                   <p style={{ marginTop: 12, color: "var(--text-dim)" }}>Coming soon</p>
                 </article>
