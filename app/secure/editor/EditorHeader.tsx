@@ -46,7 +46,7 @@ export default function EditorHeader({
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "0px 12px",
+          padding: "10px 12px",
           color: "#2d3018",
         }}
       >

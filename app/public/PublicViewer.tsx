@@ -9,11 +9,24 @@ import ViewerFooter from "../secure/editor/EditorFooter";
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
-export default function PublicViewer({ file, title }: { file: string; title?: string }) {
+/* --- тип закладки --- */
+type Bookmark = { id: string; page: number; label: string; color?: string | null };
+
+/* --- публічний в’ювер з пробросом закладок --- */
+export default function PublicViewer({
+  file,
+  title,
+  bookmarks = [],
+}: {
+  file: string;
+  title?: string;
+  bookmarks?: Bookmark[];
+}) {
   const [error, setError] = useState<string | null>(null);
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   try {
+    // контролер не очікує bookmarks — використовуємо їх нижче при рендері
     ctrl = useViewerController({ file, title });
   } catch (err: any) {
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
@@ -41,6 +54,14 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
         <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження…</h2>
       </div>
     );
+  }
+
+  /* --- згрупуємо закладки по сторінці для швидкого доступу --- */
+  const bmByPage = new Map<number, Bookmark[]>();
+  for (const b of bookmarks) {
+    const p = Math.max(1, Math.min(ctrl.totalPages || Infinity, Number(b.page) || 1));
+    if (!bmByPage.has(p)) bmByPage.set(p, []);
+    bmByPage.get(p)!.push(b);
   }
 
   return (
@@ -98,6 +119,8 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
               const bmp = ctrl!.cacheRef.current.get(pageNum);
               const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
 
+              const pageBookmarks = bmByPage.get(pageNum) || [];
+
               return (
                 <div
                   key={i}
@@ -114,6 +137,8 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
                         draggable={false}
                         style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", borderRadius: 2, display: "block" }}
                       />
+
+                      {/* інтерактивні посилання з PDF */}
                       {links?.length
                         ? links.map((L, idx) =>
                             L.href ? (
@@ -147,6 +172,55 @@ export default function PublicViewer({ file, title }: { file: string; title?: st
                               />
                             )
                           )
+                        : null}
+
+                      {/* візуальні ярлички-закладки на сторінці (правий край) */}
+                      {pageBookmarks.length
+                        ? (
+                          <div
+                            aria-hidden
+                            style={{
+                              position: "absolute",
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: 0, // контейнер без ширини — тільки для абсолютних ярликів
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {pageBookmarks.map((bm, idx) => {
+                              // вертикальний розподіл ярличків уздовж краю
+                              const topPct = 6 + idx * (88 / Math.max(1, pageBookmarks.length)); // від 6% до ~94%
+                              const bg = bm.color || "#54c2bb";
+                              return (
+                                <div
+                                  key={bm.id || `${pageNum}-${idx}`}
+                                  title={bm.label}
+                                  style={{
+                                    position: "absolute",
+                                    right: "-2px",
+                                    top: `${topPct}%`,
+                                    transform: "translateY(-50%)",
+                                    pointerEvents: "auto",
+                                    background: bg,
+                                    color: "#0f1b1d",
+                                    padding: "6px 10px",
+                                    borderTopLeftRadius: 6,
+                                    borderBottomLeftRadius: 6,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    boxShadow: "0 2px 6px rgba(0,0,0,.25)",
+                                    whiteSpace: "nowrap",
+                                    userSelect: "none",
+                                    cursor: "default",
+                                  }}
+                                >
+                                  {bm.label}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )
                         : null}
                     </>
                   ) : (
