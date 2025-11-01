@@ -295,17 +295,17 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
       onMouseLeave={ctrl!.handlePageMouseLeave}
     >
-      {/* Закладки поза сторінкою */}
+      {/* Закладки впритул до краю */}
       {pageBookmarks.map((bookmark: typeof ctrl.bookmarks[0], idx: number) => (
         <div
           key={bookmark.id}
-          className="page-bookmark"
+          className={`page-bookmark ${isRightPage ? 'right' : 'left'}`}
           style={{
             position: "absolute",
-            [isRightPage ? "right" : "left"]: "-84px", // Робить закладку виступаючою
-            top: `${20 + idx * 50}px`,
-            width: "80px",
-            height: "40px",
+            [isRightPage ? "right" : "left"]: 0,    // саме 0, без мінуса!
+            top: `${16 + idx * 48}px`,
+            width: "78px",
+            height: "38px",
             background: bookmark.color || "#f47e20",
             color: "#fff",
             display: "flex",
@@ -317,13 +317,14 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             borderBottomLeftRadius: isRightPage ? 0 : "8px",
             borderTopRightRadius: isRightPage ? "8px" : 0,
             borderBottomRightRadius: isRightPage ? "8px" : 0,
-            boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,0.2)" : "2px 2px 8px rgba(0,0,0,0.2)",
+            boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,0.15)" : "2px 2px 8px rgba(0,0,0,0.15)",
             cursor: "pointer",
-            zIndex: 10,
+            zIndex: 20,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            padding: "0 6px",
+            padding: "0 10px",
+            userSelect: "none",
           }}
           onClick={() => ctrl!.goToBookmark(bookmark.id)}
           title={bookmark.label}
@@ -393,6 +394,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 
 
 
+
           </FlipBook>
         </div>
       </section>
@@ -448,16 +450,16 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
 .page-bookmark.right:hover {
-  transform: translateX(18px) scale(1.07);
-  width: 88px;
-  height: 43px;
-  font-size: 1.07em;
+  transform: translateX(20px) scale(1.085);
+  width: 92px;
+  height: 44px;
+  font-size: 1.11em;
 }
 .page-bookmark.left:hover {
-  transform: translateX(-18px) scale(1.07);
-  width: 88px;
-  height: 43px;
-  font-size: 1.07em;
+  transform: translateX(-20px) scale(1.085);
+  width: 92px;
+  height: 44px;
+  font-size: 1.11em;
 }
 
 
