@@ -275,79 +275,117 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             }}
           >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-              const pageNum = i + 1;
-              const bmp = ctrl!.cacheRef.current.get(pageNum);
-              const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
+  const pageNum = i + 1;
+  const bmp = ctrl!.cacheRef.current.get(pageNum);
+  const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
+  
+  // Знаходимо закладки для цієї сторінки
+  const pageBookmarks = ctrl.bookmarks.filter(b => b.page === pageNum);
 
-              return (
-                <div
-                  key={i}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    background: "#fff",
-                    position: "relative"
-                  }}
-                  onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-                  onMouseLeave={ctrl!.handlePageMouseLeave}
-                >
-                  {bmp ? (
-                    <>
-                      <img
-                        src={bmp.url}
-                        alt={`p${pageNum}`}
-                        data-page-img="true"
-                        draggable={false}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          pointerEvents: "none",
-                          borderRadius: 2,
-                          display: "block"
-                        }}
-                      />
-                      {links?.length
-                        ? links.map((L, idx) =>
-                            L.href ? (
-                              <a
-                                key={idx}
-                                href={L.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="pdf-link"
-                                style={{
-                                  position: "absolute",
-                                  left: `${L.x * 100}%`,
-                                  top: `${L.y * 100}%`,
-                                  width: `${L.w * 100}%`,
-                                  height: `${L.h * 100}%`,
-                                }}
-                              />
-                            ) : (
-                              <button
-                                key={idx}
-                                className="pdf-link"
-                                title="Go to"
-                                onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                                style={{
-                                  position: "absolute",
-                                  left: `${L.x * 100}%`,
-                                  top: `${L.y * 100}%`,
-                                  width: `${L.w * 100}%`,
-                                  height: `${L.h * 100}%`,
-                                }}
-                              />
-                            )
-                          )
-                        : null}
-                    </>
-                  ) : (
-                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
-                  )}
-                </div>
-              );
-            })}
+  return (
+    <div
+      key={i}
+      style={{
+        width: "100%",
+        height: "100%",
+        background: "#fff",
+        position: "relative"
+      }}
+      onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+      onMouseLeave={ctrl!.handlePageMouseLeave}
+    >
+      {bmp ? (
+        <>
+          <img
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              pointerEvents: "none",
+              borderRadius: 2,
+              display: "block"
+            }}
+          />
+          {/* Візуальні закладки на краю сторінки */}
+          {pageBookmarks.map((bookmark, idx) => (
+            <div
+              key={bookmark.id}
+              className="page-bookmark"
+              style={{
+                position: "absolute",
+                right: 0,
+                top: `${20 + idx * 50}px`,
+                width: "80px",
+                height: "40px",
+                background: bookmark.color || "#f47e20",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "11px",
+                fontWeight: 700,
+                borderTopLeftRadius: "8px",
+                borderBottomLeftRadius: "8px",
+                boxShadow: "-2px 2px 8px rgba(0,0,0,0.2)",
+                cursor: "pointer",
+                zIndex: 10,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                padding: "0 6px",
+              }}
+              onClick={() => ctrl!.goToBookmark(bookmark.id)}
+              title={bookmark.label}
+            >
+              {bookmark.label}
+            </div>
+          ))}
+          {links?.length
+            ? links.map((L, idx) =>
+                L.href ? (
+                  <a
+                    key={idx}
+                    href={L.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pdf-link"
+                    style={{
+                      position: "absolute",
+                      left: `${L.x * 100}%`,
+                      top: `${L.y * 100}%`,
+                      width: `${L.w * 100}%`,
+                      height: `${L.h * 100}%`,
+                    }}
+                  />
+                ) : (
+                  <button
+                    key={idx}
+                    className="pdf-link"
+                    title="Go to"
+                    onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+                    style={{
+                      position: "absolute",
+                      left: `${L.x * 100}%`,
+                      top: `${L.y * 100}%`,
+                      width: `${L.w * 100}%`,
+                      height: `${L.h * 100}%`,
+                    }}
+                  />
+                )
+              )
+            : null}
+        </>
+      ) : (
+        <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
+      )}
+    </div>
+  );
+})}
+
           </FlipBook>
         </div>
       </section>
@@ -394,6 +432,12 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   color: #fff;
   background: #21353a;
   overflow: hidden;
+}
+.page-bookmark {
+  transition: transform 0.2s ease;
+}
+.page-bookmark:hover {
+  transform: translateX(-4px);
 }
 
 .local-header {
