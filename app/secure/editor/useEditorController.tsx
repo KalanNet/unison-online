@@ -41,7 +41,17 @@ function useIsNarrow(max = 600) {
   return narrow;
 }
 
-export function useViewerController({ file, title }: { file: string; title?: string }) {
+type Bookmark = { id: string; page: number; label: string; color?: string | null };
+
+export function useViewerController({
+  file,
+  title,
+  initialBookmarks,
+}: {
+  file: string;
+  title?: string;
+  initialBookmarks?: Bookmark[];
+}) {
   /* ---------- refs та базові стани ---------- */
   const stageRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<any>(null);
@@ -445,6 +455,30 @@ useEffect(() => {
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
 
 const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+
+// 1) Гідрація з публічної сторінки
+useEffect(() => {
+  if (!initialBookmarks) return;
+  // нормалізація
+  const safe = initialBookmarks.map((b) => ({
+    id: String(b.id || genId()),
+    page: Math.max(1, Number(b.page) || 1),
+    label: String(b.label ?? ""),
+    color: b.color ?? null,
+  }));
+  setBookmarks(safe);
+}, [initialBookmarks]);
+
+// 2) Після завантаження PDF — кламп сторінок у межі документа
+useEffect(() => {
+  if (!pdfDoc) return;
+  setBookmarks((list) =>
+    list.map((b) => ({
+      ...b,
+      page: Math.max(1, Math.min(pdfDoc.numPages, Number(b.page) || 1)),
+    })),
+  );
+}, [pdfDoc]);
 
 const [meta, setMetaState] = useState<{
   title: string;
