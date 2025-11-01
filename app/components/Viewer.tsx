@@ -251,6 +251,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             maxWidth: "100vw",
             maxHeight: "100vh",
             position: "relative",
+            overflow: "visible",          // ← нове
           }}
         >
           <FlipBook
@@ -272,6 +273,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
               minWidth: 0,
               minHeight: 0,
               aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+              overflow: "visible",        // ← нове
             }}
           >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
@@ -469,6 +471,12 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 }
 
 
+/* Текст на лівій закладці читається нормально */
+.page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
+.page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
+
+/* Не зникає на звороті під час перегортання */
+.page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
 
 .local-header {
   /* ! Немає position: fixed ! */
