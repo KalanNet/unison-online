@@ -43,7 +43,7 @@ export async function generateMetadata({
 
   const title =
     data?.meta?.title ??
-    (typeof searchParams.title === "string" ? (searchParams.title as string) : `Directory — ${params.slug}`);
+    (typeof searchParams.title === "string" ? (searchParams.title as string) : `directory — ${params.slug}`);
 
   const description = data?.meta?.description ?? "Unison Alberta directory viewer.";
   const ogImg = data?.meta?.featuredUrl ?? "https://unison-online-dev.pages.dev/og.jpg";
