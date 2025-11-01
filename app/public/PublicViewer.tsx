@@ -6,6 +6,8 @@ import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 
+
+
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
@@ -23,6 +25,7 @@ export default function PublicViewer({
   bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
 
+  console.log('PublicViewer bookmarks', bookmarks);
   const [error, setError] = useState<string | null>(null);
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
