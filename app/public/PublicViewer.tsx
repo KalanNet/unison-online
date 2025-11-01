@@ -175,53 +175,50 @@ export default function PublicViewer({
                         : null}
 
                       {/* візуальні ярлички-закладки на сторінці (правий край) */}
-                      {pageBookmarks.length
-                        ? (
-                          <div
-                            aria-hidden
-                            style={{
-                              position: "absolute",
-                              right: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: 0, // контейнер без ширини — тільки для абсолютних ярликів
-                              pointerEvents: "none",
-                            }}
-                          >
-                            {pageBookmarks.map((bm, idx) => {
-                              // вертикальний розподіл ярличків уздовж краю
-                              const topPct = 6 + idx * (88 / Math.max(1, pageBookmarks.length)); // від 6% до ~94%
-                              const bg = bm.color || "#54c2bb";
-                              return (
-                                <div
-                                  key={bm.id || `${pageNum}-${idx}`}
-                                  title={bm.label}
-                                  style={{
-                                    position: "absolute",
-                                    right: "-2px",
-                                    top: `${topPct}%`,
-                                    transform: "translateY(-50%)",
-                                    pointerEvents: "auto",
-                                    background: bg,
-                                    color: "#0f1b1d",
-                                    padding: "6px 10px",
-                                    borderTopLeftRadius: 6,
-                                    borderBottomLeftRadius: 6,
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    boxShadow: "0 2px 6px rgba(0,0,0,.25)",
-                                    whiteSpace: "nowrap",
-                                    userSelect: "none",
-                                    cursor: "default",
-                                  }}
-                                >
-                                  {bm.label}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )
-                        : null}
+                      {pageBookmarks.length ? (
+                        <div
+                          aria-hidden
+                          style={{
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 0,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          {pageBookmarks.map((bm, idx) => {
+                            const topPct = 6 + idx * (88 / Math.max(1, pageBookmarks.length));
+                            const bg = bm.color || "#54c2bb";
+                            return (
+                              <div
+                                key={bm.id || `${pageNum}-${idx}`}
+                                title={bm.label}
+                                style={{
+                                  position: "absolute",
+                                  right: "-2px",
+                                  top: `${topPct}%`,
+                                  transform: "translateY(-50%)",
+                                  pointerEvents: "auto",
+                                  background: bg,
+                                  color: "#0f1b1d",
+                                  padding: "6px 10px",
+                                  borderTopLeftRadius: 6,
+                                  borderBottomLeftRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  boxShadow: "0 2px 6px rgba(0,0,0,.25)",
+                                  whiteSpace: "nowrap",
+                                  userSelect: "none",
+                                  cursor: "default",
+                                }}
+                              >
+                                {bm.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
