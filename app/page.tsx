@@ -133,15 +133,16 @@ export default function Home() {
               <div className="cards-dark">
                 <article className="card-dark">
                   <span className="year">2025</span>
-                  <div className="ctitle">Directory 2025</div>
+                  <div className="ctitle">Unison Directory 2025</div>
                   <p>
-                    Live collection. Clean URLs like <code>/directory/2025/[slug]</code>.
+                    Alberta Services and Housing.
                   </p>
                   <p style={{ marginTop: 12 }}>
-                    <a className="link-light" href="/directory/2025">
-                      Explore →
-                    </a>
-                  </p>
+  <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
+    Explore →
+  </a>
+</p>
+
                 </article>
 
                 <article className="card-dark">
