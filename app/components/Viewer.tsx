@@ -9,16 +9,32 @@ import ViewerFooter from "app/secure/editor/EditorFooter";
 
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
-/* helper: slugify for client field (сервер все одно перевіряє) */
+/* helper: slugify — юнікод-стійкий */
 function slugify(input: string): string {
-  return (input || "")
+  const map: Record<string, string> = {
+    а:"a", б:"b", в:"v", г:"h", ґ:"g", д:"d", е:"e", є:"ie", ж:"zh",
+    з:"z", и:"y", і:"i", ї:"i", й:"i", к:"k", л:"l", м:"m", н:"n",
+    о:"o", п:"p", р:"r", с:"s", т:"t", у:"u", ф:"f", х:"kh", ц:"ts",
+    ч:"ch", ш:"sh", щ:"shch", ь:"", ю:"iu", я:"ia",
+    ъ:"", ы:"y", э:"e",
+  };
+
+  const dashAll = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;           // усі юнікод-дефіси
+  const spacesAll = /[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g; // усі типи пробілів
+
+  let s = (input || "")
     .normalize("NFKD")
     .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(dashAll, "-")                     // будь-яке тире → "-"
+    .replace(spacesAll, "-")                   // будь-який пробіл → "-"
+    .replace(/[а-яёіїєґъыэ]/g, ch => map[ch] ?? "")
+    .replace(/[^a-z0-9-]/g, "")                // лише [a-z0-9-]
+    .replace(/-+/g, "-")                       // стиснути дефіси
+    .replace(/^-+|-+$/g, "");                  // обрізати краї
+
+  return s;
 }
+
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -105,14 +121,18 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           </label>
 
           <label className="fb-field">
-            <div className="fb-lab">Slug</div>
-            <input
-              className="fb-inp"
-              value={ctrl.meta.slug ?? ""}
-              onChange={(e) => ctrl.setMeta({ slug: slugify(e.target.value) as any })}
-              placeholder="auto-from-title"
-            />
-          </label>
+  <div className="fb-lab">Slug</div>
+  <input
+    className="fb-inp"
+    value={ctrl.meta.slug ?? ""}
+    onChange={(e) => ctrl.setMeta({ slug: slugify(e.target.value) as any })}
+    placeholder="auto-from-title"
+    autoCapitalize="off"
+    autoCorrect="off"
+    spellCheck={false}
+  />
+</label>
+
 
           <div className="fb-field">
             <div className="fb-lab">Featured image</div>
