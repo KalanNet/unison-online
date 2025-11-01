@@ -11,7 +11,7 @@ type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   file?: string;
   publishedAt?: string;
-  bookmarks?: Bookmark[]; // ← важливо: закладки в payload
+  bookmarks?: Bookmark[]; // ← важливо: додаємо закладки у payload
 };
 
 /* ---------- Helpers ---------- */
@@ -23,6 +23,26 @@ async function getMeta(slug: string): Promise<MetaPayload | null> {
   });
   if (!r.ok) return null;
   return (await r.json()) as MetaPayload;
+}
+
+/** Жорстка санітаризація + клон для безпечної серіалізації між SSR/CSR */
+function sanitizeBookmarks(input: unknown): Bookmark[] {
+  if (!Array.isArray(input)) return [];
+  const out: Bookmark[] = [];
+  for (const it of input) {
+    if (!it || typeof it !== "object") continue;
+    const anyIt = it as Record<string, unknown>;
+    const id = String(anyIt.id ?? "");
+    const pageNum = Number(anyIt.page);
+    const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
+    const label = String(anyIt.label ?? "");
+    const colorRaw = anyIt.color;
+    const color =
+      typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
+    out.push({ id, page, label, color });
+  }
+  // structuredClone fallback: JSON roundtrip (гарантовано серіалізований plain-об’єкт)
+  return JSON.parse(JSON.stringify(out));
 }
 
 /* ---------- Metadata ---------- */
@@ -42,7 +62,7 @@ export async function generateMetadata({
     title,
     description,
     openGraph: { title, description, images: [ogImg] },
-  twitter: { card: "summary_large_image", title, description, images: [ogImg] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
   };
 }
 
@@ -65,26 +85,17 @@ export default async function Page({
       const PublicViewer = (await import("app/public/PublicViewer")).default;
       return <PublicViewer file={searchParams.file} title="Preview" />;
     }
+    // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
 
-  // ---- Є ФАЙЛ. Готуємо закладки до безпечної серіалізації ----
-  // 1) Гарантуємо масив
-  const raw = Array.isArray(data.bookmarks) ? data.bookmarks : [];
-  // 2) Перетворюємо типи, прибираємо null/undefined, щоб Next не «обрізав» ключі під час передачі в клієнт
-  const normalized = raw.map((b, i) => ({
-    id: String(b?.id ?? `bm-${i}`),
-    page: Number((b as any)?.page ?? 1),
-    label: String((b as any)?.label ?? ""),
-    color: (b as any)?.color ?? null,
-  }));
-  // 3) Жорстка JSON-серіалізація (обхід edge-глюків із несеріаліз. значеннями)
-  const safeBookmarks: Bookmark[] = JSON.parse(JSON.stringify(normalized));
-
   // Основний рендер публічного в’ювера
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title ?? slug;
+
+  // ← ЄДИНА зміна: санітаризуємо та клонуємо bookmarks перед передачею
+  const safeBookmarks = sanitizeBookmarks(data.bookmarks);
 
   return (
     <PublicViewer
