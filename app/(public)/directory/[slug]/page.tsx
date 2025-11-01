@@ -1,5 +1,6 @@
 // app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -16,8 +17,14 @@ type MetaPayload = {
 
 /* ---------- Helpers ---------- */
 async function getMeta(slug: string): Promise<MetaPayload | null> {
-  // Відносний виклик внутрішнього API (Edge/Pages friendly)
-  const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
+  // ВАЖЛИВО: абсолютний URL (Edge/Pages safe)
+  const h = await headers(); // ← виправлення: headers() повертає Promise
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  if (!host) return null;
+
+  const base = `${proto}://${host}`;
+  const r = await fetch(`${base}/api/directory/${encodeURIComponent(slug)}`, {
     cache: "no-store",
     next: { revalidate: 0 },
   });
