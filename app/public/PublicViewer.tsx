@@ -20,8 +20,9 @@ export default function PublicViewer({
 }: {
   file: string;
   title?: string;
-  bookmarks?: Bookmark[];
+  bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
+
   const [error, setError] = useState<string | null>(null);
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
@@ -56,13 +57,7 @@ export default function PublicViewer({
     );
   }
 
-  /* --- згрупуємо закладки по сторінці для швидкого доступу --- */
-  const bmByPage = new Map<number, Bookmark[]>();
-  for (const b of bookmarks) {
-    const p = Math.max(1, Math.min(ctrl.totalPages || Infinity, Number(b.page) || 1));
-    if (!bmByPage.has(p)) bmByPage.set(p, []);
-    bmByPage.get(p)!.push(b);
-  }
+
 
   return (
     <div className="viewer-root">
@@ -119,7 +114,8 @@ export default function PublicViewer({
               const bmp = ctrl!.cacheRef.current.get(pageNum);
               const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
 
-              const pageBookmarks = bmByPage.get(pageNum) || [];
+              const pageBookmarks = (bookmarks || []).filter(b => Number(b.page) === pageNum);
+
 
               return (
                 <div
@@ -137,6 +133,26 @@ export default function PublicViewer({
                         draggable={false}
                         style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", borderRadius: 2, display: "block" }}
                       />
+{/* === bookmarks overlay START === */}
+{pageBookmarks.length > 0 && (
+  <div className="bm-rail" aria-hidden>
+    {pageBookmarks.map((bm, idx) => {
+      const bg = bm.color || "#54c2bb";
+      const topPct = 8 + idx * (84 / Math.max(1, pageBookmarks.length)); // рівномірно по висоті
+      return (
+        <div
+          key={bm.id || `${pageNum}-${idx}`}
+          className="bm-tab"
+          title={bm.label}
+          style={{ top: `${topPct}%`, background: bg }}
+        >
+          <span className="bm-text">{bm.label}</span>
+        </div>
+      );
+    })}
+  </div>
+)}
+{/* === bookmarks overlay END === */}
 
                       {/* інтерактивні посилання з PDF */}
                       {links?.length
@@ -265,6 +281,47 @@ export default function PublicViewer({
         .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
+        /* === bookmarks styles START === */
+.bm-rail{
+  position:absolute;
+  width:140px;           /* є ширина, щоб overlay не відсікся */
+  right:0;
+  top:0;
+  bottom:0;
+  pointer-events:none;   /* не блокує перегортання */
+  z-index:10;
+}
+
+.bm-tab{
+  position:absolute;
+  right:12px;            /* всередині сторінки, щоб не з’ївся overflow */
+  transform:translateY(-50%);
+  min-width:80px;
+  max-width:130px;
+  padding:6px 10px;
+  border-top-left-radius:8px;
+  border-bottom-left-radius:8px;
+  color:#0f1b1d;
+  font-size:12px;
+  font-weight:800;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+  background:#54c2bb;
+  white-space:nowrap;
+  pointer-events:auto;   /* щоб працював title-хінт */
+}
+
+.bm-tab .bm-text{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+@media (max-width: 680px){
+  .bm-rail{ width:110px; }
+  .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
+}
+/* === bookmarks styles END === */
+
       `}</style>
     </div>
   );
