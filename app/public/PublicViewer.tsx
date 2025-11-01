@@ -24,14 +24,13 @@ export default function PublicViewer({
   title?: string;
   bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
-  
 
   const [error, setError] = useState<string | null>(null);
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   try {
     // контролер не очікує bookmarks — використовуємо їх нижче при рендері
-    ctrl = useViewerController({ file, title, initialBookmarks: bookmarks });
+    ctrl = useViewerController({ file, title });
   } catch (err: any) {
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
@@ -118,7 +117,7 @@ export default function PublicViewer({
   const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
     (bmp?.links as any) ?? [];
 
-  const pageBookmarks = (ctrl.bookmarks || []).filter((b) => Number(b.page) === pageNum);
+  const pageBookmarks = (bookmarks || []).filter((b) => Number(b.page) === pageNum);
 
   return (
     <div
