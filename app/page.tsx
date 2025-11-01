@@ -146,7 +146,7 @@ export default function Home() {
           <span className="year">2025</span>
           <div className="ctitle">Services & Housing Directory 2025</div>
           <p>
-            Explore our Interactive Directory Catalogue – a 170-page resource for seniors.
+            Explore our Interactive Directory Catalogue – a 170-page informational resource for older adults.
           </p>
           <p style={{ marginTop: 12 }}>
             <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
