@@ -299,14 +299,13 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       {pageBookmarks.map((bookmark, idx) => (
   <div
     key={bookmark.id}
-    className="page-bookmark"
+    className={`page-bookmark ${isRightPage ? "right" : "left"}`}   // ← ДОДАВ
     style={{
       position: "absolute",
-      // було: [isRightPage ? "right" : "left"]: "-84px",
-      [isRightPage ? "right" : "left"]: 0,                      // упритул до краю сторінки
-      transform: isRightPage
-        ? "translateX(calc(100% - 2px))"                        // на 2px «всередину» щоб не було просвіту
-        : "translateX(calc(-100% + 2px))",
+      [isRightPage ? "right" : "left"]: 0,
+      // ↓ зсув і масштаб через змінні, щоб hover міг міняти лише scale
+      transform: "translateX(var(--bmX)) scale(var(--bmScale, 1))",
+      ["--bmX" as any]: isRightPage ? "calc(100% - 2px)" : "calc(-100% + 2px)",
       transformOrigin: isRightPage ? "left center" : "right center",
       top: `${20 + idx * 50}px`,
       width: "80px",
@@ -324,7 +323,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       borderBottomRightRadius: isRightPage ? "8px" : 0,
       boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,.2)" : "2px 2px 8px rgba(0,0,0,.2)",
       cursor: "pointer",
-      zIndex: 200,                                              // поверх сторінки/тіні
+      zIndex: 200,
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
@@ -448,28 +447,27 @@ export default function Viewer({ file, title }: { file: string; title?: string }
 }
 
 /* Закладка може виходити за межі сторінки FlipBook */
+/* щоб елементи могли виходити за межі сторінки */
 .page, .page > div, .page .page-content { overflow: visible !important; }
 .page .page-content { position: relative; }
 
-.page-bookmark {
+.page-bookmark{
   transition:
     transform 0.21s cubic-bezier(.7,0,.2,1),
     width 0.21s cubic-bezier(.7,0,.2,1),
     height 0.21s cubic-bezier(.7,0,.2,1),
     font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
-.page-bookmark.right:hover {
-  transform: translateX(15px) scale(1.07);
+
+/* правий/лівий — різні селектори збережені */
+.page-bookmark.right:hover,
+.page-bookmark.left:hover{
+  --bmScale: 1.07;     /* <- працює поверх inline, бо це змінна */
   width: 88px;
   height: 43px;
   font-size: 1.07em;
 }
-.page-bookmark.left:hover {
-  transform: translateX(-18px) scale(1.07);
-  width: 88px;
-  height: 43px;
-  font-size: 1.07em;
-}
+
 
 
 .local-header {
