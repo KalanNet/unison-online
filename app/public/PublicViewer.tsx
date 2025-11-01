@@ -1,17 +1,18 @@
-// app/public/PublicViewer.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 
+// той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 /* --- тип закладки --- */
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
 
+/* --- публічний в’ювер з пробросом закладок --- */
 export default function PublicViewer({
   file,
   title,
@@ -19,12 +20,14 @@ export default function PublicViewer({
 }: {
   file: string;
   title?: string;
-  bookmarks?: Bookmark[];
+  bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
+
   const [error, setError] = useState<string | null>(null);
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   try {
+    // контролер не очікує bookmarks — використовуємо їх нижче при рендері
     ctrl = useViewerController({ file, title });
   } catch (err: any) {
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
@@ -54,25 +57,7 @@ export default function PublicViewer({
     );
   }
 
-  /* ——— нормалізовані закладки з пропса (публічні) ——— */
-  const bmarks: Bookmark[] = useMemo(() => {
-    const arr = Array.isArray(bookmarks) ? bookmarks : [];
-    return arr
-      .filter((b) => Number.isFinite(b?.page))
-      .map((b, i) => ({
-        id: b.id || `bm-${i}-${b.page}`,
-        page: Math.max(1, Math.min(ctrl!.totalPages, Number(b.page))),
-        label: b.label ?? `p.${b.page}`,
-        color: b.color ?? null,
-      }))
-      .sort((a, b) => a.page - b.page);
-  }, [bookmarks, ctrl?.totalPages]);
 
-  /* швидкий helper на перегортання */
-  const goTo = (page: number) => {
-    const idx = Math.max(0, Math.min(ctrl!.totalPages - 1, page - 1));
-    (ctrl!.bookRef.current as any)?.pageFlip()?.flip(idx);
-  };
 
   return (
     <div className="viewer-root">
@@ -84,10 +69,9 @@ export default function PublicViewer({
         isFs={ctrl.isFs}
         toggleFullscreen={ctrl.toggleFullscreen}
         handleShare={ctrl.handleShare}
-        onPublish={() => {}} // публічна сторінка без публіша
+        onPublish={() => {}} // прибито на публічній сторінці
       />
 
-      {/* Сцена між header/footer */}
       <section ref={ctrl.stageRef} className="viewer-stage">
         <div
           className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
@@ -97,14 +81,11 @@ export default function PublicViewer({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: ctrl.single
-              ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
-              : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+            width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
             height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
             maxWidth: "100vw",
             maxHeight: "100vh",
             position: "relative",
-            overflow: "visible", // ВАЖЛИВО: не обрізати таби
           }}
         >
           <FlipBook
@@ -126,233 +107,150 @@ export default function PublicViewer({
               minWidth: 0,
               minHeight: 0,
               aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-              overflow: "visible", // ВАЖЛИВО
             }}
           >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-              const pageNum = i + 1;
-              const bmp = ctrl!.cacheRef.current.get(pageNum);
-              const links:
-                | Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>
-                = (bmp?.links as any) ?? [];
+  const pageNum = i + 1;
+  const bmp = ctrl!.cacheRef.current.get(pageNum);
+  const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
+    (bmp?.links as any) ?? [];
 
-              const pageBookmarks = bmarks.filter((b) => b.page === pageNum);
+  const pageBookmarks = (bookmarks || []).filter((b) => Number(b.page) === pageNum);
 
-              return (
-                <div
-                  key={i}
-                  style={{ width: "100%", height: "100%", background: "#fff", position: "relative", overflow: "visible" }}
-                  onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-                  onMouseLeave={ctrl!.handlePageMouseLeave}
-                >
-                  {bmp ? (
-                    <>
-                      {/* сторінка */}
-                      <img
-                        src={bmp.url}
-                        alt={`p${pageNum}`}
-                        data-page-img="true"
-                        draggable={false}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          pointerEvents: "none",
-                          borderRadius: 2,
-                          display: "block",
-                        }}
-                      />
+  return (
+    <div
+      key={i}
+      style={{ width: "100%", height: "100%", background: "#fff", position: "relative" }}
+      onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+      onMouseLeave={ctrl!.handlePageMouseLeave}
+    >
+      {bmp ? (
+        <>
+          {/* PAGE IMAGE */}
+          <img
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              pointerEvents: "none",
+              borderRadius: 2,
+              display: "block",
+            }}
+          />
 
-                      {/* PDF-посилання */}
-                      {links?.length
-                        ? links.map((L, idx) =>
-                            L.href ? (
-                              <a
-                                key={idx}
-                                href={L.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="pdf-link"
-                                style={{
-                                  position: "absolute",
-                                  left: `${L.x * 100}%`,
-                                  top: `${L.y * 100}%`,
-                                  width: `${L.w * 100}%`,
-                                  height: `${L.h * 100}%`,
-                                }}
-                              />
-                            ) : (
-                              <button
-                                key={idx}
-                                className="pdf-link"
-                                title="Go to"
-                                onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                                style={{
-                                  position: "absolute",
-                                  left: `${L.x * 100}%`,
-                                  top: `${L.y * 100}%`,
-                                  width: `${L.w * 100}%`,
-                                  height: `${L.h * 100}%`,
-                                }}
-                              />
-                            )
-                          )
-                        : null}
+          {/* PDF LINKS */}
+          {links?.length
+            ? links.map((L, idx) =>
+                L.href ? (
+                  <a
+                    key={idx}
+                    href={L.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pdf-link"
+                    style={{
+                      position: "absolute",
+                      left: `${L.x * 100}%`,
+                      top: `${L.y * 100}%`,
+                      width: `${L.w * 100}%`,
+                      height: `${L.h * 100}%`,
+                    }}
+                  />
+                ) : (
+                  <button
+                    key={idx}
+                    className="pdf-link"
+                    title="Go to"
+                    onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+                    style={{
+                      position: "absolute",
+                      left: `${L.x * 100}%`,
+                      top: `${L.y * 100}%`,
+                      width: `${L.w * 100}%`,
+                      height: `${L.h * 100}%`,
+                    }}
+                  />
+                )
+              )
+            : null}
 
-                      {/* page-attached ярлички (на самій сторінці) */}
-                      {pageBookmarks.map((bm, idx) => {
-                        const isRight = pageNum % 2 === 1; // непарна — права
-                        return (
-                          <button
-                            key={bm.id || `${pageNum}-${idx}`}
-                            className={`page-bookmark ${isRight ? "right" : "left"}`}
-                            title={`${bm.label} (p.${bm.page})`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              goTo(bm.page);
-                            }}
-                            style={{
-                              position: "absolute",
-                              top: `${20 + idx * 50}px`,
-                              [isRight ? "right" : "left"]: 0,
-                              transform: isRight
-                                ? "translateX(calc(100% - 2px))"
-                                : "translateX(calc(-100% + 2px))",
-                              transformOrigin: isRight ? "left center" : "right center",
-                              width: "80px",
-                              height: "40px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: isRight ? "flex-start" : "flex-end",
-                              padding: "0 6px",
-                              color: "#fff",
-                              fontSize: 11,
-                              fontWeight: 800,
-                              background: bm.color || "#f47e20",
-                              border: "1px solid rgba(0,0,0,.18)",
-                              boxShadow: isRight ? "-2px 2px 8px rgba(0,0,0,.2)" : "2px 2px 8px rgba(0,0,0,.2)",
-                              borderTopLeftRadius: isRight ? 0 : 8,
-                              borderBottomLeftRadius: isRight ? 0 : 8,
-                              borderTopRightRadius: isRight ? 8 : 0,
-                              borderBottomRightRadius: isRight ? 8 : 0,
-                              zIndex: 1000,
-                              overflow: "hidden",
-                              whiteSpace: "nowrap",
-                              textOverflow: "ellipsis",
-                              pointerEvents: "auto",
-                            } as React.CSSProperties}
-                          >
-                            <span
-                              className="page-bookmark__txt"
-                              style={{
-                                writingMode: "vertical-rl",
-                                textOrientation: "mixed",
-                                transform: !isRight ? "rotate(180deg)" : "none",
-                                lineHeight: 1,
-                                maxHeight: "36px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {bm.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
-                  )}
-                </div>
-              );
-            })}
-          </FlipBook>
-
-          {/* === GLOBAL OVERLAY ТАБИ (як у Viewer.tsx), але з public bookmarks === */}
-          {bmarks.length > 0 && (
-            <div
-              className="bm-tabs-overlay"
-              style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: 200,
-                overflow: "visible",
-                pointerEvents: "none",
-                // @ts-ignore — CSS кастомні змінні:
-                ["--tabThickness" as any]: "36px", // виліт
-                ["--tabLength" as any]: "140px",   // довжина
-                ["--tabTop" as any]: "36px",
-                ["--tabGap" as any]: "0px",
-              } as React.CSSProperties}
-            >
-              {(() => {
-                const sorted = [...bmarks]; // вже відсортовані
-                const leftNow = ctrl.single
-                  ? ctrl.currentIndex + 1
-                  : (ctrl.currentIndex % 2 === 0 ? ctrl.currentIndex + 1 : ctrl.currentIndex);
-                const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
-
-                return sorted.map((bm, i) => {
-                  const sideIsLeft = ctrl.single ? bm.page < (ctrl.currentIndex + 1) : bm.page < leftNow;
-
-                  const baseStyle: React.CSSProperties = {
-                    position: "absolute",
-                    top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-                    width: "var(--tabThickness)",
-                    height: "var(--tabLength)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontSize: 15,
-                    fontWeight: 800,
+          {/* PAGE-ATTACHED BOOKMARK TABS */}
+          {pageBookmarks.map((bm, idx) => {
+            const isRight = pageNum % 2 === 1; // непарна сторінка — права
+            return (
+              <button
+                key={bm.id || `${pageNum}-${idx}`}
+                className={`page-bookmark ${isRight ? "right" : "left"}`}
+                title={`${bm.label} (p.${bm.page})`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  (ctrl.bookRef.current as any)?.pageFlip()?.flip((bm.page ?? 1) - 1);
+                }}
+                style={{
+                  position: "absolute",
+                  top: `${20 + idx * 50}px`,
+                  [isRight ? "right" : "left"]: 0,
+                  transform: isRight
+                    ? "translateX(calc(100% - 2px))"
+                    : "translateX(calc(-100% + 2px))",
+                  transformOrigin: isRight ? "left center" : "right center",
+                  width: "80px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: isRight ? "flex-start" : "flex-end",
+                  padding: "0 6px",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  background: bm.color || "#f47e20",
+                  border: "1px solid rgba(0,0,0,.18)",
+                  boxShadow: isRight
+                    ? "-2px 2px 8px rgba(0,0,0,.2)"
+                    : "2px 2px 8px rgba(0,0,0,.2)",
+                  borderTopLeftRadius: isRight ? 0 : 8,
+                  borderBottomLeftRadius: isRight ? 0 : 8,
+                  borderTopRightRadius: isRight ? 8 : 0,
+                  borderBottomRightRadius: isRight ? 8 : 0,
+                  zIndex: 1000,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  pointerEvents: "auto",
+                }}
+              >
+                <span
+                  className="page-bookmark__txt"
+                  style={{
+                    writingMode: "vertical-rl",
+                    textOrientation: "mixed",
+                    transform: !isRight ? "rotate(180deg)" : "none",
                     lineHeight: 1,
-                    border: "1px solid rgba(0,0,0,.18)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                    opacity: 0.98,
-                    transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-                    pointerEvents: "auto",
-                    background: bm.color || "#f47e20",
-                    borderRadius: "0 10px 10px 0",
-                  };
+                    maxHeight: "36px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {bm.label}
+                </span>
+              </button>
+            );
+          })}
+        </>
+      ) : (
+        <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
+          Рендер сторінки…
+        </div>
+      )}
+    </div>
+  );
+})}
 
-                  const sideStyle: React.CSSProperties = sideIsLeft
-                    ? { left: "calc(var(--tabThickness) * -1)", transform: "rotate(180deg)", transformOrigin: "center" }
-                    : { right: "calc(var(--tabThickness) * -1)" };
-
-                  const isActive = bm.page === leftNow || bm.page === rightNow;
-
-                  return (
-                    <button
-                      key={bm.id}
-                      className={`bm-tab ${sideIsLeft ? "left" : "right"}${isActive ? " active" : ""}`}
-                      title={`${bm.label} (p.${bm.page})`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        goTo(bm.page);
-                      }}
-                      style={{ ...baseStyle, ...sideStyle }}
-                    >
-                      <span
-                        className="bm-tab__label"
-                        style={{
-                          maxHeight: "calc(var(--tabLength) - 10px)",
-                          padding: "4px 0",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          writingMode: "vertical-rl",
-                          textOrientation: "mixed",
-                        }}
-                      >
-                        {bm.label}
-                      </span>
-                    </button>
-                  );
-                });
-              })()}
-            </div>
-          )}
-          {/* === /GLOBAL OVERLAY === */}
+          </FlipBook>
         </div>
       </section>
 
@@ -377,7 +275,6 @@ export default function PublicViewer({
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      {/* стилі — лише потрібне для закладок */}
       <style jsx global>{`
         html, body { margin: 0; height: 100%; background: #21353a; overflow: hidden !important; }
         * { box-sizing: border-box; }
@@ -392,29 +289,43 @@ export default function PublicViewer({
         .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
+        /* Закладка може виходити за межі сторінки FlipBook */
+/* щоб елементи могли виходити за межі сторінки */
+.page, .page > div, .page .page-content { overflow: visible !important; }
+.page .page-content { position: relative; }
 
-        /* Щоб елементи виходили за межі сторінки FlipBook */
-        .page, .page > div, .page .page-content { overflow: visible !important; }
-        .page .page-content { position: relative; }
+.page-bookmark{
+  transition:
+    transform 0.21s cubic-bezier(.7,0,.2,1),
+    width 0.21s cubic-bezier(.7,0,.2,1),
+    height 0.21s cubic-bezier(.7,0,.2,1),
+    font-size 0.21s cubic-bezier(.7,0,.2,1);
+}
 
-        .page-bookmark{
-          transition:
-            transform 0.21s cubic-bezier(.7,0,.2,1),
-            width 0.21s cubic-bezier(.7,0,.2,1),
-            height 0.21s cubic-bezier(.7,0,.2,1),
-            font-size 0.21s cubic-bezier(.7,0,.2,1);
-          backface-visibility: hidden;
-          transform-style: preserve-3d;
-        }
-        .page-bookmark.right:hover,
-        .page-bookmark.left:hover{
-          --bmScale: 1.07;
-          width: 88px;
-          height: 43px;
-          font-size: 1.07em;
-        }
-        .page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
-        .page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
+/* правий/лівий — різні селектори збережені */
+.page-bookmark.right:hover,
+.page-bookmark.left:hover{
+  --bmScale: 1.07;     /* <- працює поверх inline, бо це змінна */
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
+}
+
+
+/* Текст на лівій закладці читається нормально */
+.page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
+.page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
+
+/* Не зникає на звороті під час перегортання */
+.page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
+
+
+@media (max-width: 680px){
+  .bm-rail{ width:110px; }
+  .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
+}
+/* === bookmarks styles END === */
+
       `}</style>
     </div>
   );
