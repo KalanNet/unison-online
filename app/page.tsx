@@ -34,7 +34,7 @@ export default function Home() {
     "@type": "Organization",
     name: "Unison Alberta",
     url: "https://unisonalberta.online/",
-    logo: "https://unisonalberta.com/hubfs/Unison%20Logo.svg",
+    logo: "https://unison-online-dev.pages.dev/unison-logo.svg",
     sameAs: [OFFICIAL],
     department: [
       { "@type": "Organization", name: "Unison Alberta Directory", url: "https://unisonalberta.online/directory/2025" },
@@ -48,18 +48,19 @@ export default function Home() {
       <main>
         {/* ===== HEADER ===== */}
         <header className="ua-header">
-          <div className="ua-container ua-header__in">
-            <a href="/" className="ua-header__brand" aria-label="Unison Alberta — Home">
-              Unison Alberta
-            </a>
+  <div className="ua-container ua-header__in">
+    <a href="/" className="ua-header__brand" aria-label="Unison Alberta — Home">
+      <img src="/unison-logo.svg" alt="Unison Alberta" className="ua-header__logo" />
+    </a>
 
-            <nav className="ua-header__nav">
-              <a href={DONATE} className="ua-btn ua-btn--accent" style={{ color: "#fff" }}>
-                Donate now
-              </a>
-            </nav>
-          </div>
-        </header>
+    <nav className="ua-header__nav">
+      <a href={DONATE} className="ua-btn ua-btn--accent" style={{ color: "#fff" }}>
+        Donate now
+      </a>
+    </nav>
+  </div>
+</header>
+
 
         {/* ===== HERO ===== */}
         <section className="ua-hero">
