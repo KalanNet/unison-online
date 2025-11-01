@@ -97,27 +97,27 @@ export default function Home() {
               <figcaption className="ua-heroCard__metrics">
                 <div className="ua-metric">
                   <div className="ua-metric__num">
-                    <CountUp end={790} decimals={0} suffix="+" />
-                  </div>
-                  <div className="ua-metric__label">Volunteers</div>
-                </div>
-
-                <span className="ua-dot" />
-
-                <div className="ua-metric">
-                  <div className="ua-metric__num">
-                    <CountUp end={1.4} decimals={1} suffix="M" />
-                  </div>
-                  <div className="ua-metric__label">Total Donations</div>
-                </div>
-
-                <span className="ua-dot" />
-
-                <div className="ua-metric">
-                  <div className="ua-metric__num">
                     <CountUp end={5.9} decimals={1} suffix="K" />
                   </div>
-                  <div className="ua-metric__label">Unison Members</div>
+                  <div className="ua-metric__label">Members</div>
+                </div>
+
+                <span className="ua-dot" />
+
+                <div className="ua-metric">
+                  <div className="ua-metric__num">
+                    <CountUp end={50} decimals={0} suffix="+" />
+                  </div>
+                  <div className="ua-metric__label">Years of Serving Seniors</div>
+                </div>
+
+                <span className="ua-dot" />
+
+                <div className="ua-metric">
+                  <div className="ua-metric__num">
+                    <CountUp end={55} decimals={0} suffix="K" />
+                  </div>
+                  <div className="ua-metric__label">Clients in 2024</div>
                 </div>
               </figcaption>
             </figure>
@@ -128,7 +128,7 @@ export default function Home() {
         <section className="dir-wrap">
           <div className="container">
             <Reveal>
-              <h2 className="dir-title">Annual Directory</h2>
+              <h2 className="dir-title">Unison Annual Directory</h2>
               <p className="dir-lead">The Unison Directory is updated annually to provide valuable information to older adults, family members, support worker or referral agency about housing and relevant services within Southern Alberta.
                 
 
