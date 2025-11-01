@@ -278,7 +278,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   const pageNum = i + 1;
   const bmp = ctrl!.cacheRef.current.get(pageNum);
   const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
-  
   const pageBookmarks = ctrl.bookmarks.filter(b => b.page === pageNum);
 
   // Сторона для закладки (true = права, false = ліва)
@@ -297,7 +296,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       onMouseLeave={ctrl!.handlePageMouseLeave}
     >
       {/* Закладки поза сторінкою */}
-      {pageBookmarks.map((bookmark, idx) => (
+      {pageBookmarks.map((bookmark: typeof ctrl.bookmarks[0], idx: number) => (
         <div
           key={bookmark.id}
           className="page-bookmark"
@@ -351,7 +350,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
             }}
           />
           {links?.length
-            ? links.map((L, idx) =>
+            ? links.map((L: typeof links[0], idx: number) =>
                 L.href ? (
                   <a
                     key={idx}
@@ -391,6 +390,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     </div>
   );
 })}
+
 
 
           </FlipBook>
@@ -441,11 +441,25 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   overflow: hidden;
 }
 .page-bookmark {
-  transition: transform 0.2s ease;
+  transition:
+    transform 0.21s cubic-bezier(.7,0,.2,1),
+    width 0.21s cubic-bezier(.7,0,.2,1),
+    height 0.21s cubic-bezier(.7,0,.2,1),
+    font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
-.page-bookmark:hover {
-  transform: translateX(-4px);
+.page-bookmark.right:hover {
+  transform: translateX(18px) scale(1.07);
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
 }
+.page-bookmark.left:hover {
+  transform: translateX(-18px) scale(1.07);
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
+}
+
 
 .local-header {
   /* ! Немає position: fixed ! */
