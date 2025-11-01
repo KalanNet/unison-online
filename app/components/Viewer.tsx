@@ -277,145 +277,80 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       }}
     >
       {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-  const pageNum = i + 1;
-  const bmp = ctrl!.cacheRef.current.get(pageNum);
-  const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
-    (bmp?.links as any) ?? [];
-  const pageBookmarks = ctrl.bookmarks.filter((b) => b.page === pageNum);
+        const pageNum = i + 1;
+        const bmp = ctrl!.cacheRef.current.get(pageNum);
+        const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
 
-  const isRightPage = pageNum % 2 === 1; // права = непарна
-
-  return (
-    <div
-      key={i}
-      style={{
-        width: "100%",
-        height: "100%",
-        background: "#fff",
-        position: "relative",
-        overflow: "visible", // важливо для вильоту таба
-      }}
-      onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-      onMouseLeave={ctrl!.handlePageMouseLeave}
-    >
-      {/* Таби-закладки, ПРИКРІПЛЕНІ ДО СТОРІНКИ */}
-      {pageBookmarks.map((bm, idx) => (
-        <button
-          key={bm.id}
-          className={`page-bookmark ${isRightPage ? "right" : "left"}`}
-          title={`${bm.label} (p.${bm.page})`}
-          onClick={(e) => {
-            e.preventDefault();
-            ctrl!.goToBookmark(bm.id);
-          }}
-          style={{
-            position: "absolute",
-            top: `${20 + idx * 50}px`,
-            // кріпимо до внутрішнього краю сторінки
-            [isRightPage ? "right" : "left"]: 0,
-            // виносимо назовні, але лишаємося дочкою сторінки => рухаємось з нею
-            transform: isRightPage
-              ? "translateX(calc(100% - 2px))"
-              : "translateX(calc(-100% + 2px))",
-            transformOrigin: isRightPage ? "left center" : "right center",
-            width: "80px",
-            height: "40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: isRightPage ? "flex-start" : "flex-end",
-            padding: "0 6px",
-            color: "#fff",
-            fontSize: 11,
-            fontWeight: 800,
-            background: (bm as any).color || "#f47e20",
-            border: "1px solid rgba(0,0,0,.18)",
-            boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,.2)" : "2px 2px 8px rgba(0,0,0,.2)",
-            borderTopLeftRadius: isRightPage ? 0 : 8,
-            borderBottomLeftRadius: isRightPage ? 0 : 8,
-            borderTopRightRadius: isRightPage ? 8 : 0,
-            borderBottomRightRadius: isRightPage ? 8 : 0,
-            zIndex: 200,            // вище контенту сторінки
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {/* Реверс лише тексту на лівому боці */}
-          <span
-            style={{
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              transform: !isRightPage ? "rotate(180deg)" : "none",
-              lineHeight: 1,
-              maxHeight: "36px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {bm.label}
-          </span>
-        </button>
-      ))}
-
-      {/* Сторінка */}
-      {bmp ? (
-        <>
-          <img
-            src={bmp.url}
-            alt={`p${pageNum}`}
-            data-page-img="true"
-            draggable={false}
+        return (
+          <div
+            key={i}
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain",
-              pointerEvents: "none",
-              borderRadius: 2,
-              display: "block",
+              background: "#fff",
+              position: "relative"
             }}
-          />
-          {links?.length
-            ? links.map((L, idx) =>
-                L.href ? (
-                  <a
-                    key={idx}
-                    href={L.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pdf-link"
-                    style={{
-                      position: "absolute",
-                      left: `${L.x * 100}%`,
-                      top: `${L.y * 100}%`,
-                      width: `${L.w * 100}%`,
-                      height: `${L.h * 100}%`,
-                    }}
-                  />
-                ) : (
-                  <button
-                    key={idx}
-                    className="pdf-link"
-                    title="Go to"
-                    onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                    style={{
-                      position: "absolute",
-                      left: `${L.x * 100}%`,
-                      top: `${L.y * 100}%`,
-                      width: `${L.w * 100}%`,
-                      height: `${L.h * 100}%`,
-                    }}
-                  />
-                )
-              )
-            : null}
-        </>
-      ) : (
-        <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
-      )}
-    </div>
-  );
-})}
-
+            onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+            onMouseLeave={ctrl!.handlePageMouseLeave}
+          >
+            {/* СТОРІНКА */}
+            {bmp ? (
+              <>
+                <img
+                  src={bmp.url}
+                  alt={`p${pageNum}`}
+                  data-page-img="true"
+                  draggable={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    pointerEvents: "none",
+                    borderRadius: 2,
+                    display: "block"
+                  }}
+                />
+                {links?.length
+                  ? links.map((L: typeof links[0], idx: number) =>
+                      L.href ? (
+                        <a
+                          key={idx}
+                          href={L.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pdf-link"
+                          style={{
+                            position: "absolute",
+                            left: `${L.x * 100}%`,
+                            top: `${L.y * 100}%`,
+                            width: `${L.w * 100}%`,
+                            height: `${L.h * 100}%`,
+                          }}
+                        />
+                      ) : (
+                        <button
+                          key={idx}
+                          className="pdf-link"
+                          title="Go to"
+                          onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+                          style={{
+                            position: "absolute",
+                            left: `${L.x * 100}%`,
+                            top: `${L.y * 100}%`,
+                            width: `${L.w * 100}%`,
+                            height: `${L.h * 100}%`,
+                          }}
+                        />
+                      )
+                    )
+                  : null}
+              </>
+            ) : (
+              <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
+            )}
+          </div>
+        );
+      })}
     </FlipBook>
 
     {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
@@ -558,68 +493,35 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   overflow: hidden;
 }
 
-/* ===== Bookmarks Overlay (поза сторінками, не зникає при flip) ===== */
-.bm-tabs-overlay{
-  position: absolute;
-  inset: 0;
-  z-index: 200;           /* вище сторінок і тіней */
-  overflow: visible;
-  pointer-events: none;   /* клікабельні тільки самі таби */
-  --tabsTop: 36px;
-  --tabGap: 0px;
-  --tabThickness: 36px;   /* товщина (виліт назовні) */
-  --tabLength: 140px;     /* довжина вздовж сторінки */
+/* Закладка може виходити за межі сторінки FlipBook */
+/* щоб елементи могли виходити за межі сторінки */
+.page, .page > div, .page .page-content { overflow: visible !important; }
+.page .page-content { position: relative; }
+
+.page-bookmark{
+  transition:
+    transform 0.21s cubic-bezier(.7,0,.2,1),
+    width 0.21s cubic-bezier(.7,0,.2,1),
+    height 0.21s cubic-bezier(.7,0,.2,1),
+    font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
 
-.bm-tab{
-  position: absolute;
-  top: 0;
-  width: var(--tabThickness);
-  height: var(--tabLength);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
-  border: 1px solid rgba(0,0,0,.18);
-  box-shadow: 0 2px 6px rgba(0,0,0,.12);
-  opacity: .98;
-  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
-  pointer-events: auto;   /* таби клікабельні */
+/* правий/лівий — різні селектори збережені */
+.page-bookmark.right:hover,
+.page-bookmark.left:hover{
+  --bmScale: 1.07;     /* <- працює поверх inline, бо це змінна */
+  width: 88px;
+  height: 43px;
+  font-size: 1.07em;
 }
 
-/* Правий бік — звичайно */
-.bm-tab.right{
-  right: calc(var(--tabThickness) * -1);
-  border-radius: 0 10px 10px 0;
-  clip-path: polygon(0% 0%, 86% 0%, 100% 7%, 100% 93%, 86% 100%, 0% 100%);
-}
 
-/* Лівий бік — розвертаємо на 180°, щоб текст читався "з краю" */
-.bm-tab.left{
-  left: calc(var(--tabThickness) * -1);
-  border-radius: 0 10px 10px 0;
-  clip-path: polygon(0% 0%, 86% 0%, 100% 7%, 100% 93%, 86% 100%, 0% 100%);
-  transform: rotate(180deg);
-  transform-origin: center;
-}
+/* Текст на лівій закладці читається нормально */
+.page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
+.page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
 
-.bm-tab__label{
-  max-height: calc(var(--tabLength) - 10px);
-  padding: 4px 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-}
-
-.bm-tab.active{
-  filter: brightness(1.05);
-  box-shadow: 0 4px 12px rgba(0,0,0,.22);
-}
-
+/* Не зникає на звороті під час перегортання */
+.page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
 
 .local-header {
   /* ! Немає position: fixed ! */
@@ -710,10 +612,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-color-swatch{ width:24px; height:24px; border-radius:50%; border:1px solid #d7dccf; }
         .fb-color-picker{ width:40px; height:32px; border:1px solid #e7ebdf; border-radius:.55rem; background:#fff; padding:0; }
         .fb-color-picker.mini{ width:32px; height:28px; }
-
-        .page, .page > div, .page .page-content { overflow: visible !important; }
-.page .page-content { position: relative; }
-
 
         @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 360px); } }
       `}</style>
