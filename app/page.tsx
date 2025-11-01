@@ -129,14 +129,18 @@ export default function Home() {
           <div className="container">
             <Reveal>
               <h2 className="dir-title">Annual Directory</h2>
-              <p className="dir-lead">Browse the 2025 directory and preview the 2026 structure.</p>
+              <p className="dir-lead">The Unison Directory is updated annually to provide valuable information to older adults, family members, support worker or referral agency about housing and relevant services within Southern Alberta.
+                
+
+
+              </p>
 
               <div className="cards-dark">
                 <article className="card-dark">
                   <span className="year">2025</span>
-                  <div className="ctitle">Unison Directory 2025</div>
+                  <div className="ctitle">Services & Housing Directory 2025</div>
                   <p>
-                    Alberta Services and Housing.
+                    Explore our Interactive Directory Catalogue - a 170-page resource for seniors.
                   </p>
                   <p style={{ marginTop: 12 }}>
   <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
@@ -148,7 +152,7 @@ export default function Home() {
 
                 <article className="card-dark">
                   <span className="year">2026</span>
-                  <div className="ctitle">Unison Directory 2026 (comming soon...)</div>
+                  <div className="ctitle">Services & Housing Directory 2026</div>
                   <p>
                     Alberta Services and Housing.
                   </p>
