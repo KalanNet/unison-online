@@ -125,43 +125,40 @@ export default function Home() {
         </section>
 
         {/* ===== DIRECTORY ===== */}
-        <section className="dir-wrap">
-          <div className="container">
-            <Reveal>
-              <h2 className="dir-title">Unison Annual Directory</h2>
-              <p className="dir-lead">The Unison Directory is updated annually to provide valuable information to older adults, family members, support worker or referral agency about housing and relevant services within Southern Alberta.
-                
+<section className="dir-wrap">
+  <div className="container">
+    <Reveal>
+      <h2 className="dir-title">Unison Annual Directory</h2>
+      <p className="dir-lead">The Unison Directory is updated annually to provide valuable information to older adults, family members, support worker or referral agency about housing and relevant services within Southern Alberta.
+      </p>
 
+      <div className="cards-dark">
+        <article className="card-dark">
+          <span className="year">2026</span>
+          <div className="ctitle">Services & Housing Directory 2026</div>
+          <p>
+            Discover what’s new in the 2026 edition – an updated Interactive Directory Catalogue for seniors.
+          </p>
+          <p style={{ marginTop: 12, color: "var(--text-dim)" }}>Coming soon</p>
+        </article>
 
-              </p>
+        <article className="card-dark">
+          <span className="year">2025</span>
+          <div className="ctitle">Services & Housing Directory 2025</div>
+          <p>
+            Explore our Interactive Directory Catalogue – a 170-page resource for seniors.
+          </p>
+          <p style={{ marginTop: 12 }}>
+            <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
+              Explore →
+            </a>
+          </p>
+        </article>
+      </div>
+    </Reveal>
+  </div>
+</section>
 
-              <div className="cards-dark">
-                <article className="card-dark">
-                  <span className="year">2025</span>
-                  <div className="ctitle">Services & Housing Directory 2025</div>
-                  <p>
-                    Explore our Interactive Directory Catalogue - a 170-page resource for seniors.
-                  </p>
-                  <p style={{ marginTop: 12 }}>
-  <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
-    Explore →
-  </a>
-</p>
-
-                </article>
-
-                <article className="card-dark">
-                  <span className="year">2026</span>
-                  <div className="ctitle">Services & Housing Directory 2026</div>
-                  <p>
-                    Alberta Services and Housing.
-                  </p>
-                  <p style={{ marginTop: 12, color: "var(--text-dim)" }}>Coming soon</p>
-                </article>
-              </div>
-            </Reveal>
-          </div>
-        </section>
       </main>
     </>
   );

@@ -87,7 +87,7 @@ export default function RootLayout({
         >
           <div className="container flex items-center justify-between gap-2">
             <span style={{ color: "var(--ua-text-inv)", opacity: 0.9 }}>
-              © {year} Unison Alberta — All rights reserved.
+              Copyright © {year} – Unison Alberta Online | All Rights Reserved.
             </span>
             <a
               href="https://skyronis.com"
@@ -96,7 +96,7 @@ export default function RootLayout({
               target="_blank"
               style={{ color: "var(--ua-text-inv)" }}
             >
-              Built by <strong>Skyron Intelligent Solutions</strong>.
+              Created by SKYRON Intelligent Solutions.
             </a>
           </div>
         </footer>
