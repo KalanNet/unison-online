@@ -55,6 +55,56 @@ function autoFromTitle(title?: string): string {
   return slugFinal(title);
 }
 
+function SlugInput({
+  value,
+  title,
+  onChange,
+}: {
+  value: string;
+  title?: string;
+  onChange: (v: string) => void;
+}) {
+  const [slugInput, setSlugInput] = React.useState<string>(value || "");
+  const dirtyRef = React.useRef(false);
+
+  // синхронізуємося із зовнішнім value
+  React.useEffect(() => { setSlugInput(value || ""); }, [value]);
+
+  // автогенерація зі зміненого Title, якщо користувач ще не редагував
+  React.useEffect(() => {
+    if (!dirtyRef.current && (!slugInput || slugInput.length === 0)) {
+      const auto = autoFromTitle(title || "");
+      if (auto) { setSlugInput(auto); onChange(auto); }
+    }
+  }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    dirtyRef.current = true;
+    const live = slugLive(e.target.value);
+    setSlugInput(live);
+    onChange(live);
+  };
+
+  const handleBlur = () => {
+    const fin = slugFinal(slugInput);
+    setSlugInput(fin);
+    onChange(fin);
+  };
+
+  return (
+    <input
+      className="fb-inp"
+      value={slugInput}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder="auto-from-title"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      inputMode="text"
+    />
+  );
+}
 
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
@@ -146,59 +196,13 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           {/* --- S L U G --- */}
 <label className="fb-field">
   <div className="fb-lab">Slug</div>
-  {(() => {
-    // локальний стан для м’якого набору
-    const [slugInput, setSlugInput] = React.useState<string>(ctrl.meta.slug ?? "");
-    const dirtyRef = React.useRef<boolean>(false); // true після першого ручного редагування
-
-    // якщо slug у контролері зовні змінився (наприклад, після publish/load) — підтягнемо його
-    React.useEffect(() => {
-      setSlugInput(ctrl.meta.slug ?? "");
-    }, [ctrl.meta.slug]);
-
-    // Автогенерація зі Title: лише поки користувач вручну не редагував slug
-    React.useEffect(() => {
-      if (!dirtyRef.current) {
-        const auto = autoFromTitle(ctrl.title || "");
-        if (auto && !slugInput) {
-          setSlugInput(auto);
-          ctrl.setMeta({ slug: auto as any });
-        }
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ctrl.title]);
-
-    const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      dirtyRef.current = true;
-      // "жива" нормалізація — дозволяє без блоків вводити "-",
-      // & перетвориться в "and", пробіли/юнікод-дефіси → "-"
-      const live = slugLive(raw);
-      setSlugInput(live);
-      ctrl.setMeta({ slug: live as any });
-    };
-
-    const onBlur = () => {
-      const fin = slugFinal(slugInput);
-      setSlugInput(fin);
-      ctrl.setMeta({ slug: fin as any });
-    };
-
-    return (
-      <input
-        className="fb-inp"
-        value={slugInput}
-        onChange={onChange}
-        onBlur={onBlur}
-        placeholder="auto-from-title"
-        autoCapitalize="none"
-        autoCorrect="off"
-        spellCheck={false}
-        inputMode="text"
-      />
-    );
-  })()}
+  <SlugInput
+    value={ctrl.meta.slug ?? ""}
+    title={ctrl.meta.title || ctrl.title}
+    onChange={(v) => ctrl.setMeta({ slug: v as any })}
+  />
 </label>
+
 
 
           <div className="fb-field">
