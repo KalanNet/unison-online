@@ -296,41 +296,47 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       onMouseLeave={ctrl!.handlePageMouseLeave}
     >
       {/* Закладки поза сторінкою */}
-      {pageBookmarks.map((bookmark: typeof ctrl.bookmarks[0], idx: number) => (
-        <div
-          key={bookmark.id}
-          className="page-bookmark"
-          style={{
-            position: "absolute",
-            [isRightPage ? "right" : "left"]: "-84px", // Робить закладку виступаючою
-            top: `${20 + idx * 50}px`,
-            width: "80px",
-            height: "40px",
-            background: bookmark.color || "#f47e20",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: isRightPage ? "flex-start" : "flex-end",
-            fontSize: "11px",
-            fontWeight: 700,
-            borderTopLeftRadius: isRightPage ? 0 : "8px",
-            borderBottomLeftRadius: isRightPage ? 0 : "8px",
-            borderTopRightRadius: isRightPage ? "8px" : 0,
-            borderBottomRightRadius: isRightPage ? "8px" : 0,
-            boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,0.2)" : "2px 2px 8px rgba(0,0,0,0.2)",
-            cursor: "pointer",
-            zIndex: 10,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            padding: "0 6px",
-          }}
-          onClick={() => ctrl!.goToBookmark(bookmark.id)}
-          title={bookmark.label}
-        >
-          {bookmark.label}
-        </div>
-      ))}
+      {pageBookmarks.map((bookmark, idx) => (
+  <div
+    key={bookmark.id}
+    className="page-bookmark"
+    style={{
+      position: "absolute",
+      // було: [isRightPage ? "right" : "left"]: "-84px",
+      [isRightPage ? "right" : "left"]: 0,                      // упритул до краю сторінки
+      transform: isRightPage
+        ? "translateX(calc(100% - 2px))"                        // на 2px «всередину» щоб не було просвіту
+        : "translateX(calc(-100% + 2px))",
+      transformOrigin: isRightPage ? "left center" : "right center",
+      top: `${20 + idx * 50}px`,
+      width: "80px",
+      height: "40px",
+      background: bookmark.color || "#f47e20",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: isRightPage ? "flex-start" : "flex-end",
+      fontSize: "11px",
+      fontWeight: 700,
+      borderTopLeftRadius: isRightPage ? 0 : "8px",
+      borderBottomLeftRadius: isRightPage ? 0 : "8px",
+      borderTopRightRadius: isRightPage ? "8px" : 0,
+      borderBottomRightRadius: isRightPage ? "8px" : 0,
+      boxShadow: isRightPage ? "-2px 2px 8px rgba(0,0,0,.2)" : "2px 2px 8px rgba(0,0,0,.2)",
+      cursor: "pointer",
+      zIndex: 200,                                              // поверх сторінки/тіні
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      padding: "0 6px",
+    }}
+    onClick={() => ctrl!.goToBookmark(bookmark.id)}
+    title={bookmark.label}
+  >
+    {bookmark.label}
+  </div>
+))}
+
 
       {/* Сторінка */}
       {bmp ? (
@@ -440,6 +446,11 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   background: #21353a;
   overflow: hidden;
 }
+
+/* Закладка може виходити за межі сторінки FlipBook */
+.page, .page > div, .page .page-content { overflow: visible !important; }
+.page .page-content { position: relative; }
+
 .page-bookmark {
   transition:
     transform 0.21s cubic-bezier(.7,0,.2,1),
@@ -448,7 +459,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     font-size 0.21s cubic-bezier(.7,0,.2,1);
 }
 .page-bookmark.right:hover {
-  transform: translateX(18px) scale(1.07);
+  transform: translateX(15px) scale(1.07);
   width: 88px;
   height: 43px;
   font-size: 1.07em;
