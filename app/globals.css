@@ -99,7 +99,7 @@ main{ flex:1 0 auto; }
 /* Ліва колонка */
 .ua-hero__left{ padding-block: 6px; }
 .ua-hero__title{
-  font-weight: 900; letter-spacing: -.02em; line-height: 0;
+  font-weight: 900; letter-spacing: -.02em; line-height: 1.03;
   font-size: clamp(40px, 6.6vw, 68px); margin: 0 0 14px;
 }
 .ua-hero__lead{ max-width: 62ch; color: #d7e6e4; font-size: clamp(15px, 1.6vw, 18px); }
