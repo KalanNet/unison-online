@@ -241,19 +241,22 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
           borderRadius: "0 10px 10px 0",
         };
 
-        const sideStyle: React.CSSProperties = sideIsLeft
+  const sideStyle: React.CSSProperties = sideIsLeft
   ? {
-      left: "calc(var(--tabThickness) * -1)",
-      // ріст назовні з лівого боку (після rotate точка кріплення — "right")
-      transform: "scaleX(var(--bmScale,1)) rotate(180deg)",
-      transformOrigin: "left center",
+      // Лівий таб: приклеєно до краю сторінки
+      left: 0,
+      // Виносимо за край і масштабуємо назовні
+      // Порядок ВАЖЛИВИЙ: translate → rotate → scale
+      transform: "translateX(-100%) rotate(180deg) scaleX(var(--bmScale,1))",
+      transformOrigin: "right center", // внутрішній край (біля сторінки)
     }
   : {
-      right: "calc(var(--tabThickness) * -1)",
-      // ріст назовні з правого боку; точка кріплення — "left"
-      transform: "scaleX(var(--bmScale,1))",
+      // Правий таб
+      right: 0,
+      transform: "translateX(100%) scaleX(var(--bmScale,1))",
       transformOrigin: "left center",
     };
+
         return (
           <button
             key={bm.id}
