@@ -76,6 +76,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
         <main className="flex-1">{children}</main>
 {/* мінімальний футер (server-friendly) */}
+{/* ===== FOOTER (desktop unchanged; wraps & centers on narrow) ===== */}
 <footer
   className="border-t py-3"
   style={{
@@ -84,25 +85,33 @@ export default function RootLayout({
     color: "var(--ua-text-inv)",
   }}
 >
-  {/* ВАЖЛИВО: той самий контейнер, що й у хедері */}
-  <div className="ua-container flex items-center justify-between gap-2">
-    <span style={{ opacity: 0.9 }}>
-      Copyright © {year} – Unison Alberta Online | All Rights Reserved.
-    </span>
+  <div className="ua-container flex flex-wrap items-center justify-between gap-2">
+    {/* Ліва секція: 2 рядки (на вузьких центрується) */}
+    <div className="basis-full sm:basis-auto text-center sm:text-left" style={{ opacity: 0.9 }}>
+      <span className="block sm:inline">
+        Copyright © {year} – Unison Alberta Online
+      </span>
+      <span className="block sm:inline sm:ml-1">
+        All Rights Reserved.
+      </span>
+    </div>
 
-    {/* беклінк: підкреслення лише на hover */}
-    <a
-      href="https://skyronis.com"
-      className="hover:underline"
-      rel="noopener noreferrer"
-      target="_blank"
-      aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
-      title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
-    >
-      Created by SKYRON Intelligent Solutions
-    </a>
+    {/* Права секція: на вузьких переходить на новий рядок і центрується */}
+    <div className="basis-full sm:basis-auto text-center sm:text-right">
+      <a
+        href="https://skyronis.com"
+        className="hover:underline"
+        rel="noopener noreferrer"
+        target="_blank"
+        aria-label="SKYRON Intelligent Solutions — site developers"
+        title="SKYRON Intelligent Solutions — site developers"
+      >
+        Created by SKYRON Intelligent Solutions
+      </a>
+    </div>
   </div>
 </footer>
+
 
       </body>
     </html>
