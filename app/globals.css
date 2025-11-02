@@ -71,7 +71,7 @@ main{ flex:1 0 auto; }
 /* ===== HERO ===== */
 .ua-hero{
   color: #eaf4f2;
-  padding: clamp(72px, 8vw, 122px) 0;
+  padding: clamp(50px, 6vw, 122px) 0;
   background: linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%);
   position:relative; overflow:hidden;
 }
