@@ -117,7 +117,7 @@ export default function PublicViewer({
   const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
     (bmp?.links as any) ?? [];
 
-  const pageBookmarks = (bookmarks || []).filter((b) => Number(b.page) === pageNum);
+
 
   return (
     <div
@@ -180,68 +180,7 @@ export default function PublicViewer({
               )
             : null}
 
-          {/* PAGE-ATTACHED BOOKMARK TABS */}
-          {pageBookmarks.map((bm, idx) => {
-            const isRight = pageNum % 2 === 1; // непарна сторінка — права
-            return (
-              <button
-                key={bm.id || `${pageNum}-${idx}`}
-                className={`page-bookmark ${isRight ? "right" : "left"}`}
-                title={`${bm.label} (p.${bm.page})`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip()?.flip((bm.page ?? 1) - 1);
-                }}
-                style={{
-                  position: "absolute",
-                  top: `${20 + idx * 50}px`,
-                  [isRight ? "right" : "left"]: 0,
-                  transform: isRight
-                    ? "translateX(calc(100% - 2px))"
-                    : "translateX(calc(-100% + 2px))",
-                  transformOrigin: isRight ? "left center" : "right center",
-                  width: "80px",
-                  height: "40px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: isRight ? "flex-start" : "flex-end",
-                  padding: "0 6px",
-                  color: "#fff",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  background: bm.color || "#f47e20",
-                  border: "1px solid rgba(0,0,0,.18)",
-                  boxShadow: isRight
-                    ? "-2px 2px 8px rgba(0,0,0,.2)"
-                    : "2px 2px 8px rgba(0,0,0,.2)",
-                  borderTopLeftRadius: isRight ? 0 : 8,
-                  borderBottomLeftRadius: isRight ? 0 : 8,
-                  borderTopRightRadius: isRight ? 8 : 0,
-                  borderBottomRightRadius: isRight ? 8 : 0,
-                  zIndex: 1000,
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  pointerEvents: "auto",
-                }}
-              >
-                <span
-                  className="page-bookmark__txt"
-                  style={{
-                    writingMode: "vertical-rl",
-                    textOrientation: "mixed",
-                    transform: !isRight ? "rotate(180deg)" : "none",
-                    lineHeight: 1,
-                    maxHeight: "36px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {bm.label}
-                </span>
-              </button>
-            );
-          })}
+          
         </>
       ) : (
         <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
@@ -388,22 +327,7 @@ export default function PublicViewer({
 .page, .page > div, .page .page-content { overflow: visible !important; }
 .page .page-content { position: relative; }
 
-.page-bookmark{
-  transition:
-    transform 0.21s cubic-bezier(.7,0,.2,1),
-    width 0.21s cubic-bezier(.7,0,.2,1),
-    height 0.21s cubic-bezier(.7,0,.2,1),
-    font-size 0.21s cubic-bezier(.7,0,.2,1);
-}
 
-/* правий/лівий — різні селектори збережені */
-.page-bookmark.right:hover,
-.page-bookmark.left:hover{
-  --bmScale: 1.07;     /* <- працює поверх inline, бо це змінна */
-  width: 88px;
-  height: 43px;
-  font-size: 1.07em;
-}
 
 /* десь у <style jsx global> PublicViewer */
 .bm-tab {
@@ -414,13 +338,6 @@ export default function PublicViewer({
   filter: drop-shadow(0 0 6px rgba(255,255,255,.25)) brightness(1.05);
 }
 
-
-/* Текст на лівій закладці читається нормально */
-.page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
-.page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
-
-/* Не зникає на звороті під час перегортання */
-.page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
 
 
 @media (max-width: 680px){
