@@ -75,21 +75,26 @@ export default function PublicViewer({
       />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
-        <div
-          className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
-          style={{
-            transition: "transform 500ms ease-in-out",
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
-            height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
-            maxWidth: "100vw",
-            maxHeight: "100vh",
-            position: "relative",
-          }}
-        >
+  {/* НОВИЙ внутрішній контейнер, який резервує місце симетрично всередині сцени */}
+  <div className="stage-rail">
+    <div
+      className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+      style={{
+        transition: "transform 500ms ease-in-out",
+        margin: "0 auto",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: ctrl.single
+          ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
+          : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+        height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+        // ВАЖЛИВО: щоб «книга» не виходила за межі stage-rail навіть з translateX
+        maxWidth: "100%",
+        maxHeight: "100%",
+        position: "relative",
+      }}
+    >
           <FlipBook
             ref={ctrl.bookRef}
             width={ctrl.baseSize.w}
@@ -300,7 +305,7 @@ const sideStyle: React.CSSProperties = sideIsLeft
   </div>
 )}
 {/* === /OVERLAY ЗАКЛАДОК === */}
-
+</div>
 
         </div>
       </section>
@@ -330,6 +335,13 @@ const sideStyle: React.CSSProperties = sideIsLeft
         html, body { margin: 0; height: 100%; background: #21353a; overflow: hidden !important; }
         * { box-sizing: border-box; }
         :root { --hdr: 56px; --ftr: 64px; }
+        :root{
+  /* товщина закладки */
+  --tabThickness: 36px;            /* якщо вже є — ок */
+  /* внутрішній запас під закладки з обох боків (36 + невеликий повітря) */
+  --rail: calc(var(--tabThickness) + 12px);
+}
+
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
         .viewer-root { min-height: 100svh; width: 100vw; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
         .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
@@ -345,7 +357,20 @@ const sideStyle: React.CSSProperties = sideIsLeft
 .page, .page > div, .page .page-content { overflow: visible !important; }
 .page .page-content { position: relative; }
 
-
+/* нова обгортка, яка дає ВНУТРІШНІЙ запас і тримає все всередині лейауту */
+.stage-rail{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding-inline: var(--rail);     /* симетричний внутрішній відступ */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;                /* тримає все всередині */
+  /* ключове: не вилазити за межі сцени */
+  max-width: 100%;
+  box-sizing: border-box;
+}
 
 /* десь у <style jsx global> PublicViewer */
 .bm-tab {
