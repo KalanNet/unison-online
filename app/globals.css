@@ -195,6 +195,11 @@ main{ flex:1 0 auto; }
 .cards-dark{ display:grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 24px; }
 @media (max-width: 960px){ .cards-dark{ grid-template-columns: 1fr; } }
 
+@media (max-width: 360px){
+  .ua-metric{ row-gap: 1px; }
+  .ua-metric__num{ line-height: .95; }
+}
+
 .card-dark{
   background: #fff4e7;
   border: 1px solid #e3ecea;
