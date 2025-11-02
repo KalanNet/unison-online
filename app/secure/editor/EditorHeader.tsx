@@ -8,6 +8,10 @@ type Props = {
   /** виклик пошуку (в editor показуємо prompt) */
   onSearch: (q: string) => void;
   isSearching?: boolean;
+  searchOpen?: boolean;
+  onSearchToggle?: (open: boolean) => void;
+  searchQuery?: string;
+  onSearchChange?: (v: string) => void;
 
   /** для кнопки Download */
   file: string;
@@ -27,6 +31,10 @@ export default function EditorHeader({
   title,
   onSearch,
   isSearching,
+    searchOpen,
+  onSearchToggle,
+  searchQuery,
+  onSearchChange,
   file,
   isFs,
   toggleFullscreen,
@@ -68,19 +76,41 @@ export default function EditorHeader({
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           {/* Search */}
-          <button
-            className="lh-iconbtn"
-            onClick={runPromptSearch}
-            title="Search"
-            disabled={!!isSearching}
-            aria-label="Search"
-          >
-            {/* magnifier */}
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
-              <path d="M20 20l-4.35-4.35" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-          </button>
+{searchOpen ? (
+  <input
+    className="lh-search"
+    value={searchQuery ?? ""}
+    onChange={(e) => onSearchChange?.(e.target.value)}
+    placeholder="Search…"
+    aria-label="Search in PDF"
+    autoFocus
+    onKeyDown={(e) => {
+      if (e.key === "Escape") {
+        onSearchChange?.("");
+        onSearchToggle?.(false);
+      }
+      if (e.key === "Enter") {
+        onSearch?.(searchQuery ?? "");
+      }
+    }}
+    style={{ width: 180 }}
+  />
+) : (
+  <button
+    className="lh-iconbtn"
+    onClick={() => onSearchToggle?.(true)}
+    title="Search"
+    disabled={!!isSearching}
+    aria-label="Search"
+  >
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M20 20l-4.35-4.35" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+    </svg>
+  </button>
+)}
+
+
 
           {/* Download */}
           <a className="lh-iconbtn" href={file} download title="Download PDF" aria-label="Download">
@@ -149,6 +179,17 @@ export default function EditorHeader({
           color: #2d3018;
           box-shadow: 0 4px 12px rgba(0,0,0,.06);
         }
+          .lh-search{
+  height:32px;
+  padding:6px 10px;
+  border-radius:8px;
+  border:1px solid rgba(0,0,0,.12);
+  background:#fff;
+  color:#2d3018;
+  font-size:14px;
+  min-width:0;
+}
+
         .lh-iconbtn[disabled] { opacity: .5; pointer-events: none; }
       `}</style>
     </header>
