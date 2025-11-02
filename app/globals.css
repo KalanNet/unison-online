@@ -174,10 +174,20 @@ main{ flex:1 0 auto; }
 .ua-metric__label{
   font-size:16px;
   color: rgba(255,255,255,.85);
-  line-height: 1;
   padding-bottom: 4px;
-  margin: -2px 0 0 0;
 }
+
+@media (max-width: 640px){
+  .ua-metric__label{
+    font-size:16px;
+    color: rgba(255,255,255,.85);
+    line-height: 1;
+    padding-bottom: 4px;
+    margin: -1px 0 0 0;
+  }
+}
+
+
 
 /* ===== DIRECTORY ===== */
 .dir-wrap{
