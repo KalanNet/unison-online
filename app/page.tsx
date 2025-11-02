@@ -90,7 +90,7 @@ export default function Home() {
                 width={1200}
                 height={630}
                 priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
+                sizes="(max-width: 1100px) 100vw, (max-width: 1560px) 44vw, 880px"
                 className="ua-heroCard__img"
                 draggable={false}
               />

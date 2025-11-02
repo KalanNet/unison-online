@@ -99,7 +99,7 @@ export default function RootLayout({
       aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
       title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
     >
-      Created by SKYRON Intelligent Solutions.
+      Created by SKYRON Intelligent Solutions
     </a>
   </div>
 </footer>
