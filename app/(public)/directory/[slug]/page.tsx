@@ -5,13 +5,13 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /* ---------- Types ---------- */
-type Bookmark = { id: string; page: number; label: string; color?: string | null };
+type Bookmark = { id: string; page: number; label: string; color: string | null };
 
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   file?: string;
   publishedAt?: string;
-  bookmarks?: Bookmark[]; // ← важливо: додаємо закладки у payload
+  bookmarks?: Bookmark[];
 };
 
 /* ---------- Helpers ---------- */
@@ -37,11 +37,10 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
     const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
     const label = String(anyIt.label ?? "");
     const colorRaw = anyIt.color;
-    const color =
-      typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
-    out.push({ id, page, label, color });
+    const color = typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
+    if (label.length > 0) out.push({ id, page, label, color });
   }
-  // structuredClone fallback: JSON roundtrip (гарантовано серіалізований plain-об’єкт)
+  // structuredClone fallback: JSON roundtrip (plain-об’єкт)
   return JSON.parse(JSON.stringify(out));
 }
 
@@ -83,7 +82,9 @@ export default async function Page({
   if (!data?.file) {
     if (typeof searchParams.file === "string" && searchParams.file) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
-      return <PublicViewer file={searchParams.file} title="Preview" />;
+      const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
+      const title = data?.meta?.title || slug || "Preview";
+      return <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />;
     }
     // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
@@ -93,15 +94,7 @@ export default async function Page({
   // Основний рендер публічного в’ювера
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title ?? slug;
-
-  // ← ЄДИНА зміна: санітаризуємо та клонуємо bookmarks перед передачею
   const safeBookmarks = sanitizeBookmarks(data.bookmarks);
 
-  return (
-    <PublicViewer
-      file={data.file}
-      title={title}
-      bookmarks={safeBookmarks}
-    />
-  );
+  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />;
 }

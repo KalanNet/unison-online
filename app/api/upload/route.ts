@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       new PutObjectCommand({
         Bucket: R2_BUCKET,
         Key: objectKey,
-        Body: Buffer.from(arrayBuffer),
+        Body: new Uint8Array(arrayBuffer),
         ContentType: file.type,
         ACL: "public-read", // можливо забрати, якщо bucket повністю public!
       })
