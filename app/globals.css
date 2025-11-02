@@ -164,8 +164,7 @@ main{ flex:1 0 auto; }
 /* смужка метрик (як у референсі) */
 .ua-heroCard__metrics{
   position:absolute; left:0; right:0; bottom:0;
-  display:flex; align-items:center; justify-content:space-evenly; gap:28px;
-  min-height: 100px;
+  display:flex; align-items:center; justify-content:space-evenly; gap:25px;
   background: linear-gradient(0deg, rgba(22,22,22,.72), rgba(22,22,22,.36));
   color: #fff; z-index:3;
 }
