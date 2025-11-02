@@ -253,6 +253,98 @@ export default function PublicViewer({
 })}
 
           </FlipBook>
+
+          {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
+{(bookmarks?.length ?? 0) > 0 && (
+  <div
+    className="bm-tabs-overlay"
+    style={{
+      position: "absolute",
+      inset: 0,
+      zIndex: 200,
+      overflow: "visible",
+      pointerEvents: "none",
+      ["--tabThickness" as any]: "36px",
+      ["--tabLength" as any]: "140px",
+      ["--tabTop" as any]: "36px",
+      ["--tabGap" as any]: "0px",
+    } as React.CSSProperties}
+  >
+    {(() => {
+      const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
+
+      // поточний розворот
+      const leftNow = ctrl!.single
+        ? ctrl!.currentIndex + 1
+        : (ctrl!.currentIndex % 2 === 0 ? ctrl!.currentIndex + 1 : ctrl!.currentIndex);
+      const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
+
+      return sorted.map((bm, i) => {
+        const sideIsLeft = ctrl!.single ? bm.page < (ctrl!.currentIndex + 1) : bm.page < leftNow;
+
+        const baseStyle: React.CSSProperties = {
+          position: "absolute",
+          top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
+          width: "var(--tabThickness)",
+          height: "var(--tabLength)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontSize: 15,
+          fontWeight: 800,
+          lineHeight: 1,
+          border: "1px solid rgba(0,0,0,.18)",
+          boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+          opacity: 0.98,
+          transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
+          pointerEvents: "auto",
+          background: bm.color || "#f47e20",
+          borderRadius: "0 10px 10px 0",
+        };
+
+        const sideStyle: React.CSSProperties = sideIsLeft
+          ? {
+              left: "calc(var(--tabThickness) * -1)",
+              transform: "rotate(180deg)",
+              transformOrigin: "center",
+            }
+          : {
+              right: "calc(var(--tabThickness) * -1)",
+            };
+
+        return (
+          <button
+            key={bm.id}
+            className={`bm-tab ${sideIsLeft ? "left" : "right"}${
+              (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
+            }`}
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => { e.preventDefault(); ctrl!.goToBookmark(bm.id); }}
+            style={{ ...baseStyle, ...sideStyle }}
+          >
+            <span
+              className="bm-tab__label"
+              style={{
+                maxHeight: "calc(var(--tabLength) - 10px)",
+                padding: "4px 0",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+              } as React.CSSProperties}
+            >
+              {bm.label}
+            </span>
+          </button>
+        );
+      });
+    })()}
+  </div>
+)}
+{/* === /OVERLAY ЗАКЛАДОК === */}
+
+
         </div>
       </section>
 
@@ -311,6 +403,15 @@ export default function PublicViewer({
   width: 88px;
   height: 43px;
   font-size: 1.07em;
+}
+
+/* десь у <style jsx global> PublicViewer */
+.bm-tab {
+  border: 0;
+  cursor: pointer;
+}
+.bm-tab.active {
+  filter: drop-shadow(0 0 6px rgba(255,255,255,.25)) brightness(1.05);
 }
 
 
