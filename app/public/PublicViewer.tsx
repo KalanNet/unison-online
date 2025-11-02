@@ -247,8 +247,8 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
       left: 0,
       // Виносимо за край і масштабуємо назовні
       // Порядок ВАЖЛИВИЙ: translate → rotate → scale
-      transform: "translateX(-100%) rotate(180deg) scaleX(var(--bmScale,1))",
-      transformOrigin: "right center", // внутрішній край (біля сторінки)
+       transform: "rotate(180deg) translateX(100%) scaleX(var(--bmScale,1))",
+      transformOrigin: "left center", // внутрішній край (біля сторінки)
     }
   : {
       // Правий таб
