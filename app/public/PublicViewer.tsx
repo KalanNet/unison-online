@@ -243,12 +243,10 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
 
   const sideStyle: React.CSSProperties = sideIsLeft
   ? {
-      // Лівий таб: приклеєно до краю сторінки
-      left: 0,
-      // Виносимо за край і масштабуємо назовні
-      // Порядок ВАЖЛИВИЙ: translate → rotate → scale
-       transform: "rotate(180deg) translateX(100%) scaleX(var(--bmScale,1))",
-      transformOrigin: "left center", // внутрішній край (біля сторінки)
+      // ЛІВА вкладка: правий край приклеєний до сторінки
+      left: "calc(var(--tabThickness) * -1)",
+      transform: "rotate(180deg) scaleX(var(--bmScale,1))",
+      transformOrigin: "right center", // росте вліво (назовні), правий край фіксований
     }
   : {
       // Правий таб
