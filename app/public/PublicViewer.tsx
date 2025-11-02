@@ -27,6 +27,11 @@ export default function PublicViewer({
 
   const [error, setError] = useState<string | null>(null);
 
+  // --- Search UI state (for header) ---
+const [searchOpen, setSearchOpen] = useState(false);
+const [q, setQ] = useState("");
+
+
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   try {
     // контролер не очікує bookmarks — використовуємо їх нижче при рендері
@@ -72,6 +77,15 @@ export default function PublicViewer({
         toggleFullscreen={ctrl.toggleFullscreen}
         handleShare={ctrl.handleShare}
         onPublish={() => {}} // прибито на публічній сторінці
+          /* нове */
+  searchOpen={searchOpen}
+  onSearchToggle={setSearchOpen}
+  searchQuery={q}
+  onSearchChange={(v) => {
+    setQ(v);
+    // якщо інпут став порожнім — просто сховай правий флайаут; поле можна лишити відкритим
+    // якщо хочеш автоматично повертати лупу — переведи setSearchOpen(false) коли v === ""
+  }}
       />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
