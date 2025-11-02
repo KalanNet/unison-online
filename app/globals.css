@@ -164,14 +164,18 @@ main{ flex:1 0 auto; }
 /* смужка метрик (як у референсі) */
 .ua-heroCard__metrics{
   position:absolute; left:0; right:0; bottom:0;
-  display:flex; align-items:center; justify-content:space-evenly; gap:25px;
+  display:flex; align-items:center; justify-content:space-evenly;
   background: linear-gradient(0deg, rgba(22,22,22,.72), rgba(22,22,22,.36));
   color: #fff; z-index:3;
 }
-.ua-metric{ display:grid; gap:4px; text-align:center; }
+.ua-metric{ display:grid; text-align:center; }
 .ua-metric__num{ font-weight:900; font-size: clamp(22px, 2.7vw, 34px); letter-spacing:.2px; }
-.ua-metric__label{ font-size:16px; color: rgba(255,255,255,.85); }
-.ua-dot{ width:6px; height:6px; border-radius:50%; background: rgba(255,153,51,.9); display:inline-block; }
+.ua-metric__label{
+  font-size:16px;
+  color: rgba(255,255,255,.85);
+  padding-bottom: 4px;          /* ⬅ відступ знизу для тексту */
+  /* альтернативно: margin-bottom: 4px; або padding-block-end: 4px; */
+}
 
 /* ===== DIRECTORY ===== */
 .dir-wrap{
