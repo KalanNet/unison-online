@@ -3,8 +3,6 @@ export const dynamic = "force-static";
 
 import type { Metadata } from "next";
 import Image from "next/image";
-
-import Reveal from "./components/Reveal";
 import CountUp from "./components/CountUp";
 
 export const metadata: Metadata = {
@@ -25,8 +23,6 @@ export const metadata: Metadata = {
 
 const OFFICIAL = "https://unisonalberta.com";
 const DONATE = "https://unisonalberta.com/donate";
-const CONTACT = "https://unisonalberta.com/contact";
-const ABOUT = "https://unisonalberta.com/about";
 
 export default function Home() {
   const jsonLd = {
@@ -37,30 +33,41 @@ export default function Home() {
     logo: "https://unison-online-dev.pages.dev/unison-logo.svg",
     sameAs: [OFFICIAL],
     department: [
-      { "@type": "Organization", name: "Unison Alberta Directory", url: "https://unisonalberta.online/directory/2025" },
+      {
+        "@type": "Organization",
+        name: "Unison Alberta Directory",
+        url: "https://unisonalberta.online/directory/2025",
+      },
     ],
   };
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script
+        type="application/ld+json"
+        // SEO: структуровані дані
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       <main>
         {/* ===== HEADER ===== */}
         <header className="ua-header">
-  <div className="ua-container ua-header__in">
-    <a href="/" className="ua-header__brand" aria-label="Unison Alberta — Home">
-      <img src="/unison-logo.svg" alt="Unison Alberta" className="ua-header__logo" />
-    </a>
+          <div className="ua-container ua-header__in">
+            <a
+              href="/"
+              className="ua-header__brand scale-90 sm:scale-100 origin-left"
+              aria-label="Unison Alberta — Home"
+            >
+              <img src="/unison-logo.svg" alt="Unison Alberta" className="ua-header__logo" />
+            </a>
 
-    <nav className="ua-header__nav">
-      <a href={DONATE} className="ua-btn ua-btn--accent" style={{ color: "#fff" }}>
-        Donate now
-      </a>
-    </nav>
-  </div>
-</header>
-
+            <nav className="ua-header__nav scale-90 sm:scale-100 origin-right">
+              <a href={DONATE} className="ua-btn ua-btn--accent" style={{ color: "#fff" }}>
+                Donate now
+              </a>
+            </nav>
+          </div>
+        </header>
 
         {/* ===== HERO ===== */}
         <section className="ua-hero">
@@ -71,6 +78,7 @@ export default function Home() {
                 <br />
                 in Alberta
               </h1>
+
               <p className="ua-hero__lead">
                 Empowering seniors 50+ to live their best lives through a series of programs and services.
               </p>
@@ -94,7 +102,9 @@ export default function Home() {
                 className="ua-heroCard__img"
                 draggable={false}
               />
+
               <figcaption className="ua-heroCard__metrics">
+                {/* 5.9K Members */}
                 <div className="ua-metric">
                   <div className="ua-metric__num">
                     <CountUp end={5.9} decimals={1} suffix="K" />
@@ -104,64 +114,76 @@ export default function Home() {
 
                 <span className="ua-dot" />
 
+                {/* 50+ Years / Years of Serving Seniors */}
                 <div className="ua-metric">
                   <div className="ua-metric__num">
                     <CountUp end={50} decimals={0} suffix="+" />
                   </div>
-                  <div className="ua-metric__label">Years of Serving Seniors</div>
+                  <div className="ua-metric__label">
+                    <span className="sm:hidden">Years</span>
+                    <span className="hidden sm:inline">Years of Serving Seniors</span>
+                  </div>
                 </div>
 
                 <span className="ua-dot" />
 
+                {/* 55K Clients / Clients in 2024 */}
                 <div className="ua-metric">
                   <div className="ua-metric__num">
                     <CountUp end={55} decimals={0} suffix="K" />
                   </div>
-                  <div className="ua-metric__label">Clients in 2024</div>
+                  <div className="ua-metric__label">
+                    <span className="sm:hidden">Clients</span>
+                    <span className="hidden sm:inline">Clients in 2024</span>
+                  </div>
                 </div>
               </figcaption>
             </figure>
           </div>
         </section>
 
-        {/* ===== DIRECTORY ===== */}
-<section className="dir-wrap">
-  <div className="container">
-    <Reveal>
-      <h2 className="dir-title">Unison Annual Directory</h2>
-      <p className="dir-lead">The Unison Directory is updated annually to provide valuable information to older adults, family members, support worker or referral agency about housing and relevant services within Southern Alberta.
-      </p>
+        {/* ===== DIRECTORY (без Reveal/lazy) ===== */}
+        <section className="dir-wrap">
+          <div className="container">
+            <h2 className="dir-title">Unison Annual Directory</h2>
+            <p className="dir-lead">
+              The Unison Directory is updated annually to provide valuable information to older adults, family members,
+              support worker or referral agency about housing and relevant services within Southern Alberta.
+            </p>
 
-      <div className="cards-dark">
-        <article className="card-dark">
-          <span className="year">2026</span>
-          <div className="ctitle">Services & Housing Directory 2026</div>
-          <p>
-            Discover what’s new in the 2026 edition – an updated Interactive Directory Catalogue for seniors.
-          </p>
-          <p style={{ marginTop: 12 }}>
-  <span className="link-light link-disabled">Coming soon →</span>
-</p>
+            <div className="cards-dark">
+              {/* 2026 */}
+              <article className="card-dark">
+                <span className="year">2026</span>
+                <div className="ctitle">Services &amp; Housing Directory 2026</div>
+                <p>
+                  Discover what’s new in the 2026 edition – an updated Interactive Directory Catalogue for seniors.
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  {/* не-клік, стилізовано як Explore */}
+                  <span className="link-light link-disabled">Coming soon →</span>
+                </p>
+              </article>
 
-        </article>
-
-        <article className="card-dark">
-          <span className="year">2025</span>
-          <div className="ctitle">Services & Housing Directory 2025</div>
-          <p>
-            Explore our Interactive Directory Catalogue – a 170-page informational resource for older adults.
-          </p>
-          <p style={{ marginTop: 12 }}>
-            <a className="link-light" href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025">
-              Explore →
-            </a>
-          </p>
-        </article>
-      </div>
-    </Reveal>
-  </div>
-</section>
-
+              {/* 2025 */}
+              <article className="card-dark">
+                <span className="year">2025</span>
+                <div className="ctitle">Services &amp; Housing Directory 2025</div>
+                <p>
+                  Explore our Interactive Directory Catalogue – a 170-page informational resource for older adults.
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  <a
+                    className="link-light"
+                    href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025"
+                  >
+                    Explore →
+                  </a>
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
       </main>
     </>
   );
