@@ -139,7 +139,10 @@ export default function Home() {
           <p>
             Discover what’s new in the 2026 edition – an updated Interactive Directory Catalogue for seniors.
           </p>
-          <p style={{ marginTop: 12, color: "var(--text-dim)" }}>Coming soon</p>
+          <p style={{ marginTop: 12 }}>
+  <span className="link-light link-disabled">Coming soon →</span>
+</p>
+
         </article>
 
         <article className="card-dark">
