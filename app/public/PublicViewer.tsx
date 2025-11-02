@@ -32,6 +32,8 @@ const [searchOpen, setSearchOpen] = useState(false);
 const [q, setQ] = useState("");
 
 
+
+
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   try {
     // контролер не очікує bookmarks — використовуємо їх нижче при рендері
@@ -39,6 +41,21 @@ const [q, setQ] = useState("");
   } catch (err: any) {
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
+
+  // === AUTO-SEARCH (debounced) ===
+React.useEffect(() => {
+  const inst = ctrl;           // фіксуємо посилання для TS
+  const qTrim = q.trim();
+  if (!inst) return;
+
+  const t = setTimeout(() => {
+    inst.runSearch(qTrim);
+  }, 250);
+
+  return () => clearTimeout(t);
+}, [q, file, ctrl]);
+// === /AUTO-SEARCH ===
+
 
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
@@ -66,27 +83,28 @@ const [q, setQ] = useState("");
 
 
 
-  return (
-    <div className="viewer-root">
-      <EditorHeader
-        title={ctrl.title}
-        onSearch={ctrl.runSearch}
-        isSearching={(ctrl as any).searching ?? false}
-        file={file}
-        isFs={ctrl.isFs}
-        toggleFullscreen={ctrl.toggleFullscreen}
-        handleShare={ctrl.handleShare}
-        onPublish={() => {}} // прибито на публічній сторінці
-          /* нове */
-  searchOpen={searchOpen}
-  onSearchToggle={setSearchOpen}
-  searchQuery={q}
-  onSearchChange={(v) => {
-    setQ(v);
-    // якщо інпут став порожнім — просто сховай правий флайаут; поле можна лишити відкритим
-    // якщо хочеш автоматично повертати лупу — переведи setSearchOpen(false) коли v === ""
-  }}
-      />
+return (
+  <div className="viewer-root">
+    <EditorHeader
+      title={ctrl.title}
+      onSearch={ctrl.runSearch}
+      isSearching={(ctrl as any).searching ?? false}
+      file={file}
+      isFs={ctrl.isFs}
+      toggleFullscreen={ctrl.toggleFullscreen}
+      handleShare={ctrl.handleShare}
+      onPublish={() => {}} // прибито на публічній сторінці
+
+      // --- нове: керування полем пошуку ---
+      searchOpen={searchOpen}
+      onSearchToggle={setSearchOpen}
+      searchQuery={q}
+      onSearchChange={(v) => {
+        setQ(v);
+        // опційно: якщо рядок порожній — сховати флайаут/результати
+        // if (!v.trim()) setSearchOpen(false);
+      }}
+    />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
   {/* НОВИЙ внутрішній контейнер, який резервує місце симетрично всередині сцени */}
@@ -323,6 +341,49 @@ const sideStyle: React.CSSProperties = sideIsLeft
 
         </div>
       </section>
+{/* === RIGHT SEARCH FLYOUT (не впливає на лейаут) === */}
+{q.trim().length > 0 && (
+  <aside className="search-flyout" role="region" aria-label="Search results">
+    <div className="sf-hd">
+      <strong>Search</strong>
+      <span className="sf-meta">
+        {ctrl.searching ? "Searching…" : `${ctrl.hits.length} results`}
+      </span>
+      <button
+        className="sf-close"
+        type="button"
+        onClick={() => { setQ(""); setSearchOpen(false); }}
+        aria-label="Close search"
+        title="Close"
+      >
+        ✕
+      </button>
+    </div>
+
+    <div className="sf-list">
+      {ctrl.hits.length === 0 && !ctrl.searching && (
+        <div className="sf-empty">No matches.</div>
+      )}
+
+      {ctrl.hits.map((h, i) => (
+        <button
+          key={h.id}
+          type="button"
+          className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
+          onClick={() => {
+            ctrl.setActiveHit(i);
+            ctrl.goToPage(h.page);
+          }}
+          title={`Go to page ${h.page}`}
+        >
+          <div className="sf-snippet">{h.snippet}</div>
+          <div className="sf-meta">Page {h.page}</div>
+        </button>
+      ))}
+    </div>
+  </aside>
+)}
+{/* === /RIGHT SEARCH FLYOUT === */}
 
       <ViewerFooter
         refEl={ctrl.toolbarRef}
@@ -408,6 +469,56 @@ const sideStyle: React.CSSProperties = sideIsLeft
   .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
 }
 /* === bookmarks styles END === */
+
+/* === Search flyout (fixed) === */
+.search-flyout{
+  position: fixed;
+  top: var(--hdr);
+  right: 12px;
+  bottom: var(--ftr);
+  width: min(360px, 92vw);
+  background: #fff;
+  color: #1b2430;
+  border: 1px solid #e7ebdf;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.22);
+  z-index: 320;         /* вище за книгу та закладки */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;     /* власний скрол усередині */
+}
+.sf-hd{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fafbf8;
+  border-bottom: 1px solid #eef2e6;
+  font-weight: 800;
+}
+.sf-hd .sf-meta{ margin-left: auto; color:#5b6a50; font-weight:600; }
+.sf-close{
+  background: #fff; border: 1px solid #e7ebdf; border-radius: .6rem;
+  padding: .2rem .55rem; line-height: 1; font-weight: 900; color:#2d3018;
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+}
+.sf-list{
+  overflow: auto; padding: 6px 0; flex: 1 1 auto;
+  background: #fff;
+}
+.sf-empty{
+  padding: 16px 14px; color:#6b7280; font-style: italic;
+}
+.sf-item{
+  width: 100%; text-align: left; background: #fff; border: 0;
+  border-bottom: 1px solid #f1f4ec; padding: 10px 12px; cursor: pointer;
+}
+.sf-item:hover{ background: #f8faf5; }
+.sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
+.sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
+.sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
+/* === /Search flyout === */
+
 
       `}</style>
     </div>
