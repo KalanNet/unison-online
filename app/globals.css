@@ -169,7 +169,7 @@ main{ flex:1 0 auto; }
   background: linear-gradient(0deg, rgba(22,22,22,.72), rgba(22,22,22,.36));
   color: #fff; z-index:3;
 }
-.ua-metric{ display:grid; text-align:center; row-gap: 2px;}
+.ua-metric{ display:grid; text-align:center;}
 .ua-metric__num{ font-weight:900; font-size: clamp(22px, 2.7vw, 34px); letter-spacing:.2px;}
 @media screen and (min-width: 641px){
   .ua-metric__label{
@@ -188,7 +188,7 @@ main{ flex:1 0 auto; }
     color: rgba(255,255,255,.85);
     line-height: 1;
     padding-bottom: 4px;
-    margin: -1px 0 0 0;
+    margin: -5px 0 0 0;
   }
 }
 
