@@ -213,13 +213,12 @@ export default function PublicViewer({
       const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
 
       // поточний розворот
-      const leftNow = ctrl!.single
-        ? ctrl!.currentIndex + 1
-        : (ctrl!.currentIndex % 2 === 0 ? ctrl!.currentIndex + 1 : ctrl!.currentIndex);
-      const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
+      const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
+const leftNow  = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
 
       return sorted.map((bm, i) => {
-        const sideIsLeft = ctrl!.single ? bm.page < (ctrl!.currentIndex + 1) : bm.page < leftNow;
+        const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
 
         const baseStyle: React.CSSProperties = {
           position: "absolute",
@@ -259,7 +258,16 @@ export default function PublicViewer({
               (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
             }`}
             title={`${bm.label} (p.${bm.page})`}
-            onClick={(e) => { e.preventDefault(); ctrl!.goToBookmark(bm.id); }}
+            onClick={(e) => {
+  e.preventDefault();
+  const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
+  if (typeof ctrl!.goToPage === "function") {
+    ctrl!.goToPage(pageIndex);
+  } else {
+    (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+  }
+}}
+
             style={{ ...baseStyle, ...sideStyle }}
           >
             <span
