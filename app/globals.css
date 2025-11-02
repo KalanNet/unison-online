@@ -118,40 +118,41 @@ main{ flex:1 0 auto; }
    — без %; явні піксельні ширини по брейкпоінтах
    — «виліт» вправо на десктопі */
 .ua-heroCard{
+  /* адаптивні змінні */
+  --hc-r:  clamp(24px, 8vw, 84px);   /* радіус кутів */
+  --hc-bw: clamp(4px, 0.6vw, 8px);   /* товщина рамки */
+
   position: relative;
   margin: 0;
-  width: 880px;                      /* було ~1180 — робимо менше */
+  inline-size: clamp(640px, 44vw, 880px); /* замість жорстких width + медіа-квері */
+  max-inline-size: 100%;
   aspect-ratio: 1134 / 409;
-  border-radius: 0 84px 0 84px;
+
+  border-radius: 0 var(--hc-r) 0 var(--hc-r);
   overflow: hidden;
   background: #2a3f3d;
   box-shadow: 0 22px 56px rgba(0,0,0,.36);
   isolation: isolate;
+
   justify-self: end;
-  margin-right: -24px;               /* легкий “bleed” вправо, менший */
+  margin-right: 0;                    /* без «bleed» вправо */
+
+  transition: border-radius .25s ease, inline-size .25s ease;
 }
 
-@media (max-width: 1600px){
-  .ua-heroCard{ width: 1080px; margin-right: -56px; }
-}
-@media (max-width: 1440px){
-  .ua-heroCard{ width: 980px;  margin-right: -40px; }
-}
-@media (max-width: 1280px){
-  .ua-heroCard{ width: 880px;  margin-right: -28px; }
-}
+/* на вузьких стовпчик → займає повну ширину колонки */
 @media (max-width: 1100px){
-  .ua-heroCard{ width: 100%; margin-right: 0; }  /* у стовпчик — зайвих вилітів нема */
+  .ua-heroCard{ inline-size: 100%; }
 }
 
-/* чітка помаранчева рамка зверху та зліва */
+/* помаранчева рамка зверху та зліва — синхронно з радіусом */
 .ua-heroCard::before{
   content:"";
   position:absolute; inset:0;
-  border-top: 8px solid var(--ua-accent-2);
-  border-left: 8px solid var(--ua-accent-2);
+  border-top: var(--hc-bw) solid var(--ua-accent-2);
+  border-left: var(--hc-bw) solid var(--ua-accent-2);
   border-right: 0; border-bottom: 0;
-  border-radius: 0 84px 0 84px;
+  border-radius: inherit;             /* та сама форма, що в картки */
   pointer-events:none; z-index:2;
 }
 .ua-heroCard__img{
