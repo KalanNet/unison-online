@@ -75,53 +75,35 @@ export default function RootLayout({
 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
         <main className="flex-1">{children}</main>
-
-       {/* ===== FOOTER (same grid as header) ===== */}
-<footer className="ua-footer">
-  <div className="ua-container ua-footer__row">
-    <span className="ua-footer__text">
-      © {new Date().getFullYear()} — Unison Alberta Online | All Rights Reserved.
+{/* мінімальний футер (server-friendly) */}
+<footer
+  className="border-t py-3"
+  style={{
+    background: "linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%)",
+    borderColor: "rgba(255,255,255,.08)",
+    color: "var(--ua-text-inv)",
+  }}
+>
+  {/* ВАЖЛИВО: той самий контейнер, що й у хедері */}
+  <div className="ua-container flex items-center justify-between gap-2">
+    <span style={{ opacity: 0.9 }}>
+      Copyright © {year} – Unison Alberta Online | All Rights Reserved.
     </span>
 
-    {/* backlink label */}
+    {/* беклінк: підкреслення лише на hover */}
     <a
       href="https://skyronis.com"
-      className="ua-footer__link"
+      className="hover:underline"
+      rel="noopener noreferrer"
       target="_blank"
-      rel="noopener"
-      aria-label="Visit SKYRON Intelligent Solutions — site developers"
-      title="SKYRON Intelligent Solutions — site developers"
+      aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
+      title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
     >
       Created by SKYRON Intelligent Solutions.
     </a>
   </div>
-
-  {/* footer styles kept local to layout */}
-  <style jsx global>{`
-    .ua-footer {
-      background: linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%);
-      border-top: 1px solid rgba(255,255,255,.08);
-      color: var(--ua-text-inv);
-    }
-    .ua-footer__row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 14px 0;
-    }
-    .ua-footer__text { color: var(--ua-text-inv); opacity: .9; }
-
-    /* link looks like the copyright text; underline only on hover */
-    .ua-footer__link {
-      color: var(--ua-text-inv);
-      text-decoration: none;
-      font-weight: 500;
-      letter-spacing: .01em;
-    }
-    .ua-footer__link:hover { text-decoration: underline; }
-  `}</style>
 </footer>
+
       </body>
     </html>
   );
