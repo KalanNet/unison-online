@@ -245,8 +245,8 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
   ? {
       left: "calc(var(--tabThickness) * -1)",
       // ріст назовні з лівого боку (після rotate точка кріплення — "right")
-      transform: "rotate(180deg) scaleX(var(--bmScale,1))",
-      transformOrigin: "right center",
+      transform: "scaleX(var(--bmScale,1)) rotate(180deg)",
+      transformOrigin: "left center",
     }
   : {
       right: "calc(var(--tabThickness) * -1)",
