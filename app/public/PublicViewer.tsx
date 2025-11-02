@@ -343,7 +343,7 @@ const sideStyle: React.CSSProperties = sideIsLeft
 }
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
-        .viewer-root { min-height: 100svh; width: 100vw; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
+        .viewer-root { min-height: 100svh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
         .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
         button[aria-label="Publish"] { display: none !important; }
         .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
