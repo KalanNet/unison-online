@@ -112,8 +112,6 @@ export default function Home() {
                   <div className="ua-metric__label">Members</div>
                 </div>
 
-                <span className="ua-dot" />
-
                 {/* 50+ Years / Years of Serving Seniors */}
                 <div className="ua-metric">
                   <div className="ua-metric__num">
@@ -124,8 +122,6 @@ export default function Home() {
                     <span className="hidden sm:inline">Years of Serving Seniors</span>
                   </div>
                 </div>
-
-                <span className="ua-dot" />
 
                 {/* 55K Clients / Clients in 2024 */}
                 <div className="ua-metric">
