@@ -74,7 +74,7 @@ export default function PublicViewer({
         onPublish={() => {}} // прибито на публічній сторінці
       />
 
-      <section ref={ctrl.stageRef} className="viewer-stage" style={{ paddingInline: 'var(--rail)' }}>
+      <section ref={ctrl.stageRef} className="viewer-stage">
         <div
           className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
           style={{
@@ -335,15 +335,9 @@ const sideStyle: React.CSSProperties = sideIsLeft
         .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
         button[aria-label="Publish"] { display: none !important; }
         .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
-        .viewer-stage { 
-   flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; 
-   display: flex; align-items: center; justify-content: center;  
-  overflow: hidden;
-  /* резерв простору ВНУТРІ лейауту з обох боків — симетрично */
-  padding-inline: var(--rail);
- }
+        .viewer-stage { flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
-        .book-container.is-cover { /* shift removed to avoid external overflow */ }
+        .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
         /* Закладка може виходити за межі сторінки FlipBook */
