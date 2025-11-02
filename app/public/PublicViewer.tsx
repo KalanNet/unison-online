@@ -242,15 +242,18 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
         };
 
         const sideStyle: React.CSSProperties = sideIsLeft
-          ? {
-              left: "calc(var(--tabThickness) * -1)",
-              transform: "rotate(180deg)",
-              transformOrigin: "center",
-            }
-          : {
-              right: "calc(var(--tabThickness) * -1)",
-            };
-
+  ? {
+      left: "calc(var(--tabThickness) * -1)",
+      // ріст назовні з лівого боку (після rotate точка кріплення — "right")
+      transform: "rotate(180deg) scaleX(var(--bmScale,1))",
+      transformOrigin: "right center",
+    }
+  : {
+      right: "calc(var(--tabThickness) * -1)",
+      // ріст назовні з правого боку; точка кріплення — "left"
+      transform: "scaleX(var(--bmScale,1))",
+      transformOrigin: "left center",
+    };
         return (
           <button
             key={bm.id}
@@ -341,11 +344,17 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
 .bm-tab {
   border: 0;
   cursor: pointer;
+    --bmScale: 1;
+  will-change: transform;
 }
-.bm-tab.active {
-  filter: drop-shadow(0 0 6px rgba(255,255,255,.25)) brightness(1.05);
+.bm-tab:hover {
+  --bmScale: 1.12;                /* наскільки «вилазить» */
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.18)) brightness(1.03);
 }
 
+.bm-tab:active {
+  --bmScale: 1.06;
+}
 
 
 @media (max-width: 680px){

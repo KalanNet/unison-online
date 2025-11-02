@@ -103,8 +103,8 @@ export default function RootLayout({
         className="hover:underline"
         rel="noopener noreferrer"
         target="_blank"
-        aria-label="SKYRON Intelligent Solutions — site developers"
-        title="SKYRON Intelligent Solutions — site developers"
+        aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
+        title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
       >
         Created by SKYRON Intelligent Solutions
       </a>
