@@ -241,19 +241,25 @@ const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
           borderRadius: "0 10px 10px 0",
         };
 
-  const sideStyle: React.CSSProperties = sideIsLeft
+const sideStyle: React.CSSProperties = sideIsLeft
   ? {
-      // ЛІВА вкладка: правий край приклеєний до сторінки
-      left: "calc(var(--tabThickness) * -1)",
-      transform: "rotate(180deg) scaleX(var(--bmScale,1))",
-      transformOrigin: "right center", // росте вліво (назовні), правий край фіксований
+      // Ліва: якір у самісінькому лівому краї
+      left: 0,
+      transformOrigin: "center center",
+      // 1) виносимо таб назовні: translateX(-100%)
+      // 2) компенсуємо приріст ширини при scaleX, щоб край залишався біля сторінки
+      transform:
+        "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
     }
   : {
-      // Правий таб
+      // Права: якір у правому краї
       right: 0,
-      transform: "translateX(100%) scaleX(var(--bmScale,1))",
-      transformOrigin: "left center",
+      transformOrigin: "center center",
+      // Аналогічна компенсація, але у протилежний бік
+      transform:
+        "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
     };
+
 
         return (
           <button
