@@ -229,36 +229,3 @@ main{ flex:1 0 auto; }
 .credit:hover{ text-decoration: underline; }
 
 
-/* ==== HERO — mobile tuning (<= 640px) ==== */
-@media (max-width: 640px){
-  /* трохи зсуваємо фокус фото, щоб обличчя були вище */
-  .ua-heroCard__img{ object-position: 60% center; }
-
-  /* смуга метрик: робимо трохи нижче і вужче, по центру */
-  .ua-heroCard__metrics{
-    bottom: -10px;               /* опускаємо, щоб не закривала обличчя */
-    padding: 8px 10px;
-    min-height: 76px;
-    gap: 18px;
-    left: 50%;                   /* замість full-width */
-    right: auto;
-    transform: translateX(-50%);
-    width: min(92%, 520px);      /* «звузити до середини» */
-    justify-content: center;
-  }
-
-  /* трохи менші шрифти всередині метрик */
-  .ua-metric__num{ font-size: clamp(18px, 6vw, 24px); }
-  .ua-metric__label{ font-size: 13px; }
-}
-
-/* footer responsive stack */
-.footer-flex{
-  display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 0;
-}
-@media (max-width: 640px){
-  .footer-flex{
-    flex-direction:column; text-align:center; gap:6px;
-  }
-  .footer-flex p, .footer-flex a{ width:100%; }
-}

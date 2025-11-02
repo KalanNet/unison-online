@@ -84,12 +84,13 @@ export default function RootLayout({
     color: "var(--ua-text-inv)",
   }}
 >
-  <div className="ua-container footer-flex">
-    <p className="m-0" style={{ opacity: 0.9 }}>
-      <span className="block sm:inline">Copyright © {year} – Unison Alberta Online</span>
-      <span className="block sm:inline">All Rights Reserved.</span>
-    </p>
+  {/* ВАЖЛИВО: той самий контейнер, що й у хедері */}
+  <div className="ua-container flex items-center justify-between gap-2">
+    <span style={{ opacity: 0.9 }}>
+      Copyright © {year} – Unison Alberta Online | All Rights Reserved.
+    </span>
 
+    {/* беклінк: підкреслення лише на hover */}
     <a
       href="https://skyronis.com"
       className="hover:underline"
@@ -102,7 +103,6 @@ export default function RootLayout({
     </a>
   </div>
 </footer>
-
 
       </body>
     </html>
