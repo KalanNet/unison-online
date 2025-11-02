@@ -85,8 +85,8 @@ export default function PublicViewer({
             justifyContent: "center",
             width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
             height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
-            maxWidth: "100%",
-            maxHeight: "100%",
+            maxWidth: "100vw",
+            maxHeight: "100vh",
             position: "relative",
           }}
         >

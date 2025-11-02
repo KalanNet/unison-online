@@ -17,10 +17,6 @@
 
   --text-light: rgba(255,255,255,.88);
   --text-dim:   rgba(255,255,255,.66);
-
-  --viewer-gutter: clamp(12px, 2vw, 28px);
-  
-
   
 
   /* HERO palette */
@@ -254,8 +250,3 @@ main{ flex:1 0 auto; }
 .credit:hover{ text-decoration: underline; }
 
 
-.viewer-stage{
-  /* вже є display:flex; center */
-  padding-inline: var(--viewer-gutter);
-  box-sizing: border-box;   /* щоб padding враховувався в ширині */
-}
