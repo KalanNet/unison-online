@@ -202,7 +202,7 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const rotation = page.rotate || 0;
   const DPR_CAP = 3;                              // не розганяємо вище
   const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const QUALITY = 1;                              // КЛЮЧ: 1:1 до DPR
+  const QUALITY = 3;                              // КЛЮЧ: 1:1 до DPR
   let scale = (cssW / pageW) * dpr * QUALITY;     // => bmp.w ≈ cssW * dpr
 
   // 3) Стеля по площі полотна (~48 Мп) — запобіжник
