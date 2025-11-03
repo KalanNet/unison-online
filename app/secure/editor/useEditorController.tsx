@@ -200,9 +200,16 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
 
   // 2) HiDPI-рендер: підвищуємо бекінг у 2–3x відносно CSS, але з «стелею» по площі
   const rotation = page.rotate || 0;
-  const DPR = Math.max(1, window.devicePixelRatio || 1);
-  const QUALITY = 3.0; // 2.4–3.0 зазвичай дає гострий текст
-  let scale = (cssW / pageW) * DPR * QUALITY;
+// Стало (трохи агресивніше + “стеля”, щоб не вбити GPU на 4K):
+const DPR_CAP = 7;                                // не гнати вище ~3x
+const DPR = Math.min(DPR_CAP, Math.max(1, window.devicePixelRatio || 1));
+
+// QUALITY = наскільки ми «пересемплюємо» понад DPR.
+// 2.6–3.2 — sweet spot. Спробуй 3.2, якщо треба ще гостріше.
+const QUALITY = 3.5;
+
+let scale = (cssW / pageW) * DPR * QUALITY;
+
 
   // 3) Обмежуємо площу, щоб не вилітати за 48 Мп
   const MAX_AREA = 48_000_000;
