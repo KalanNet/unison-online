@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-const [isFlipping, setIsFlipping] = useState(false);
+
 import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
@@ -17,6 +17,7 @@ type Bookmark = { id: string; page: number; label: string; color?: string | null
 
 /* --- публічний в’ювер з пробросом закладок --- */
 export default function PublicViewer({
+  
   file,
   title,
   bookmarks = [],
@@ -26,6 +27,7 @@ export default function PublicViewer({
   bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
 
+  const [isFlipping, setIsFlipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // --- Search UI state (for header) ---
