@@ -191,35 +191,58 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
   async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-    const page = await pdfDoc.getPage(pageNum);
+  if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
+  const page = await pdfDoc.getPage(pageNum);
 
-    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 3;
-    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
-    const vp = page.getViewport({ scale });
+  const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
+  const rotation = page.rotate || 0;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(vp.width));
-    canvas.height = Math.max(1, Math.round(vp.height));
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("2D context unavailable");
+  // густина пікселів (ефективний upscale відносно CSS-розміру)
+  const DPR = Math.max(1, Math.min(6, window.devicePixelRatio || 1));
+  const QUALITY = 2.6; // 2.4–3.2 зазвичай ідеально; можна підкрутити
+  let scale = (css.w / pageW) * DPR * QUALITY;
+
+  // запобіжник від надвеликих полотен (~48 Мп)
+  const MAX_AREA = 48_000_000;
+  {
+    const test = page.getViewport({ scale, rotation });
+    const area = Math.round(test.width) * Math.round(test.height);
+    if (area > MAX_AREA) scale *= Math.sqrt(MAX_AREA / area);
+  }
+
+  const vp = page.getViewport({ scale, rotation });
+
+const canvas = document.createElement("canvas");
+canvas.width  = Math.max(1, Math.round(vp.width));
+canvas.height = Math.max(1, Math.round(vp.height));
+
+const ctx = canvas.getContext("2d", { alpha: false })!;
+(ctx as any).imageSmoothingEnabled = true;
+(ctx as any).imageSmoothingQuality = "high";
+
+// білий фон без використання параметра background
+ctx.save();
+ctx.fillStyle = "#fff";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+ctx.restore();
+
+// ✅ головне: передати ще й canvas
 await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
+  // лінки (координати в цьому ж viewport — вже з rotation)
+  const anns = await page.getAnnotations({ intent: "display" });
+  const links: PageBmp["links"] = [];
+  anns.forEach((a: any) => {
+    if (a.subtype !== "Link") return;
+    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+    const left = Math.min(x1, x2), top = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
+  });
 
-    const anns = await page.getAnnotations({ intent: "display" });
-    const links: PageBmp["links"] = [];
-    anns.forEach((a: any) => {
-      if (a.subtype !== "Link") return;
-      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-      const left = Math.min(x1, x2), top = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
-    });
+  return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
+}
 
-    return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
-  }
   const [, setTick] = useState(0);
   function warmPagesAround(idx0: number) {
     if (!pdfDoc) return;

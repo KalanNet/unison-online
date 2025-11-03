@@ -188,6 +188,9 @@ return (
   alt={`p${pageNum}`}
   data-page-img="true"
   draggable={false}
+  // 🔽 ФІКС: HTML-атрибути з цілими значеннями
+  width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
+  height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
   style={{
     width: "100%",
     height: "100%",
@@ -197,6 +200,7 @@ return (
     display: "block",
   }}
 />
+
 
 {/* === HIGHLIGHTS LAYER === */}
 <div className="hl-layer" aria-hidden>
