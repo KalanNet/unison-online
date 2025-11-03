@@ -204,55 +204,77 @@ return (
         <>
           {/* PAGE IMAGE */}
           <img
-            src={bmp.url}
-            alt={`p${pageNum}`}
-            data-page-img="true"
-            draggable={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              pointerEvents: "none",
-              borderRadius: 2,
-              display: "block",
-            }}
-          />
+  src={bmp.url}
+  alt={`p${pageNum}`}
+  data-page-img="true"
+  draggable={false}
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    pointerEvents: "none",
+    borderRadius: 2,
+    display: "block",
+  }}
+/>
 
-          {/* PDF LINKS */}
-          {links?.length
-            ? links.map((L, idx) =>
-                L.href ? (
-                  <a
-                    key={idx}
-                    href={L.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pdf-link"
-                    style={{
-                      position: "absolute",
-                      left: `${L.x * 100}%`,
-                      top: `${L.y * 100}%`,
-                      width: `${L.w * 100}%`,
-                      height: `${L.h * 100}%`,
-                    }}
-                  />
-                ) : (
-                  <button
-                    key={idx}
-                    className="pdf-link"
-                    title="Go to"
-                    onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                    style={{
-                      position: "absolute",
-                      left: `${L.x * 100}%`,
-                      top: `${L.y * 100}%`,
-                      width: `${L.w * 100}%`,
-                      height: `${L.h * 100}%`,
-                    }}
-                  />
-                )
-              )
-            : null}
+{/* === HIGHLIGHTS LAYER === */}
+<div className="hl-layer" aria-hidden>
+  {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map((r: any, j: number) => {
+    const isActive = typeof r.hitIndex === "number" && r.hitIndex === (ctrl as any).activeHit;
+    return (
+      <div
+        key={j}
+        className={`hl${isActive ? " is-active" : ""}`}
+        style={{
+          position: "absolute",
+          left: `${r.x * 100}%`,
+          top: `${r.y * 100}%`,
+          width: `${r.w * 100}%`,
+          height: `${r.h * 100}%`,
+        }}
+      />
+    );
+  })}
+</div>
+{/* === /HIGHLIGHTS LAYER === */}
+
+{/* PDF LINKS */}
+{links?.length
+  ? links.map((L, idx) =>
+      L.href ? (
+        <a
+          key={idx}
+          href={L.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pdf-link"
+          style={{
+            position: "absolute",
+            left: `${L.x * 100}%`,
+            top: `${L.y * 100}%`,
+            width: `${L.w * 100}%`,
+            height: `${L.h * 100}%`,
+          }}
+        />
+      ) : (
+        <button
+          key={idx}
+          className="pdf-link"
+          title="Go to"
+          onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+          style={{
+            position: "absolute",
+            left: `${L.x * 100}%`,
+            top: `${L.y * 100}%`,
+            width: `${L.w * 100}%`,
+            height: `${L.h * 100}%`,
+          }}
+        />
+      )
+    )
+  : null}
+
 
           
         </>

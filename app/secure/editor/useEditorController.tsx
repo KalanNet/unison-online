@@ -66,7 +66,12 @@ export function useViewerController({ file, title }: { file: string; title?: str
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [activeHit, setActiveHit] = useState<number>(-1);
-  const [pageHighlights, setPageHighlights] = useState<Map<number, SearchBox[]>>(() => new Map());
+  type HighlightBox = SearchBox & { hitIndex?: number };
+
+const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>>(
+  () => new Map()
+);
+
 
   // fullscreen (десктоп)
   const [isFs, setIsFs] = useState(false);
@@ -242,7 +247,7 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
     setSearching(true);
     const nextHits: SearchHit[] = [];
-    const nextMap = new Map<number, SearchBox[]>();
+    const nextMap = new Map<number, HighlightBox[]>();
 
     try {
       const ql = q.toLowerCase();
@@ -260,10 +265,18 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
             const w = item.width ?? 0;
             const h = item.height ?? 0;
             const box = normBox(x, yTop, w, h, vp.width, vp.height);
-            const hit: SearchHit = { id: genId(), page: p, box, snippet: str.length > 120 ? str.slice(0, 120) + "…" : str };
-            nextHits.push(hit);
-            if (!nextMap.has(p)) nextMap.set(p, []);
-            nextMap.get(p)!.push(box);
+const hitIndex = nextHits.length; // індекс хіта, який додамо зараз
+const hit: SearchHit = {
+  id: genId(),
+  page: p,
+  box,
+  snippet: str.length > 120 ? str.slice(0, 120) + "…" : str
+};
+nextHits.push(hit);
+
+if (!nextMap.has(p)) nextMap.set(p, []);
+nextMap.get(p)!.push({ ...box, hitIndex });
+
           }
         }
       }
