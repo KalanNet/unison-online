@@ -194,22 +194,21 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
   const page = await pdfDoc.getPage(pageNum);
 
-  // 1) Фактичний видимий CSS-розмір сторінки у вашому лейауті
+  // 1) реальний CSS-розмір сторінки зараз
   const cssW = Math.max(1, Math.round(pageW * fitScale));
   const cssH = Math.max(1, Math.round(pageH * fitScale));
 
-  // 2) Точний HiDPI без «перешарпу»: рендер = CSS × DPR × QUALITY(=1)
+  // 2) HiDPI-апсемпл відносно CSS, але без безумств
   const rotation = page.rotate || 0;
-  const DPR_CAP = 3;                              // не розганяємо вище
-  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const QUALITY = 3;                              // КЛЮЧ: 1:1 до DPR
-  let scale = (cssW / pageW) * dpr * QUALITY;     // => bmp.w ≈ cssW * dpr
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const QUALITY = 2.6;                     // 2.4–3.0 зазвичай ідеально
+  let scale = (cssW / pageW) * DPR * QUALITY;
 
-  // 3) Стеля по площі полотна (~48 Мп) — запобіжник
+  // 3) ліміт площі (≈48 Мп) — щоб не різати продуктивність
   const MAX_AREA = 48_000_000;
   {
-    const testVp = page.getViewport({ scale, rotation });
-    const area = Math.round(testVp.width) * Math.round(testVp.height);
+    const test = page.getViewport({ scale, rotation });
+    const area = Math.round(test.width) * Math.round(test.height);
     if (area > MAX_AREA) scale *= Math.sqrt(MAX_AREA / area);
   }
 
@@ -219,26 +218,21 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   canvas.width  = Math.max(1, Math.round(vp.width));
   canvas.height = Math.max(1, Math.round(vp.height));
   const ctx = canvas.getContext("2d", { alpha: false })!;
-  // жодних imageSmoothing «покращувачів» — pdf.js малює вектором сам
   await page.render({ canvasContext: ctx, viewport: vp, canvas, background: "#fff" }).promise;
 
-  // ...далі без змін: збирання links/anns і return
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
-  anns.forEach((a: any) => {
-    if (a.subtype !== "Link") return;
+  for (const a of anns as any[]) {
+    if (a.subtype !== "Link") continue;
     const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
     const left = Math.min(x1, x2), top = Math.min(y1, y2);
     const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-    links.push({
-      x: left / vp.width, y: top / vp.height,
-      w: w / vp.width, h: h / vp.height,
-      href: sanitizeLink(a) || undefined, dest: a.dest,
-    });
-  });
+    links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
+  }
 
   return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
 }
+
 
 
 

@@ -145,25 +145,19 @@ return (
       }}
     >
           <FlipBook
-            ref={ctrl.bookRef}
-            width={ctrl.baseSize.w}
-            height={ctrl.baseSize.h}
-            size="stretch"
-            usePortrait={ctrl.single}
-            showCover={!ctrl.single}
-            flippingTime={600}
-            maxShadowOpacity={0.2}
-            drawShadow
-            mobileScrollSupport
-            startPage={(initPageRef.current ?? 0) as number}
-            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-            style={{
-              width: "100%",
-              height: "100%",
-              minWidth: 0,
-              minHeight: 0,
-              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-            }}
+             ref={ctrl.bookRef}
+  /* ТЕПЕР: фіксовані пікселі без CSS-scale */
+  size="fixed"
+  width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
+  height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
+  usePortrait={ctrl.single}
+  showCover={!ctrl.single}
+  flippingTime={600}
+  maxShadowOpacity={0.2}
+  drawShadow
+  mobileScrollSupport
+  startPage={(initPageRef.current ?? 0) as number}
+  onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
           >
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
   const pageNum = i + 1;
@@ -187,17 +181,20 @@ return (
   src={bmp.url}
   alt={`p${pageNum}`}
   data-page-img="true"
-  decoding="sync"            // ← синхронне декодування — менше артефактів
-  loading="eager"            // ← не відкладати
   draggable={false}
+  /* важливо: саме HTML-атрибути */
+  width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
+  height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
   style={{
-    // (!) важливо: не давати браузеру додатково масштабувати
-    width:  `${Math.round(bmp.w / (window.devicePixelRatio || 1))}px`,
-    height: `${Math.round(bmp.h / (window.devicePixelRatio || 1))}px`,
+    width: "100%",
+    height: "100%",
     objectFit: "contain",
-    imageRendering: "auto",  // не 'crisp-edges' (псує шрифти), і точно не 'pixelated'
+    pointerEvents: "none",
+    borderRadius: 2,
+    display: "block",
   }}
 />
+
 
 
 
@@ -606,6 +603,12 @@ const sideStyle: React.CSSProperties = sideIsLeft
   outline-color: rgba(56, 189, 248, .95);
   box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
 }
+
+img[data-page-img='true']{
+  image-rendering: -webkit-optimize-contrast; /* Safari/Chrome hint */
+  image-rendering: optimizeQuality;           /* інші браузери */
+}
+
 
       `}</style>
     </div>
