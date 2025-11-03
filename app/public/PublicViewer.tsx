@@ -187,11 +187,11 @@ return (
   src={bmp.url}
   alt={`p${pageNum}`}
   data-page-img="true"
-  // ВАЖЛИВО: html-атрибути width/height мають бути ЦІЛИМИ
+  // ВАЖЛИВО: саме HTML-атрибути, не тільки стилі
   width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
   height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
   style={{
-    width: "100%",      // контейнер рівно цього ж піксельного розміру
+    width: "100%",
     height: "100%",
     objectFit: "contain",
     display: "block",
@@ -199,6 +199,7 @@ return (
     borderRadius: 2,
   }}
 />
+
 
 
 

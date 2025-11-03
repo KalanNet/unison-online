@@ -190,32 +190,39 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   function getPageCssSize(base: { w: number; h: number }, fit: number) {
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
-// ЗАМІНА всієї функції renderPageToImage
 async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
   const page = await pdfDoc.getPage(pageNum);
 
-  // 1) ФАКТИЧНИЙ макетний розмір сторінки у пікселях екрана
-  const layoutW = Math.max(1, Math.round(pageW * fitScale));
-  const layoutH = Math.max(1, Math.round(pageH * fitScale));
+  // 1) Фактичний видимий розмір сторінки в макеті (CSS px)
+  const cssW = Math.max(1, Math.round(pageW * fitScale));
+  const cssH = Math.max(1, Math.round(pageH * fitScale));
 
-  // 2) Масштаб pdf.js: робимо viewport рівним макетному розміру (без додаткових множників)
+  // 2) HiDPI-рендер: підвищуємо бекінг у 2–3x відносно CSS, але з «стелею» по площі
   const rotation = page.rotate || 0;
-  const scale = layoutW / pageW;
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const QUALITY = 3.0; // 2.4–3.0 зазвичай дає гострий текст
+  let scale = (cssW / pageW) * DPR * QUALITY;
+
+  // 3) Обмежуємо площу, щоб не вилітати за 48 Мп
+  const MAX_AREA = 48_000_000;
+  {
+    const testVp = page.getViewport({ scale, rotation });
+    const area = Math.round(testVp.width) * Math.round(testVp.height);
+    if (area > MAX_AREA) scale *= Math.sqrt(MAX_AREA / area);
+  }
+
   const vp = page.getViewport({ scale, rotation });
 
-  // 3) Канва = рівно екранний розмір (1:1), без наступного даунсемплу
+  // 4) Канва точно під viewport, TypeScript — вимагає 'canvas' у RenderParameters
   const canvas = document.createElement("canvas");
   canvas.width  = Math.max(1, Math.round(vp.width));
   canvas.height = Math.max(1, Math.round(vp.height));
-
   const ctx = canvas.getContext("2d", { alpha: false })!;
-  // жодних imageSmoothing-хінтів тут не потрібно — pdf.js малює вектором у нативний розмір
-
-  // ВАЖЛИВО: додати canvas у параметри (інакше TS лається)
+  // Без додаткових imageSmoothing-хінтів — pdf.js малює вектором у власну канву
   await page.render({ canvasContext: ctx, viewport: vp, canvas, background: "#fff" }).promise;
 
-  // 4) Лінки в тих же координатах viewport
+  // 5) Лінки у координатах цього ж viewport
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
   anns.forEach((a: any) => {
@@ -223,11 +230,16 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
     const left = Math.min(x1, x2), top = Math.min(y1, y2);
     const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-    links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
+    links.push({
+      x: left / vp.width, y: top / vp.height,
+      w: w / vp.width, h: h / vp.height,
+      href: sanitizeLink(a) || undefined, dest: a.dest,
+    });
   });
 
   return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
 }
+
 
 
   const [, setTick] = useState(0);
