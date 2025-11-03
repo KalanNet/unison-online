@@ -259,13 +259,18 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
           const str: string = item.str ?? "";
           if (!str) continue;
           if (str.toLowerCase().includes(ql)) {
-            const tr = item.transform as number[];
-            const x = tr[4];
-            const yTop = tr[5] - (item.height ?? 0);
-            const w = item.width ?? 0;
-            const h = item.height ?? 0;
-            const box = normBox(x, yTop, w, h, vp.width, vp.height);
+            const tr = item.transform as number[]; 
+const x = tr[4];                // ліва межа
+const yBaseline = tr[5];        // baseline (низ рядка в pdf.js)
+const w = item.width  ?? 0;
+const h = item.height ?? 0;
 const hitIndex = nextHits.length; // індекс хіта, який додамо зараз
+// top у пікселях від ВЕРХУ сторінки viewport:
+const yTopCssPx = vp.height - (yBaseline + h);
+
+// нормалізований бокс для нашого оверлею
+const box = normBox(x, yTopCssPx, w, h, vp.width, vp.height);
+
 const hit: SearchHit = {
   id: genId(),
   page: p,
