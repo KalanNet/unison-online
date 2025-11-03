@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-// Тип ctrl узятий із вашого useViewerController (нічого не імпортуємо — приймаємо як any)
 type Ctrl = any;
 
 type Props = {
   ctrl: Ctrl;
   file: string;
   title?: string;
-  // з MobileHeader
+
+  // з MobileHeader (проброс — не чіпаємо, але лишаємо для сумісності)
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   runSearch: (q: string) => void;
@@ -22,29 +22,69 @@ type Props = {
 export default function MobilePager(p: Props) {
   const { ctrl } = p;
 
-  // Поточна сторінка (1-based) і її bmp з кешу контролера
+  // ===== 1) Гарантуємо, що рендеримо лише ПОТОЧНУ (і підігріваємо сусідів) =====
   const pageNum = ctrl.currentIndex + 1;
-  const bmp = ctrl.cacheRef.current.get(pageNum);
-
-  // Підігріваємо сусідів для плавності свайпів
   useEffect(() => {
+    // тепер сторінка рендериться on-demand
+    try { ctrl.ensureRendered?.(ctrl.currentIndex); } catch {}
     try { ctrl.warmPagesAround?.(ctrl.currentIndex); } catch {}
   }, [ctrl.currentIndex]);
+
+  const bmp = ctrl.cacheRef.current.get(pageNum);
+
+  // ===== 2) Swipe жест (на дотик) =====
+  const touchStartX = useRef<number | null>(null);
+  const touchDeltaX  = useRef(0);
+  const SWIPE_PX = 50; // поріг
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (touchStartX.current == null) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  }
+  function onTouchEnd() {
+    if (touchStartX.current == null) return;
+    const dx = touchDeltaX.current;
+    touchStartX.current = null;
+    touchDeltaX.current = 0;
+    if (Math.abs(dx) < SWIPE_PX) return;
+    if (dx < 0 && ctrl.canNext) ctrl.goNext();
+    if (dx > 0 && ctrl.canPrev) ctrl.goPrev();
+  }
+
+  // ===== 3) Висота: рівно видима зона БЕЗ скролу =====
+  // MobileHeader має фіксовану висоту 56px — віднімемо її.
+  const headerH = 56;
+  // Низ — наш мобільний тулбар ~ 56px (точний розмір ми контролюємо CSSом нижче).
+  const footerH = 56;
+  const rootStyle: React.CSSProperties = {
+    // Вся мобільна частина займає весь екран мінус Header
+    height: `calc(100svh - ${headerH}px)`,
+    display: "grid",
+    gridTemplateRows: `1fr ${footerH}px`,
+    background: "#21353a",
+  };
 
   return (
     <div
       ref={ctrl.stageRef}
       className="mpg-root"
-      onTouchStartCapture={() => {}}
-      style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: "100svh", background: "#21353a" }}
+      style={rootStyle}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
-      {/* Саме полотно з однією сторінкою */}
-      <div className="mpg-canvas" style={{ display: "grid", placeItems: "center", padding: "10px 10px 12px" }}>
+      {/* Полотно з однією сторінкою */}
+      <div className="mpg-canvas" style={{ display:"grid", placeItems:"center", padding:"10px 10px 12px", overflow:"hidden" }}>
         <div
           className="mpg-page"
           style={{
             width: "100%",
             maxWidth: "980px",
+            // ВАЖЛИВО: зберігаємо пропорції сторінки — завжди поміститься по висоті секції
             aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
             background: "#fff",
             borderRadius: 4,
@@ -61,10 +101,10 @@ export default function MobilePager(p: Props) {
                 alt={`p${pageNum}`}
                 data-page-img="true"
                 draggable={false}
-                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", pointerEvents: "none" }}
+                style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", pointerEvents:"none" }}
               />
 
-              {/* Клікабельні PDF-лінки */}
+              {/* PDF лінки (клікабельні області) */}
               {(bmp.links || []).map((L: any, i: number) =>
                 L?.href ? (
                   <a
@@ -119,25 +159,17 @@ export default function MobilePager(p: Props) {
               </div>
             </>
           ) : (
-            <div style={{ color: "#8aa0a6", display: "grid", placeItems: "center", height: "100%" }}>Рендер сторінки…</div>
+            <div style={{ color:"#8aa0a6", display:"grid", placeItems:"center", height:"100%" }}>Рендер сторінки…</div>
           )}
         </div>
       </div>
 
-      {/* Невеликий мобільний тулбар */}
-      <footer className="mpg-bar" style={{ background: "#ffffffef", borderTop: "1px solid #ecefe7", padding: 8 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 8, alignItems: "center" }}>
-          <button
-            className="mpg-btn"
-            onClick={ctrl.goPrev}
-            disabled={!ctrl.canPrev}
-            aria-label="Previous"
-            title="Previous"
-          >
-            ◀
-          </button>
+      {/* Мобільний тулбар */}
+      <footer className="mpg-bar">
+        <div className="mpg-bar__grid">
+          <button className="mpg-btn" onClick={ctrl.goPrev} disabled={!ctrl.canPrev} aria-label="Previous" title="Previous">◀</button>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center" }}>
+          <div className="mpg-mid">
             <input
               inputMode="numeric"
               pattern="[0-9]*"
@@ -148,29 +180,41 @@ export default function MobilePager(p: Props) {
               aria-label="Page"
               title="Enter page"
             />
-            <span style={{ color: "#5c6750" }}>/</span>
-            <strong style={{ color: "#2d3018" }}>{ctrl.totalPages}</strong>
+            <span className="mpg-sep">/</span>
+            <strong className="mpg-total">{ctrl.totalPages}</strong>
           </div>
 
-          <button
-            className="mpg-btn"
-            onClick={ctrl.goNext}
-            disabled={!ctrl.canNext}
-            aria-label="Next"
-            title="Next"
-          >
-            ▶
-          </button>
+          <button className="mpg-btn" onClick={ctrl.goNext} disabled={!ctrl.canNext} aria-label="Next" title="Next">▶</button>
         </div>
       </footer>
 
       <style jsx global>{`
         .mpg-root { color:#2d3018; }
-        .mpg-btn { height:36px; min-width:36px; border:1px solid #e6eadf; border-radius:.6rem; background:#fff; }
+
+        .mpg-bar{
+          height:56px;
+          background:#ffffffef;
+          border-top:1px solid #ecefe7;
+          padding:8px;
+        }
+        .mpg-bar__grid{
+          display:grid;
+          grid-template-columns:auto 1fr auto;
+          gap:8px;
+          align-items:center;
+          height:100%;
+        }
+        .mpg-btn{ height:36px; min-width:36px; border:1px solid #e6eadf; border-radius:.6rem; background:#fff; }
         .mpg-btn[disabled]{ opacity:.45; }
-        .mpg-jump { width:72px; text-align:center; height:36px; border:1px solid #e7ebdf; border-radius:.5rem; }
-        .hl { background: #f4ce6944; outline: 1px solid #f4ce69; border-radius: 3px; }
-        .hl.is-active { background: #f47e2050; outline-color:#f47e20; }
+        .mpg-mid{ display:flex; justify-content:center; gap:8px; align-items:center; }
+        .mpg-jump{ width:72px; text-align:center; height:36px; border:1px solid #e7ebdf; border-radius:.5rem; }
+        .mpg-sep{ color:#5c6750; }
+        .mpg-total{ color:#2d3018; }
+
+        .pdf-link{ border:0; background:transparent; display:block; }
+
+        .hl{ background:#f4ce6944; outline:1px solid #f4ce69; border-radius:3px; }
+        .hl.is-active{ background:#f47e2050; outline-color:#f47e20; }
       `}</style>
     </div>
   );
