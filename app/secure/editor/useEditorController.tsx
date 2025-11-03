@@ -191,41 +191,36 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
 async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-  if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-  const page = await pdfDoc.getPage(pageNum);
+    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
+    const page = await pdfDoc.getPage(pageNum);
 
-  // ЦІЛЬОВІ CSS-пікселі для сторінки зараз у макеті
-  const cssW = Math.max(1, Math.round(pageW * fitScale));
-  const cssH = Math.max(1, Math.round(pageH * fitScale));
+    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
+    const DPR_CAP = 7, QUALITY = 3;
+    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
+    const vp = page.getViewport({ scale });
 
-  // Рендеримо рівно в ці ж пікселі (без подальшого даунскейлу в <img>)
-  const rotation = page.rotate || 0;
-  const scale = cssW / pageW;  // ⬅️ 1:1 з макетом
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(vp.width));
+    canvas.height = Math.max(1, Math.round(vp.height));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("2D context unavailable");
+await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
-  const vp = page.getViewport({ scale, rotation });
 
-  const canvas = document.createElement("canvas");
-  canvas.width  = Math.round(vp.width);
-  canvas.height = Math.round(vp.height);
+    const anns = await page.getAnnotations({ intent: "display" });
+    const links: PageBmp["links"] = [];
+    anns.forEach((a: any) => {
+      if (a.subtype !== "Link") return;
+      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+      const left = Math.min(x1, x2), top = Math.min(y1, y2);
+      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
+    });
 
-  const ctx = canvas.getContext("2d", { alpha: false })!;
-  // pdf.js малює вектор — додаткові imageSmoothing не потрібні
+    return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
+  }
 
-  await page.render({ canvasContext: ctx, viewport: vp, canvas, background: "#fff" }).promise;
-
-  // Лінки:
-  const anns = await page.getAnnotations({ intent: "display" });
-  const links: PageBmp["links"] = [];
-  anns.forEach((a: any) => {
-    if (a.subtype !== "Link") return;
-    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-    const left = Math.min(x1, x2), top = Math.min(y1, y2);
-    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-    links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
-  });
-
-  return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
-}
 
 
 
