@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
-
+import MobileHeader from "./MobileHeader";          // ваш наданий компонент із повідомлення
+import MobilePager from "./MobilePager";            // новий файл з п.1
 
 
 // той самий FlipBook
@@ -70,6 +71,18 @@ React.useEffect(() => {
 }, [q, file, !!ctrl]);
 // === /AUTO-SEARCH ===
 
+function useIsMobile(bp = 980) {
+  const [isMob, setIsMob] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width:${bp}px)`);
+    const on = () => setIsMob(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [bp]);
+  return isMob;
+}
 
 
 
@@ -98,6 +111,40 @@ React.useEffect(() => {
     );
   }
 
+  // --- Мобільний рендер на ≤980px ---
+  const isMobile = useIsMobile(980);
+  if (isMobile) {
+    return (
+      <div className="viewer-root" style={{ background:"#21353a", minHeight:"100svh" }}>
+        <MobileHeader
+          title={ctrl.title}
+          file={file}
+          searchQuery={q}
+          setSearchQuery={setQ}
+          runSearch={(qq: string) => setQ(qq)}
+     // запуск викличе useEffect авто-пошуку
+          searching={ctrl.searching}
+          hits={ctrl.hits}
+          onGoto={(p: number) => { ctrl.goToPage?.(p); }}
+          onShare={ctrl.handleShare}
+          splashActive={false}
+        />
+
+        <MobilePager
+          ctrl={ctrl}
+          file={file}
+          title={ctrl.title}
+          searchQuery={q}
+          setSearchQuery={setQ}
+          runSearch={(qq) => setQ(qq)}
+          searching={ctrl.searching}
+          hits={ctrl.hits}
+          onGoto={(p) => { ctrl.goToPage?.(p); }}
+          onShare={ctrl.handleShare}
+        />
+      </div>
+    );
+  }
 
 
 return (
