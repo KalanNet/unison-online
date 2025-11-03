@@ -194,24 +194,18 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
   const page = await pdfDoc.getPage(pageNum);
 
-  // 1) Фактичний видимий розмір сторінки в макеті (CSS px)
+  // 1) Фактичний видимий CSS-розмір сторінки у вашому лейауті
   const cssW = Math.max(1, Math.round(pageW * fitScale));
   const cssH = Math.max(1, Math.round(pageH * fitScale));
 
-  // 2) HiDPI-рендер: підвищуємо бекінг у 2–3x відносно CSS, але з «стелею» по площі
+  // 2) Точний HiDPI без «перешарпу»: рендер = CSS × DPR × QUALITY(=1)
   const rotation = page.rotate || 0;
-// Стало (трохи агресивніше + “стеля”, щоб не вбити GPU на 4K):
-const DPR_CAP = 7;                                // не гнати вище ~3x
-const DPR = Math.min(DPR_CAP, Math.max(1, window.devicePixelRatio || 1));
+  const DPR_CAP = 3;                              // не розганяємо вище
+  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+  const QUALITY = 1;                              // КЛЮЧ: 1:1 до DPR
+  let scale = (cssW / pageW) * dpr * QUALITY;     // => bmp.w ≈ cssW * dpr
 
-// QUALITY = наскільки ми «пересемплюємо» понад DPR.
-// 2.6–3.2 — sweet spot. Спробуй 3.2, якщо треба ще гостріше.
-const QUALITY = 3.5;
-
-let scale = (cssW / pageW) * DPR * QUALITY;
-
-
-  // 3) Обмежуємо площу, щоб не вилітати за 48 Мп
+  // 3) Стеля по площі полотна (~48 Мп) — запобіжник
   const MAX_AREA = 48_000_000;
   {
     const testVp = page.getViewport({ scale, rotation });
@@ -221,15 +215,14 @@ let scale = (cssW / pageW) * DPR * QUALITY;
 
   const vp = page.getViewport({ scale, rotation });
 
-  // 4) Канва точно під viewport, TypeScript — вимагає 'canvas' у RenderParameters
   const canvas = document.createElement("canvas");
   canvas.width  = Math.max(1, Math.round(vp.width));
   canvas.height = Math.max(1, Math.round(vp.height));
   const ctx = canvas.getContext("2d", { alpha: false })!;
-  // Без додаткових imageSmoothing-хінтів — pdf.js малює вектором у власну канву
+  // жодних imageSmoothing «покращувачів» — pdf.js малює вектором сам
   await page.render({ canvasContext: ctx, viewport: vp, canvas, background: "#fff" }).promise;
 
-  // 5) Лінки у координатах цього ж viewport
+  // ...далі без змін: збирання links/anns і return
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
   anns.forEach((a: any) => {
@@ -246,6 +239,7 @@ let scale = (cssW / pageW) * DPR * QUALITY;
 
   return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
 }
+
 
 
 

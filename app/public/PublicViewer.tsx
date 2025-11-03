@@ -187,18 +187,18 @@ return (
   src={bmp.url}
   alt={`p${pageNum}`}
   data-page-img="true"
-  // ВАЖЛИВО: саме HTML-атрибути, не тільки стилі
-  width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
-  height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
+  decoding="sync"            // ← синхронне декодування — менше артефактів
+  loading="eager"            // ← не відкладати
+  draggable={false}
   style={{
-    width: "100%",
-    height: "100%",
+    // (!) важливо: не давати браузеру додатково масштабувати
+    width:  `${Math.round(bmp.w / (window.devicePixelRatio || 1))}px`,
+    height: `${Math.round(bmp.h / (window.devicePixelRatio || 1))}px`,
     objectFit: "contain",
-    display: "block",
-    pointerEvents: "none",
-    borderRadius: 2,
+    imageRendering: "auto",  // не 'crisp-edges' (псує шрифти), і точно не 'pixelated'
   }}
 />
+
 
 
 
