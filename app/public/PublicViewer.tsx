@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+const [isFlipping, setIsFlipping] = useState(false);
 import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
@@ -156,14 +157,10 @@ return (
             drawShadow
             mobileScrollSupport
             startPage={(initPageRef.current ?? 0) as number}
-            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-            style={{
-              width: "100%",
-              height: "100%",
-              minWidth: 0,
-              minHeight: 0,
-              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-            }}
+              onFlip={() => {
+    setIsFlipping(true);
+    setTimeout(() => setIsFlipping(false), 900); 
+  }}
           >
 
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
@@ -185,18 +182,21 @@ return (
         <>
           {/* PAGE IMAGE */}
           <img
-            src={bmp.url}
-            alt={`p${pageNum}`}
-            data-page-img="true"
-            draggable={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              pointerEvents: "none",
-              borderRadius: 2,
-              display: "block",
-            }}
+  src={bmp.url}
+ alt={`p${pageNum}`}
+  data-page-img={true}
+  draggable={false}
+  style={{
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    objectPosition: 'left top',
+    pointerEvents: 'none',
+    borderRadius: 2,
+    display: 'block',
+    transition: 'none', // <--- додати!
+  }}
+  className={isFlipping ? 'img-noflip' : ''}
           />
 
 
@@ -608,6 +608,7 @@ const sideStyle: React.CSSProperties = sideIsLeft
   outline-color: rgba(56, 189, 248, .95);
   box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
 }
+
 
 
       `}</style>
