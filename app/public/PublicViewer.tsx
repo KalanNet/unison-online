@@ -42,19 +42,28 @@ const [q, setQ] = useState("");
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
-  // === AUTO-SEARCH (debounced) ===
+ // === AUTO-SEARCH (debounced, only on q/file change) ===
+const lastSigRef = React.useRef<string>("");
+
 React.useEffect(() => {
-  const inst = ctrl;           // фіксуємо посилання для TS
+  if (!ctrl) return;                 // чекаємо, поки зʼявиться контролер
+
   const qTrim = q.trim();
-  if (!inst) return;
+  const sig = `${file}::${qTrim}`;   // унікальна сигнатура для цього файлу + рядка
+
+  // якщо нічого не змінилось — не тригеримо пошук
+  if (lastSigRef.current === sig) return;
+  lastSigRef.current = sig;
 
   const t = setTimeout(() => {
-    inst.runSearch(qTrim);
+    ctrl.runSearch(qTrim);           // один виклик після debounce
   }, 250);
 
   return () => clearTimeout(t);
-}, [q, file, ctrl]);
+  // важливо: залежності тільки від q та file, і флагу наявності ctrl
+}, [q, file, !!ctrl]);
 // === /AUTO-SEARCH ===
+
 
 
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
