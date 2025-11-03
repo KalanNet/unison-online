@@ -185,22 +185,20 @@ return (
         <>
           {/* PAGE IMAGE */}
           <img
-  src={bmp.url}
-  alt={`p${pageNum}`}
-  data-page-img="true"
-  draggable={false}
-  /* важливо: саме HTML-атрибути */
-  width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
-  height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
-  style={{
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    pointerEvents: "none",
-    borderRadius: 2,
-    display: "block",
-  }}
-/>
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              pointerEvents: "none",
+              borderRadius: 2,
+              display: "block",
+            }}
+          />
+
 
 
 
@@ -609,11 +607,6 @@ const sideStyle: React.CSSProperties = sideIsLeft
   background: rgba(56, 189, 248, .25);             /* блакитний для активного */
   outline-color: rgba(56, 189, 248, .95);
   box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
-}
-
-img[data-page-img='true']{
-  image-rendering: -webkit-optimize-contrast; /* Safari/Chrome hint */
-  image-rendering: optimizeQuality;           /* інші браузери */
 }
 
 
