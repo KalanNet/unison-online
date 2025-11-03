@@ -89,6 +89,12 @@ React.useEffect(() => {
       </div>
     );
   }
+// === fix: startPage лише один раз ===
+const initPageRef = React.useRef<number | null>(null);
+if (initPageRef.current === null) {
+  initPageRef.current = ctrl.currentIndex; // зафіксувати стартовий індекс
+}
+// === /fix ===
 
 
 
@@ -147,7 +153,7 @@ return (
             maxShadowOpacity={0.2}
             drawShadow
             mobileScrollSupport
-            startPage={ctrl.currentIndex}
+            startPage={initPageRef.current as number}
             onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
             style={{
               width: "100%",
@@ -379,17 +385,31 @@ const sideStyle: React.CSSProperties = sideIsLeft
     key={h.id}
     type="button"
     className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
-    onClick={() => {
-      ctrl.setActiveHit(i);
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-      // PDF 1-based -> FlipBook 0-based
-      const pageIndex = Math.max(0, (h.page ?? 1) - 1);
-
-      if (typeof ctrl.goToPage === "function") {
-        if (ctrl.currentIndex !== pageIndex) ctrl.goToPage(pageIndex);
-      } else {
-        (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+      const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
+      if (ctrl.currentIndex === target) {
+        ctrl.setActiveHit(i);
+        return;
       }
+
+      // 1) спочатку синхронізуємо наш state
+      ctrl.setActiveHit(i);
+      ctrl.setCurrentIndex(target);
+
+      // 2) у наступний кадр — командуємо FlipBook
+      setTimeout(() => {
+        const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+        if (api?.turnToPage) {
+          api.turnToPage(target);           // абсолютний перехід
+        } else if (typeof ctrl.goToPage === "function") {
+          ctrl.goToPage(target);
+        } else if (api?.flip) {
+          api.flip(target);
+        }
+      }, 0);
     }}
     title={`Go to page ${h.page}`}
   >
@@ -397,6 +417,7 @@ const sideStyle: React.CSSProperties = sideIsLeft
     <div className="sf-meta">Page {h.page}</div>
   </button>
 ))}
+
 
     </div>
   </aside>
