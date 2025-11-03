@@ -31,6 +31,8 @@ export default function PublicViewer({
 const [searchOpen, setSearchOpen] = useState(false);
 const [q, setQ] = useState("");
 const initPageRef = React.useRef<number | null>(null);
+const suppressNavRef = React.useRef<boolean>(false); // ⬅️ ДОДАНО
+
 
 
 
@@ -49,29 +51,46 @@ const initPageRef = React.useRef<number | null>(null);
   }
   // ⬆️⬆️ КІНЕЦЬ ВСТАВКИ
 
- // === AUTO-SEARCH (debounced, only on q/file change) ===
+// === AUTO-SEARCH (debounced, only on q/file change) ===
 const lastSigRef = React.useRef<string>("");
-const suppressNavRef = React.useRef(false);
-
 
 React.useEffect(() => {
-  if (!ctrl) return;                 // чекаємо, поки зʼявиться контролер
+  if (!ctrl) return;
 
   const qTrim = q.trim();
-  const sig = `${file}::${qTrim}`;   // унікальна сигнатура для цього файлу + рядка
+  const sig = `${file}::${qTrim}`;
 
-  // якщо нічого не змінилось — не тригеримо пошук
   if (lastSigRef.current === sig) return;
   lastSigRef.current = sig;
 
-  const t = setTimeout(() => {
-    ctrl.runSearch(qTrim);           // один виклик після debounce
+  const t = setTimeout(async () => {
+    // тимчасово приглушимо будь-яку навігацію зсередини runSearch
+    const hadGoTo =
+      ctrl && typeof (ctrl as any).goToPage === "function";
+    const realGoToPage = hadGoTo ? (ctrl as any).goToPage : undefined;
+
+    if (hadGoTo) {
+      suppressNavRef.current = true;
+      (ctrl as any).goToPage = (...args: any[]) => {
+        if (suppressNavRef.current) return; // ігноруємо переходи під час введення
+        return realGoToPage!(...args);
+      };
+    }
+
+    try {
+      await ctrl.runSearch(qTrim);
+    } finally {
+      // відновити поведінку
+      suppressNavRef.current = false;
+      if (hadGoTo) (ctrl as any).goToPage = realGoToPage!;
+    }
   }, 250);
 
   return () => clearTimeout(t);
-  // важливо: залежності тільки від q та file, і флагу наявності ctrl
 }, [q, file, !!ctrl]);
 // === /AUTO-SEARCH ===
+
+
 
 
 
