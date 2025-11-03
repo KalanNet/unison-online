@@ -190,46 +190,32 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   function getPageCssSize(base: { w: number; h: number }, fit: number) {
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
-  async function renderPageToImage(pageNum: number): Promise<PageBmp> {
+// ЗАМІНА всієї функції renderPageToImage
+async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
   const page = await pdfDoc.getPage(pageNum);
 
-  const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
+  // 1) ФАКТИЧНИЙ макетний розмір сторінки у пікселях екрана
+  const layoutW = Math.max(1, Math.round(pageW * fitScale));
+  const layoutH = Math.max(1, Math.round(pageH * fitScale));
+
+  // 2) Масштаб pdf.js: робимо viewport рівним макетному розміру (без додаткових множників)
   const rotation = page.rotate || 0;
-
-  // густина пікселів (ефективний upscale відносно CSS-розміру)
-  const DPR = Math.max(1, Math.min(6, window.devicePixelRatio || 1));
-  const QUALITY = 2.6; // 2.4–3.2 зазвичай ідеально; можна підкрутити
-  let scale = (css.w / pageW) * DPR * QUALITY;
-
-  // запобіжник від надвеликих полотен (~48 Мп)
-  const MAX_AREA = 48_000_000;
-  {
-    const test = page.getViewport({ scale, rotation });
-    const area = Math.round(test.width) * Math.round(test.height);
-    if (area > MAX_AREA) scale *= Math.sqrt(MAX_AREA / area);
-  }
-
+  const scale = layoutW / pageW;
   const vp = page.getViewport({ scale, rotation });
 
-const canvas = document.createElement("canvas");
-canvas.width  = Math.max(1, Math.round(vp.width));
-canvas.height = Math.max(1, Math.round(vp.height));
+  // 3) Канва = рівно екранний розмір (1:1), без наступного даунсемплу
+  const canvas = document.createElement("canvas");
+  canvas.width  = Math.max(1, Math.round(vp.width));
+  canvas.height = Math.max(1, Math.round(vp.height));
 
-const ctx = canvas.getContext("2d", { alpha: false })!;
-(ctx as any).imageSmoothingEnabled = true;
-(ctx as any).imageSmoothingQuality = "high";
+  const ctx = canvas.getContext("2d", { alpha: false })!;
+  // жодних imageSmoothing-хінтів тут не потрібно — pdf.js малює вектором у нативний розмір
 
-// білий фон без використання параметра background
-ctx.save();
-ctx.fillStyle = "#fff";
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-ctx.restore();
+  // ВАЖЛИВО: додати canvas у параметри (інакше TS лається)
+  await page.render({ canvasContext: ctx, viewport: vp, canvas, background: "#fff" }).promise;
 
-// ✅ головне: передати ще й canvas
-await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
-
-  // лінки (координати в цьому ж viewport — вже з rotation)
+  // 4) Лінки в тих же координатах viewport
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
   anns.forEach((a: any) => {
@@ -242,6 +228,7 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
   return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
 }
+
 
   const [, setTick] = useState(0);
   function warmPagesAround(idx0: number) {
@@ -607,6 +594,9 @@ async function publishMetaAndBookmarks() {
     .toolbtn.slim{ min-width:32px; height:32px; }
     .toolbtn.disabled{ opacity:.45; cursor:not-allowed; }
     .toolbtn.active{ outline:2px solid #8ea05a33; }
+
+
+
 
     .page-jump{ display:flex; align-items:center; gap:.4rem; background:#fff; border:1px solid #e7ebdf; border-radius:.8rem; padding:.2rem .35rem; }
     .jump-inp{ width:72px; text-align:center; font-weight:800; border:1px solid #e7ebdf; border-radius:.5rem; padding:.3rem .35rem; color:#2d3018; height:32px; }

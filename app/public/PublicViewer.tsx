@@ -187,19 +187,19 @@ return (
   src={bmp.url}
   alt={`p${pageNum}`}
   data-page-img="true"
-  draggable={false}
-  // 🔽 ФІКС: HTML-атрибути з цілими значеннями
+  // ВАЖЛИВО: html-атрибути width/height мають бути ЦІЛИМИ
   width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
   height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
   style={{
-    width: "100%",
+    width: "100%",      // контейнер рівно цього ж піксельного розміру
     height: "100%",
     objectFit: "contain",
+    display: "block",
     pointerEvents: "none",
     borderRadius: 2,
-    display: "block",
   }}
 />
+
 
 
 {/* === HIGHLIGHTS LAYER === */}
