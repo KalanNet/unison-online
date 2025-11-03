@@ -602,8 +602,6 @@ async function publishMetaAndBookmarks() {
     .panel-title{ color:#e9f0e4; font-weight:800; margin-bottom:.5rem; }
     .viewer-panel{ background:#fff; box-shadow: inset 0 1px 0 #eef1e8; }
 
-    .book-container { transition: transform 500ms ease-in-out; transform: translateX(0); }
-    .book-container.is-cover { transform: translateX(-25%); }
 
     .portal-loupe{ position: fixed; z-index: 60; border-radius: 999px; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.24), inset 0 0 0 2px rgba(255,255,255,.9); pointer-events: none; background:#fff; contain: layout paint; will-change: transform; transform: translateZ(0); }
 
