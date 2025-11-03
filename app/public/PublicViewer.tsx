@@ -375,20 +375,29 @@ const sideStyle: React.CSSProperties = sideIsLeft
       )}
 
       {ctrl.hits.map((h, i) => (
-        <button
-          key={h.id}
-          type="button"
-          className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
-          onClick={() => {
-            ctrl.setActiveHit(i);
-            ctrl.goToPage(h.page);
-          }}
-          title={`Go to page ${h.page}`}
-        >
-          <div className="sf-snippet">{h.snippet}</div>
-          <div className="sf-meta">Page {h.page}</div>
-        </button>
-      ))}
+  <button
+    key={h.id}
+    type="button"
+    className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
+    onClick={() => {
+      ctrl.setActiveHit(i);
+
+      // PDF 1-based -> FlipBook 0-based
+      const pageIndex = Math.max(0, (h.page ?? 1) - 1);
+
+      if (typeof ctrl.goToPage === "function") {
+        if (ctrl.currentIndex !== pageIndex) ctrl.goToPage(pageIndex);
+      } else {
+        (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+      }
+    }}
+    title={`Go to page ${h.page}`}
+  >
+    <div className="sf-snippet">{h.snippet}</div>
+    <div className="sf-meta">Page {h.page}</div>
+  </button>
+))}
+
     </div>
   </aside>
 )}
