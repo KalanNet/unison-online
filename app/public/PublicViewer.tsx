@@ -478,7 +478,7 @@ export default function PublicViewer({
       />
 
       <style jsx global>{`
-        html, body { margin: 0; height: 100%; background: #21353a; overflow: hidden !important; }
+        html, body { margin: 0; height: 100%; background: #21353a; }
         * { box-sizing: border-box; }
         :root { --hdr: 56px; --ftr: 64px; }
         :root{
@@ -487,11 +487,23 @@ export default function PublicViewer({
         }
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
-        .viewer-root { min-height: 100svh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
+        .viewer-root { min-height: 100dvh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
         .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
         button[aria-label="Publish"] { display: none !important; }
         .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
-        .viewer-stage { flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .viewer-stage {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  /* явна висота, щоб після F11 не «з’їдалося» кілька px знизу */
+  height: calc(100dvh - var(--hdr) - var(--ftr));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
         .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
         .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
