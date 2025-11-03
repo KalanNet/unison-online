@@ -56,34 +56,14 @@ const lastSigRef = React.useRef<string>("");
 
 React.useEffect(() => {
   if (!ctrl) return;
-
   const qTrim = q.trim();
   const sig = `${file}::${qTrim}`;
-
   if (lastSigRef.current === sig) return;
   lastSigRef.current = sig;
 
-  const t = setTimeout(async () => {
-    // тимчасово приглушимо будь-яку навігацію зсередини runSearch
-    const hadGoTo =
-      ctrl && typeof (ctrl as any).goToPage === "function";
-    const realGoToPage = hadGoTo ? (ctrl as any).goToPage : undefined;
-
-    if (hadGoTo) {
-      suppressNavRef.current = true;
-      (ctrl as any).goToPage = (...args: any[]) => {
-        if (suppressNavRef.current) return; // ігноруємо переходи під час введення
-        return realGoToPage!(...args);
-      };
-    }
-
-    try {
-      await ctrl.runSearch(qTrim);
-    } finally {
-      // відновити поведінку
-      suppressNavRef.current = false;
-      if (hadGoTo) (ctrl as any).goToPage = realGoToPage!;
-    }
+  const t = setTimeout(() => {
+    // НІЯКИХ monkey-patch для goToPage
+    ctrl.runSearch(qTrim);
   }, 250);
 
   return () => clearTimeout(t);
@@ -602,6 +582,25 @@ const sideStyle: React.CSSProperties = sideIsLeft
 .sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
 /* === /Search flyout === */
 
+/* === Search highlights === */
+.hl-layer{
+  position: absolute;
+  inset: 0;
+  pointer-events: none;   /* не заважає клікам по лінках */
+  z-index: 5;             /* вище за картинку сторінки */
+}
+.hl{
+  position: absolute;
+  background: rgba(255, 226, 61, .28);             /* жовтий прозорий */
+  outline: 2px solid rgba(255, 200, 0, .9);
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+}
+.hl.is-active{
+  background: rgba(56, 189, 248, .25);             /* блакитний для активного */
+  outline-color: rgba(56, 189, 248, .95);
+  box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
+}
 
       `}</style>
     </div>
