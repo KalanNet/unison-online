@@ -93,36 +93,92 @@ export default function PublicViewer({
 
   // --- МОБІЛЬНИЙ РЕНДЕР на ≤980px ---
   if (isMobile) {
-    return (
-      <div className="viewer-root" style={{ background: "#21353a", minHeight: "100svh" }}>
-        <MobileHeader
-          title={ctrl.title}
-          file={file}
-          searchQuery={q}
-          setSearchQuery={setQ}
-          runSearch={(qq: string) => setQ(qq)}   // викличе useEffect авто-пошуку
-          searching={ctrl.searching}
-          hits={ctrl.hits}
-          onGoto={(p: number) => { ctrl.goToPage?.(p); }} // p — 1-based у хедері
-          onShare={ctrl.handleShare}
-          splashActive={false}
-        />
+  // Адаптер: примусово даємо мобільні версії переходів БЕЗ FlipBook
+  // локальні хелпери підвантаження сторінок (щоб не було TS-помилок)
+const ensureRendered = (idx: number) => {
+  // якщо ваш контролер має власний метод — викличеться він;
+  // інакше пробуємо типові варіанти (1-based API)
+  try { (ctrl as any).ensureRendered?.(idx); } catch {}
+  try { (ctrl as any).renderPage?.(idx + 1); } catch {}
+  try { (ctrl as any).renderThumb?.(idx + 1); } catch {}
+};
 
-        <MobilePager
-          ctrl={ctrl}
-          file={file}
-          title={ctrl.title}
-          searchQuery={q}
-          setSearchQuery={setQ}
-          runSearch={(qq: string) => setQ(qq)}
-          searching={ctrl.searching}
-          hits={ctrl.hits}
-          onGoto={(p: number) => { ctrl.goToPage?.(p); }}
-          onShare={ctrl.handleShare}
-        />
-      </div>
-    );
-  }
+const warmPagesAround = (idx: number) => {
+  [idx - 1, idx + 1].forEach(i => {
+    if (i >= 0 && i < ctrl.totalPages) ensureRendered(i);
+  });
+};
+
+const mCtrl = {
+  ...ctrl,
+  goToPage: (idx: number) => {
+    const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+  goNext: () => {
+    if (!ctrl.canNext) return;
+    const next = ctrl.currentIndex + 1;
+    ctrl.setCurrentIndex(next);
+    ensureRendered(next);
+    warmPagesAround(next);
+  },
+  goPrev: () => {
+    if (!ctrl.canPrev) return;
+    const prev = ctrl.currentIndex - 1;
+    ctrl.setCurrentIndex(prev);
+    ensureRendered(prev);
+    warmPagesAround(prev);
+  },
+  submitJump: () => {
+    const n = parseInt(String(ctrl.pageJump), 10);
+    if (!Number.isFinite(n)) return;
+    const target = Math.max(1, Math.min(n, ctrl.totalPages)) - 1; // 0-based
+    const safe = Math.max(0, Math.min(target, ctrl.totalPages - 1));
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+};
+
+
+  return (
+    <div className="viewer-root" style={{ background:"#21353a" }}>
+      <MobileHeader
+        title={ctrl.title}
+        file={file}
+        searchQuery={q}
+        setSearchQuery={setQ}
+        runSearch={(qq: string) => setQ(qq)}   // тригерить авто-пошук через useEffect
+        searching={ctrl.searching}
+        hits={ctrl.hits}
+        onGoto={(p: number) => mCtrl.goToPage(p - 1)} // p з хедера 1-based
+        onShare={ctrl.handleShare}
+        splashActive={false}
+      />
+
+      <MobilePager
+        ctrl={mCtrl as any}
+        file={file}
+        title={ctrl.title}
+        searchQuery={q}
+        setSearchQuery={setQ}
+        runSearch={(qq: string) => setQ(qq)}
+        searching={ctrl.searching}
+        hits={ctrl.hits}
+        onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+        onShare={ctrl.handleShare}
+      />
+
+      {/* тільки для мобільного режиму — блокуємо прокрутку всього документу */}
+      <style jsx global>{`
+        html, body { height: 100svh; overflow: hidden; }
+        .viewer-root { min-height: 100svh; }
+      `}</style>
+    </div>
+  );
+}
 
   // --- ДЕСКТОП (FlipBook) ---
   return (
