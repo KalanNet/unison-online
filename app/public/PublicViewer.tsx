@@ -5,9 +5,8 @@ import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
-import MobileHeader from "./MobileHeader";          // ваш наданий компонент із повідомлення
-import MobilePager from "./MobilePager";            // новий файл з п.1
-
+import MobileHeader from "./MobileHeader";
+import MobilePager from "./MobilePager";
 
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
@@ -15,62 +14,7 @@ const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 /* --- тип закладки --- */
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
 
-/* --- публічний в’ювер з пробросом закладок --- */
-export default function PublicViewer({
-  file,
-  title,
-  bookmarks = [],
-}: {
-  file: string;
-  title?: string;
-  bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
-}) {
-
-  const [error, setError] = useState<string | null>(null);
-
-  // --- Search UI state (for header) ---
-const [searchOpen, setSearchOpen] = useState(false);
-const [q, setQ] = useState("");
-const initPageRef = React.useRef<number | null>(null);
-const suppressNavRef = React.useRef<boolean>(false); // ⬅️ ДОДАНО
-
-
-
-
-
-  let ctrl: ReturnType<typeof useViewerController> | null = null;
-  try {
-    // контролер не очікує bookmarks — використовуємо їх нижче при рендері
-    ctrl = useViewerController({ file, title });
-  } catch (err: any) {
-    setError(typeof err === "string" ? err : err?.message || "Viewer component error");
-  }
-
-    // ⬇️⬇️ ВСТАВИТИ СЮДИ (РІВНО ПІСЛЯ try/catch і ПЕРЕД // === AUTO-SEARCH)
-  if (ctrl && initPageRef.current === null) {
-    initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
-  }
-  // ⬆️⬆️ КІНЕЦЬ ВСТАВКИ
-
-// === AUTO-SEARCH (debounced, only on q/file change) ===
-const lastSigRef = React.useRef<string>("");
-
-React.useEffect(() => {
-  if (!ctrl) return;
-  const qTrim = q.trim();
-  const sig = `${file}::${qTrim}`;
-  if (lastSigRef.current === sig) return;
-  lastSigRef.current = sig;
-
-  const t = setTimeout(() => {
-    // НІЯКИХ monkey-patch для goToPage
-    ctrl.runSearch(qTrim);
-  }, 250);
-
-  return () => clearTimeout(t);
-}, [q, file, !!ctrl]);
-// === /AUTO-SEARCH ===
-
+/** Хук для брейкпоінта 980px */
 function useIsMobile(bp = 980) {
   const [isMob, setIsMob] = React.useState(false);
   React.useEffect(() => {
@@ -84,9 +28,52 @@ function useIsMobile(bp = 980) {
   return isMob;
 }
 
+/* --- публічний в’ювер з пробросом закладок --- */
+export default function PublicViewer({
+  file,
+  title,
+  bookmarks = [],
+}: {
+  file: string;
+  title?: string;
+  bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
+}) {
+  // --- Search UI state (for header) ---
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [q, setQ] = useState("");
 
+  const initPageRef = React.useRef<number | null>(null);
+  const suppressNavRef = React.useRef<boolean>(false);
 
+  // 1) ХУК КОНТРОЛЕРА — БЕЗ try/catch і setState під час рендера
+  const ctrl = useViewerController({ file, title });
 
+  // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
+  const isMobile = useIsMobile(980);
+
+  // 3) Зафіксувати стартову сторінку (один раз)
+  if (ctrl && initPageRef.current === null) {
+    initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
+  }
+
+  // === AUTO-SEARCH (debounced, only on q/file change) ===
+  const lastSigRef = React.useRef<string>("");
+  React.useEffect(() => {
+    if (!ctrl) return;
+    const qTrim = q.trim();
+    const sig = `${file}::${qTrim}`;
+    if (lastSigRef.current === sig) return;
+    lastSigRef.current = sig;
+
+    const t = setTimeout(() => {
+      ctrl.runSearch(qTrim);
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [q, file, !!ctrl]);
+  // === /AUTO-SEARCH ===
+
+  // ---- РАННІ ВАЛІДАЦІЇ ----
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -95,14 +82,7 @@ function useIsMobile(bp = 980) {
       </div>
     );
   }
-  if (error) {
-    return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Помилка перегляду PDF!</h2>
-        <div style={{ color: "#aaa", marginTop: 12 }}>{error}</div>
-      </div>
-    );
-  }
+
   if (!ctrl || !ctrl.pdfDoc) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
@@ -111,21 +91,19 @@ function useIsMobile(bp = 980) {
     );
   }
 
-  // --- Мобільний рендер на ≤980px ---
-  const isMobile = useIsMobile(980);
+  // --- МОБІЛЬНИЙ РЕНДЕР на ≤980px ---
   if (isMobile) {
     return (
-      <div className="viewer-root" style={{ background:"#21353a", minHeight:"100svh" }}>
+      <div className="viewer-root" style={{ background: "#21353a", minHeight: "100svh" }}>
         <MobileHeader
           title={ctrl.title}
           file={file}
           searchQuery={q}
           setSearchQuery={setQ}
-          runSearch={(qq: string) => setQ(qq)}
-     // запуск викличе useEffect авто-пошуку
+          runSearch={(qq: string) => setQ(qq)}   // викличе useEffect авто-пошуку
           searching={ctrl.searching}
           hits={ctrl.hits}
-          onGoto={(p: number) => { ctrl.goToPage?.(p); }}
+          onGoto={(p: number) => { ctrl.goToPage?.(p); }} // p — 1-based у хедері
           onShare={ctrl.handleShare}
           splashActive={false}
         />
@@ -136,367 +114,347 @@ function useIsMobile(bp = 980) {
           title={ctrl.title}
           searchQuery={q}
           setSearchQuery={setQ}
-          runSearch={(qq) => setQ(qq)}
+          runSearch={(qq: string) => setQ(qq)}
           searching={ctrl.searching}
           hits={ctrl.hits}
-          onGoto={(p) => { ctrl.goToPage?.(p); }}
+          onGoto={(p: number) => { ctrl.goToPage?.(p); }}
           onShare={ctrl.handleShare}
         />
       </div>
     );
   }
 
-
-return (
-  <div className="viewer-root">
-    <EditorHeader
-      title={ctrl.title}
-      onSearch={(term) => setQ(term)} // лише оновлюємо стан; пошук зробить useEffect
-      isSearching={(ctrl as any).searching ?? false}
-      file={file}
-      isFs={ctrl.isFs}
-      toggleFullscreen={ctrl.toggleFullscreen}
-      handleShare={ctrl.handleShare}
-      onPublish={() => {}} // прибито на публічній сторінці
-
-      // --- нове: керування полем пошуку ---
-      searchOpen={searchOpen}
-      onSearchToggle={setSearchOpen}
-      searchQuery={q}
-      onSearchChange={(v) => {
-        setQ(v);
-        // опційно: якщо рядок порожній — сховати флайаут/результати
-        // if (!v.trim()) setSearchOpen(false);
-      }}
-    />
-
-      <section ref={ctrl.stageRef} className="viewer-stage">
-  {/* НОВИЙ внутрішній контейнер, який резервує місце симетрично всередині сцени */}
-  <div className="stage-rail">
-    <div
-      className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
-      style={{
-        transition: "transform 500ms ease-in-out",
-        margin: "0 auto",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: ctrl.single
-          ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
-          : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
-        height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
-        // ВАЖЛИВО: щоб «книга» не виходила за межі stage-rail навіть з translateX
-        maxWidth: "100%",
-        maxHeight: "100%",
-        position: "relative",
-      }}
-    >
-          <FlipBook
-            ref={ctrl.bookRef}
-            width={ctrl.baseSize.w}
-            height={ctrl.baseSize.h}
-            size="stretch"
-            usePortrait={ctrl.single}
-            showCover={!ctrl.single}
-            flippingTime={900}
-            maxShadowOpacity={0.2}
-            drawShadow
-            mobileScrollSupport
-            startPage={(initPageRef.current ?? 0) as number}
-            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-            style={{
-              width: "100%",
-              height: "100%",
-              minWidth: 0,
-              minHeight: 0,
-              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-            }}
-          >
-
-            {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-  const pageNum = i + 1;
-  const bmp = ctrl!.cacheRef.current.get(pageNum);
-  const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
-    (bmp?.links as any) ?? [];
-
-
-
+  // --- ДЕСКТОП (FlipBook) ---
   return (
-    <div
-      key={i}
-      style={{ width: "100%", height: "100%", background: "#fff", position: "relative" }}
-      onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-      onMouseLeave={ctrl!.handlePageMouseLeave}
-    >
-      {bmp ? (
-        <>
-          {/* PAGE IMAGE */}
-          <img
-            src={bmp.url}
-            alt={`p${pageNum}`}
-            data-page-img="true"
-            draggable={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              pointerEvents: "none",
-              borderRadius: 2,
-              display: "block",
-            }}
-          />
+    <div className="viewer-root">
+      <EditorHeader
+        title={ctrl.title}
+        onSearch={(term) => setQ(term)} // лише оновлюємо стан; пошук зробить useEffect
+        isSearching={(ctrl as any).searching ?? false}
+        file={file}
+        isFs={ctrl.isFs}
+        toggleFullscreen={ctrl.toggleFullscreen}
+        handleShare={ctrl.handleShare}
+        onPublish={() => {}} // прибито на публічній сторінці
 
-
-
-{/* === HIGHLIGHTS LAYER === */}
-<div className="hl-layer" aria-hidden>
-  {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map((r: any, j: number) => {
-    const isActive = typeof r.hitIndex === "number" && r.hitIndex === (ctrl as any).activeHit;
-    return (
-      <div
-        key={j}
-        className={`hl${isActive ? " is-active" : ""}`}
-        style={{
-          position: "absolute",
-          left: `${r.x * 100}%`,
-          top: `${r.y * 100}%`,
-          width: `${r.w * 100}%`,
-          height: `${r.h * 100}%`,
+        // --- нове: керування полем пошуку ---
+        searchOpen={searchOpen}
+        onSearchToggle={setSearchOpen}
+        searchQuery={q}
+        onSearchChange={(v) => {
+          setQ(v);
+          // if (!v.trim()) setSearchOpen(false);
         }}
       />
-    );
-  })}
-</div>
-{/* === /HIGHLIGHTS LAYER === */}
 
-{/* PDF LINKS */}
-{links?.length
-  ? links.map((L, idx) =>
-      L.href ? (
-        <a
-          key={idx}
-          href={L.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="pdf-link"
-          style={{
-            position: "absolute",
-            left: `${L.x * 100}%`,
-            top: `${L.y * 100}%`,
-            width: `${L.w * 100}%`,
-            height: `${L.h * 100}%`,
-          }}
-        />
-      ) : (
-        <button
-          key={idx}
-          className="pdf-link"
-          title="Go to"
-          onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-          style={{
-            position: "absolute",
-            left: `${L.x * 100}%`,
-            top: `${L.y * 100}%`,
-            width: `${L.w * 100}%`,
-            height: `${L.h * 100}%`,
-          }}
-        />
-      )
-    )
-  : null}
-
-
-          
-        </>
-      ) : (
-        <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
-          Рендер сторінки…
-        </div>
-      )}
-    </div>
-  );
-})}
-
-          </FlipBook>
-
-          {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
-{(bookmarks?.length ?? 0) > 0 && (
-  <div
-    className="bm-tabs-overlay"
-    style={{
-      position: "absolute",
-      inset: 0,
-      zIndex: 200,
-      overflow: "visible",
-      pointerEvents: "none",
-      ["--tabThickness" as any]: "36px",
-      ["--tabLength" as any]: "140px",
-      ["--tabTop" as any]: "36px",
-      ["--tabGap" as any]: "0px",
-    } as React.CSSProperties}
-  >
-    {(() => {
-      const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
-
-      // поточний розворот
-      const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
-const leftNow  = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
-
-      return sorted.map((bm, i) => {
-        const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
-
-        const baseStyle: React.CSSProperties = {
-          position: "absolute",
-          top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-          width: "var(--tabThickness)",
-          height: "var(--tabLength)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#fff",
-          fontSize: 15,
-          fontWeight: 800,
-          lineHeight: 1,
-          border: "1px solid rgba(0,0,0,.18)",
-          boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-          opacity: 0.98,
-          transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-          pointerEvents: "auto",
-          background: bm.color || "#f47e20",
-          borderRadius: "0 10px 10px 0",
-        };
-
-const sideStyle: React.CSSProperties = sideIsLeft
-  ? {
-      // Ліва: якір у самісінькому лівому краї
-      left: 0,
-      transformOrigin: "center center",
-      // 1) виносимо таб назовні: translateX(-100%)
-      // 2) компенсуємо приріст ширини при scaleX, щоб край залишався біля сторінки
-      transform:
-        "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
-    }
-  : {
-      // Права: якір у правому краї
-      right: 0,
-      transformOrigin: "center center",
-      // Аналогічна компенсація, але у протилежний бік
-      transform:
-        "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
-    };
-
-
-        return (
-          <button
-            key={bm.id}
-            className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-              (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
-            }`}
-            title={`${bm.label} (p.${bm.page})`}
-            onClick={(e) => {
-  e.preventDefault();
-  const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
-  if (typeof ctrl!.goToPage === "function") {
-    ctrl!.goToPage(pageIndex);
-  } else {
-    (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
-  }
-}}
-
-            style={{ ...baseStyle, ...sideStyle }}
+      <section ref={ctrl.stageRef} className="viewer-stage">
+        {/* внутрішній контейнер, який резервує місце симетрично всередині сцени */}
+        <div className="stage-rail">
+          <div
+            className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+            style={{
+              transition: "transform 500ms ease-in-out",
+              margin: "0 auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: ctrl.single
+                ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
+                : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+              height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+              maxWidth: "100%",
+              maxHeight: "100%",
+              position: "relative",
+            }}
           >
-            <span
-              className="bm-tab__label"
+            <FlipBook
+              ref={ctrl.bookRef}
+              width={ctrl.baseSize.w}
+              height={ctrl.baseSize.h}
+              size="stretch"
+              usePortrait={ctrl.single}
+              showCover={!ctrl.single}
+              flippingTime={900}
+              maxShadowOpacity={0.2}
+              drawShadow
+              mobileScrollSupport
+              startPage={(initPageRef.current ?? 0) as number}
+              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
               style={{
-                maxHeight: "calc(var(--tabLength) - 10px)",
-                padding: "4px 0",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-              } as React.CSSProperties}
+                width: "100%",
+                height: "100%",
+                minWidth: 0,
+                minHeight: 0,
+                aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+              }}
             >
-              {bm.label}
-            </span>
-          </button>
-        );
-      });
-    })()}
-  </div>
-)}
-{/* === /OVERLAY ЗАКЛАДОК === */}
-</div>
+              {Array.from({ length: ctrl.totalPages }).map((_, i) => {
+                const pageNum = i + 1;
+                const bmp = ctrl!.cacheRef.current.get(pageNum);
+                const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
+                  (bmp?.links as any) ?? [];
 
+                return (
+                  <div
+                    key={i}
+                    style={{ width: "100%", height: "100%", background: "#fff", position: "relative" }}
+                    onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+                    onMouseLeave={ctrl!.handlePageMouseLeave}
+                  >
+                    {bmp ? (
+                      <>
+                        {/* PAGE IMAGE */}
+                        <img
+                          src={bmp.url}
+                          alt={`p${pageNum}`}
+                          data-page-img="true"
+                          draggable={false}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            pointerEvents: "none",
+                            borderRadius: 2,
+                            display: "block",
+                          }}
+                        />
+
+                        {/* === HIGHLIGHTS LAYER === */}
+                        <div className="hl-layer" aria-hidden>
+                          {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map((r: any, j: number) => {
+                            const isActive = typeof r.hitIndex === "number" && r.hitIndex === (ctrl as any).activeHit;
+                            return (
+                              <div
+                                key={j}
+                                className={`hl${isActive ? " is-active" : ""}`}
+                                style={{
+                                  position: "absolute",
+                                  left: `${r.x * 100}%`,
+                                  top: `${r.y * 100}%`,
+                                  width: `${r.w * 100}%`,
+                                  height: `${r.h * 100}%`,
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                        {/* === /HIGHLIGHTS LAYER === */}
+
+                        {/* PDF LINKS */}
+                        {links?.length
+                          ? links.map((L, idx) =>
+                              L.href ? (
+                                <a
+                                  key={idx}
+                                  href={L.href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="pdf-link"
+                                  style={{
+                                    position: "absolute",
+                                    left: `${L.x * 100}%`,
+                                    top: `${L.y * 100}%`,
+                                    width: `${L.w * 100}%`,
+                                    height: `${L.h * 100}%`,
+                                  }}
+                                />
+                              ) : (
+                                <button
+                                  key={idx}
+                                  className="pdf-link"
+                                  title="Go to"
+                                  onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+                                  style={{
+                                    position: "absolute",
+                                    left: `${L.x * 100}%`,
+                                    top: `${L.y * 100}%`,
+                                    width: `${L.w * 100}%`,
+                                    height: `${L.h * 100}%`,
+                                  }}
+                                />
+                              )
+                            )
+                          : null}
+                      </>
+                    ) : (
+                      <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
+                        Рендер сторінки…
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </FlipBook>
+
+            {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
+            {(bookmarks?.length ?? 0) > 0 && (
+              <div
+                className="bm-tabs-overlay"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 200,
+                  overflow: "visible",
+                  pointerEvents: "none",
+                  ["--tabThickness" as any]: "36px",
+                  ["--tabLength" as any]: "140px",
+                  ["--tabTop" as any]: "36px",
+                  ["--tabGap" as any]: "0px",
+                } as React.CSSProperties}
+              >
+                {(() => {
+                  const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
+
+                  // поточний розворот
+                  const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
+                  const leftNow = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+                  const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
+
+                  return sorted.map((bm, i) => {
+                    const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+                    const baseStyle: React.CSSProperties = {
+                      position: "absolute",
+                      top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
+                      width: "var(--tabThickness)",
+                      height: "var(--tabLength)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontSize: 15,
+                      fontWeight: 800,
+                      lineHeight: 1,
+                      border: "1px solid rgba(0,0,0,.18)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                      opacity: 0.98,
+                      transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
+                      pointerEvents: "auto",
+                      background: bm.color || "#f47e20",
+                      borderRadius: "0 10px 10px 0",
+                    };
+
+                    const sideStyle: React.CSSProperties = sideIsLeft
+                      ? {
+                          left: 0,
+                          transformOrigin: "center center",
+                          transform:
+                            "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
+                        }
+                      : {
+                          right: 0,
+                          transformOrigin: "center center",
+                          transform:
+                            "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
+                        };
+
+                    return (
+                      <button
+                        key={bm.id}
+                        className={`bm-tab ${sideIsLeft ? "left" : "right"}${
+                          (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
+                        }`}
+                        title={`${bm.label} (p.${bm.page})`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
+                          if (typeof ctrl!.goToPage === "function") {
+                            ctrl!.goToPage(pageIndex);
+                          } else {
+                            (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+                          }
+                        }}
+                        style={{ ...baseStyle, ...sideStyle }}
+                      >
+                        <span
+                          className="bm-tab__label"
+                          style={{
+                            maxHeight: "calc(var(--tabLength) - 10px)",
+                            padding: "4px 0",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            writingMode: "vertical-rl",
+                            textOrientation: "mixed",
+                          } as React.CSSProperties}
+                        >
+                          {bm.label}
+                        </span>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+            {/* === /OVERLAY ЗАКЛАДОК === */}
+          </div>
         </div>
       </section>
-{/* === RIGHT SEARCH FLYOUT (не впливає на лейаут) === */}
-{q.trim().length > 0 && (
-  <aside className="search-flyout" role="region" aria-label="Search results">
-    <div className="sf-hd">
-      <strong>Search</strong>
-      <span className="sf-meta">
-        {ctrl.searching ? "Searching…" : `${ctrl.hits.length} results`}
-      </span>
-      <button
-        className="sf-close"
-        type="button"
-        onClick={() => { setQ(""); setSearchOpen(false); }}
-        aria-label="Close search"
-        title="Close"
-      >
-        ✕
-      </button>
-    </div>
 
-    <div className="sf-list">
-      {ctrl.hits.length === 0 && !ctrl.searching && (
-        <div className="sf-empty">No matches.</div>
+      {/* === RIGHT SEARCH FLYOUT === */}
+      {q.trim().length > 0 && (
+        <aside className="search-flyout" role="region" aria-label="Search results">
+          <div className="sf-hd">
+            <strong>Search</strong>
+            <span className="sf-meta">
+              {ctrl.searching ? "Searching…" : `${ctrl.hits.length} results`}
+            </span>
+            <button
+              className="sf-close"
+              type="button"
+              onClick={() => { setQ(""); setSearchOpen(false); }}
+              aria-label="Close search"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="sf-list">
+            {ctrl.hits.length === 0 && !ctrl.searching && (
+              <div className="sf-empty">No matches.</div>
+            )}
+
+            {ctrl.hits.map((h, i) => (
+              <button
+                key={h.id}
+                type="button"
+                className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
+                  if (ctrl.currentIndex === target) {
+                    ctrl.setActiveHit(i);
+                    return;
+                  }
+
+                  // 1) спочатку синхронізуємо наш state
+                  ctrl.setActiveHit(i);
+                  ctrl.setCurrentIndex(target);
+
+                  // 2) у наступний кадр — командуємо FlipBook
+                  setTimeout(() => {
+                    const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+                    if (api?.turnToPage) {
+                      api.turnToPage(target);           // абсолютний перехід
+                    } else if (typeof ctrl.goToPage === "function") {
+                      ctrl.goToPage(target);
+                    } else if (api?.flip) {
+                      api.flip(target);
+                    }
+                  }, 0);
+                }}
+                title={`Go to page ${h.page}`}
+              >
+                <div className="sf-snippet">{h.snippet}</div>
+                <div className="sf-meta">Page {h.page}</div>
+              </button>
+            ))}
+          </div>
+        </aside>
       )}
-
-      {ctrl.hits.map((h, i) => (
-  <button
-    key={h.id}
-    type="button"
-    className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
-      if (ctrl.currentIndex === target) {
-        ctrl.setActiveHit(i);
-        return;
-      }
-
-      // 1) спочатку синхронізуємо наш state
-      ctrl.setActiveHit(i);
-      ctrl.setCurrentIndex(target);
-
-      // 2) у наступний кадр — командуємо FlipBook
-      setTimeout(() => {
-        const api = (ctrl.bookRef.current as any)?.pageFlip?.();
-        if (api?.turnToPage) {
-          api.turnToPage(target);           // абсолютний перехід
-        } else if (typeof ctrl.goToPage === "function") {
-          ctrl.goToPage(target);
-        } else if (api?.flip) {
-          api.flip(target);
-        }
-      }, 0);
-    }}
-    title={`Go to page ${h.page}`}
-  >
-    <div className="sf-snippet">{h.snippet}</div>
-    <div className="sf-meta">Page {h.page}</div>
-  </button>
-))}
-
-
-    </div>
-  </aside>
-)}
-{/* === /RIGHT SEARCH FLYOUT === */}
+      {/* === /RIGHT SEARCH FLYOUT === */}
 
       <ViewerFooter
         refEl={ctrl.toolbarRef}
@@ -524,11 +482,9 @@ const sideStyle: React.CSSProperties = sideIsLeft
         * { box-sizing: border-box; }
         :root { --hdr: 56px; --ftr: 64px; }
         :root{
-  /* товщина закладки */
-  --tabThickness: 36px;            /* якщо вже є — ок */
-  /* внутрішній запас під закладки з обох боків (36 + невеликий повітря) */
-  --rail: calc(var(--tabThickness) + 12px);
-}
+          --tabThickness: 36px;
+          --rail: calc(var(--tabThickness) + 12px);
+        }
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
         .viewer-root { min-height: 100svh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
@@ -540,119 +496,68 @@ const sideStyle: React.CSSProperties = sideIsLeft
         .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
-        /* Закладка може виходити за межі сторінки FlipBook */
-/* щоб елементи могли виходити за межі сторінки */
-.page, .page > div, .page .page-content { overflow: visible !important; }
-.page .page-content { position: relative; }
 
-/* нова обгортка, яка дає ВНУТРІШНІЙ запас і тримає все всередині лейауту */
-.stage-rail{
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding-inline: var(--rail);     /* симетричний внутрішній відступ */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;                /* тримає все всередині */
-  /* ключове: не вилазити за межі сцени */
-  max-width: 100%;
-  box-sizing: border-box;
-}
+        .page, .page > div, .page .page-content { overflow: visible !important; }
+        .page .page-content { position: relative; }
 
-/* десь у <style jsx global> PublicViewer */
-.bm-tab {
-  border: 0;
-  cursor: pointer;
-    --bmScale: 1;
-  will-change: transform;
-}
-.bm-tab:hover {
-  --bmScale: 1.12;                /* наскільки «вилазить» */
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,.18)) brightness(1.03);
-}
+        .stage-rail{
+          position: relative;
+          width: 100%;
+          height: 100%;
+          padding-inline: var(--rail);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
 
-.bm-tab:active {
-  --bmScale: 1.06;
-}
+        .bm-tab { border: 0; cursor: pointer; --bmScale: 1; will-change: transform; }
+        .bm-tab:hover { --bmScale: 1.12; filter: drop-shadow(0 2px 8px rgba(0,0,0,.18)) brightness(1.03); }
+        .bm-tab:active { --bmScale: 1.06; }
 
+        @media (max-width: 680px){
+          .bm-rail{ width:110px; }
+          .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
+        }
 
-@media (max-width: 680px){
-  .bm-rail{ width:110px; }
-  .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
-}
-/* === bookmarks styles END === */
+        .search-flyout{
+          position: fixed; top: var(--hdr); right: 12px; bottom: var(--ftr);
+          width: min(360px, 92vw);
+          background: #fff; color: #1b2430;
+          border: 1px solid #e7ebdf; border-radius: 14px;
+          box-shadow: 0 18px 40px rgba(0,0,0,.22);
+          z-index: 320; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .sf-hd{ display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fafbf8; border-bottom: 1px solid #eef2e6; font-weight: 800; }
+        .sf-hd .sf-meta{ margin-left: auto; color:#5b6a50; font-weight:600; }
+        .sf-close{
+          background: #fff; border: 1px solid #e7ebdf; border-radius: .6rem;
+          padding: .2rem .55rem; line-height: 1; font-weight: 900; color:#2d3018;
+          box-shadow: 0 4px 12px rgba(0,0,0,.06);
+        }
+        .sf-list{ overflow: auto; padding: 6px 0; flex: 1 1 auto; background: #fff; }
+        .sf-empty{ padding: 16px 14px; color:#6b7280; font-style: italic; }
+        .sf-item{ width: 100%; text-align: left; background: #fff; border: 0; border-bottom: 1px solid #f1f4ec; padding: 10px 12px; cursor: pointer; }
+        .sf-item:hover{ background: #f8faf5; }
+        .sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
+        .sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
+        .sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
 
-/* === Search flyout (fixed) === */
-.search-flyout{
-  position: fixed;
-  top: var(--hdr);
-  right: 12px;
-  bottom: var(--ftr);
-  width: min(360px, 92vw);
-  background: #fff;
-  color: #1b2430;
-  border: 1px solid #e7ebdf;
-  border-radius: 14px;
-  box-shadow: 0 18px 40px rgba(0,0,0,.22);
-  z-index: 320;         /* вище за книгу та закладки */
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;     /* власний скрол усередині */
-}
-.sf-hd{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #fafbf8;
-  border-bottom: 1px solid #eef2e6;
-  font-weight: 800;
-}
-.sf-hd .sf-meta{ margin-left: auto; color:#5b6a50; font-weight:600; }
-.sf-close{
-  background: #fff; border: 1px solid #e7ebdf; border-radius: .6rem;
-  padding: .2rem .55rem; line-height: 1; font-weight: 900; color:#2d3018;
-  box-shadow: 0 4px 12px rgba(0,0,0,.06);
-}
-.sf-list{
-  overflow: auto; padding: 6px 0; flex: 1 1 auto;
-  background: #fff;
-}
-.sf-empty{
-  padding: 16px 14px; color:#6b7280; font-style: italic;
-}
-.sf-item{
-  width: 100%; text-align: left; background: #fff; border: 0;
-  border-bottom: 1px solid #f1f4ec; padding: 10px 12px; cursor: pointer;
-}
-.sf-item:hover{ background: #f8faf5; }
-.sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
-.sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
-.sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
-/* === /Search flyout === */
-
-/* === Search highlights === */
-.hl-layer{
-  position: absolute;
-  inset: 0;
-  pointer-events: none;   /* не заважає клікам по лінках */
-  z-index: 5;             /* вище за картинку сторінки */
-}
-.hl{
-  position: absolute;
-  background: rgba(255, 226, 61, .28);             /* жовтий прозорий */
-  outline: 2px solid rgba(255, 200, 0, .9);
-  border-radius: 2px;
-  mix-blend-mode: multiply;
-}
-.hl.is-active{
-  background: rgba(56, 189, 248, .25);             /* блакитний для активного */
-  outline-color: rgba(56, 189, 248, .95);
-  box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
-}
-
-
+        .hl-layer{ position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+        .hl{
+          position: absolute;
+          background: rgba(255, 226, 61, .28);
+          outline: 2px solid rgba(255, 200, 0, .9);
+          border-radius: 2px;
+          mix-blend-mode: multiply;
+        }
+        .hl.is-active{
+          background: rgba(56, 189, 248, .25);
+          outline-color: rgba(56, 189, 248, .95);
+          box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
+        }
       `}</style>
     </div>
   );
