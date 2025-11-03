@@ -48,9 +48,11 @@ const initPageRef = React.useRef<number | null>(null);
     initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
   }
   // ⬆️⬆️ КІНЕЦЬ ВСТАВКИ
-  
+
  // === AUTO-SEARCH (debounced, only on q/file change) ===
 const lastSigRef = React.useRef<string>("");
+const suppressNavRef = React.useRef(false);
+
 
 React.useEffect(() => {
   if (!ctrl) return;                 // чекаємо, поки зʼявиться контролер
@@ -103,7 +105,7 @@ return (
   <div className="viewer-root">
     <EditorHeader
       title={ctrl.title}
-      onSearch={ctrl.runSearch}
+      onSearch={(term) => setQ(term)} // лише оновлюємо стан; пошук зробить useEffect
       isSearching={(ctrl as any).searching ?? false}
       file={file}
       isFs={ctrl.isFs}
