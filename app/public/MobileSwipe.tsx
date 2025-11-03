@@ -3,38 +3,73 @@
 import React from "react";
 
 type Props = {
+  /** вміст «картки» */
+  children: React.ReactNode;
   /** викликається, коли користувач «змахнув» ліворуч (наступна сторінка) */
   onSwipeLeft?: () => void;
   /** викликається, коли користувач «змахнув» праворуч (попередня сторінка) */
   onSwipeRight?: () => void;
-  /** опціонально вимкнути жест */
-  enabled?: boolean;
-  /** вміст, що буде «карткою» */
-  children: React.ReactNode;
   /** пікселі до спрацювання свайпу */
   threshold?: number;
+  /** примусово увімк/вимк свайп ззовні */
+  enabled?: boolean;
 };
 
+/**
+ * MobileSwipe (zoom-safe + animated):
+ *  - блокує свайп, коли активний браузерний зум (visualViewport.scale > 1)
+ *  - під час double-tap тимчасово вимикає свайп (~650 мс), щоб не заважати zoom
+ *  - зберігає анімацію картки (translate/rotate/opacity), fling-off/reset
+ *  - визначає напрям жесту (горизонтальний/вертикальний) і блокує вертикальний скрол під час горизонтального
+ *  - підтримує мишу для зручного дебагу
+ */
 export default function MobileSwipe({
+  children,
   onSwipeLeft,
   onSwipeRight,
-  enabled = true,
-  children,
   threshold = 80,
+  enabled = true,
 }: Props) {
   const ref = React.useRef<HTMLDivElement>(null);
 
+  // ===== Zoom state (visualViewport) =====
+  const [vvScale, setVvScale] = React.useState(1);
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const onChange = () => setVvScale(vv.scale ?? 1);
+    onChange();
+    vv.addEventListener("resize", onChange);
+    vv.addEventListener("scroll", onChange);
+    return () => {
+      vv.removeEventListener("resize", onChange);
+      vv.removeEventListener("scroll", onChange);
+    };
+  }, []);
+
+  // ===== Double-tap detection (для паузи свайпу) =====
+  const [suspendSwipe, setSuspendSwipe] = React.useState(false);
+  const lastTapTsRef = React.useRef<number>(0);
+  const lastTapXRef = React.useRef<number>(0);
+  const lastTapYRef = React.useRef<number>(0);
+
+  // ===== Gesture refs (анімація + вирішення напряму) =====
   const startX = React.useRef(0);
   const startY = React.useRef(0);
   const dx = React.useRef(0);
   const dragging = React.useRef(false);
   const decided = React.useRef<null | "h" | "v">(null); // горизонтально/вертикально
 
+  // Головний перемикач
+  const zoomActive = vvScale > 1.01;
+  const swipeEnabled = enabled && !zoomActive && !suspendSwipe;
+
+  // ===== Helpers: анімаційні стилі =====
   const setStyle = (x: number, animate = false) => {
     const el = ref.current;
     if (!el) return;
-    const rot = Math.max(-12, Math.min(12, x * 0.06));      // невеликий нахил
-    const op = Math.max(0.25, 1 - Math.abs(x) / 600);       // трохи тьмяніє
+    const rot = Math.max(-12, Math.min(12, x * 0.06)); // невеликий нахил
+    const op = Math.max(0.25, 1 - Math.abs(x) / 600);  // трохи тьмяніє
     el.style.transition = animate ? "transform 280ms, opacity 280ms" : "none";
     el.style.transform = `translateX(${x}px) rotate(${rot}deg)`;
     el.style.opacity = String(op);
@@ -44,10 +79,10 @@ export default function MobileSwipe({
     const el = ref.current;
     if (!el) return;
     setStyle(0, true);
-    // повернути після анімації
     window.setTimeout(() => {
       el.style.transition = "none";
       el.style.opacity = "1";
+      el.style.transform = "translateX(0) rotate(0deg)";
     }, 300);
   };
 
@@ -64,8 +99,34 @@ export default function MobileSwipe({
     }, 260);
   };
 
-  const onStart = (clientX: number, clientY: number) => {
-    if (!enabled) return;
+  // Якщо посеред жесту з’явився zoom або double-tap — скинемо трансформацію
+  React.useEffect(() => {
+    if (!swipeEnabled) {
+      dragging.current = false;
+      decided.current = null;
+      dx.current = 0;
+      reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swipeEnabled]);
+
+  // ===== Core handlers =====
+  const onStart = (clientX: number, clientY: number, ts?: number) => {
+    // Double-tap detection
+    if (typeof ts === "number") {
+      const dt = ts - lastTapTsRef.current;
+      const dxTap = Math.abs(clientX - lastTapXRef.current);
+      const dyTap = Math.abs(clientY - lastTapYRef.current);
+      if (dt < 300 && dxTap < 30 && dyTap < 30) {
+        setSuspendSwipe(true);
+        window.setTimeout(() => setSuspendSwipe(false), 650);
+      }
+      lastTapTsRef.current = ts;
+      lastTapXRef.current = clientX;
+      lastTapYRef.current = clientY;
+    }
+
+    if (!swipeEnabled) return;
     dragging.current = true;
     decided.current = null;
     startX.current = clientX;
@@ -74,7 +135,7 @@ export default function MobileSwipe({
   };
 
   const onMove = (clientX: number, clientY: number, e?: Event) => {
-    if (!enabled || !dragging.current) return;
+    if (!swipeEnabled || !dragging.current) return;
     const ddx = clientX - startX.current;
     const ddy = clientY - startY.current;
 
@@ -85,7 +146,7 @@ export default function MobileSwipe({
     }
 
     if (decided.current === "h") {
-      // блокуємо вертикальну прокрутку, коли це горизонтальний свайп
+      // блокуємо вертикальну прокрутку, коли це горизонтальний жест
       (e as any)?.preventDefault?.();
       dx.current = ddx;
       setStyle(dx.current);
@@ -93,7 +154,7 @@ export default function MobileSwipe({
   };
 
   const onEnd = () => {
-    if (!enabled || !dragging.current) return;
+    if (!swipeEnabled || !dragging.current) return;
     dragging.current = false;
 
     if (decided.current === "h") {
@@ -107,21 +168,24 @@ export default function MobileSwipe({
     }
   };
 
-  // touch
+  // ===== DOM listeners (touch + mouse) =====
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    const ts = (e: TouchEvent) => onStart(e.touches[0].clientX, e.touches[0].clientY);
+    // touch
+    const ts = (e: TouchEvent) =>
+      onStart(e.touches[0].clientX, e.touches[0].clientY, e.timeStamp);
     const tm = (e: TouchEvent) => onMove(e.touches[0].clientX, e.touches[0].clientY, e);
     const te = () => onEnd();
 
+    // важливо: touchmove має бути НЕ пасивним, щоб sp.preventDefault працював
     el.addEventListener("touchstart", ts, { passive: true });
     el.addEventListener("touchmove", tm, { passive: false });
     el.addEventListener("touchend", te);
     el.addEventListener("touchcancel", te);
 
-    // pointer/mouse для емулювання на десктопі
+    // mouse (debug)
     const md = (e: MouseEvent) => onStart(e.clientX, e.clientY);
     const mm = (e: MouseEvent) => onMove(e.clientX, e.clientY, e);
     const mu = () => onEnd();
@@ -139,17 +203,18 @@ export default function MobileSwipe({
       window.removeEventListener("mousemove", mm);
       window.removeEventListener("mouseup", mu);
     };
-  }, [enabled]);
+  }, [swipeEnabled]);
+
+  // Коли свайп вимкнено — залишаємо браузеру повну свободу gesture-ів (пінч/дабл-тап).
+  // Коли увімкнено — дозволяємо вертикальний пан (для внутрішніх елементів), горизонтальний перехоплюємо ми.
+  const wrapperStyle: React.CSSProperties = {
+    willChange: "transform, opacity",
+    touchAction: swipeEnabled ? "pan-y" : "auto",
+  };
 
   return (
-    <div ref={ref} className="swipe-card">
+    <div ref={ref} className="swipe-card" style={wrapperStyle}>
       {children}
-      <style jsx>{`
-        .swipe-card {
-          will-change: transform, opacity;
-          touch-action: pan-y; /* дозволяємо вертикальний скрол, але ми блокуємо його, коли жест горизонтальний */
-        }
-      `}</style>
     </div>
   );
 }
