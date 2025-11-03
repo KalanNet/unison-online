@@ -145,20 +145,29 @@ return (
       }}
     >
           <FlipBook
-             ref={ctrl.bookRef}
-  /* ТЕПЕР: фіксовані пікселі без CSS-scale */
-  size="fixed"
+  ref={ctrl.bookRef}
+  // даємо сторінці вже остаточний розмір у CSS-пікселях
   width={Math.round(ctrl.baseSize.w * ctrl.fitScale)}
   height={Math.round(ctrl.baseSize.h * ctrl.fitScale)}
+  size="fixed"                    // ⬅️ ключове: НІЯКОГО внутрішнього stretch
   usePortrait={ctrl.single}
   showCover={!ctrl.single}
-  flippingTime={600}
+  flippingTime={900}
   maxShadowOpacity={0.2}
   drawShadow
   mobileScrollSupport
   startPage={(initPageRef.current ?? 0) as number}
   onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-          >
+  style={{
+    width: "100%",
+    height: "100%",
+    minWidth: 0,
+    minHeight: 0,
+    // ВАЖЛИВО: прибираємо aspectRatio, щоб не було додаткових перерахунків
+    // aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+  }}
+>
+
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
   const pageNum = i + 1;
   const bmp = ctrl!.cacheRef.current.get(pageNum);
