@@ -195,7 +195,7 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 5;
+    const DPR_CAP = 5, QUALITY = 4;
     const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
     const vp = page.getViewport({ scale });
@@ -205,6 +205,8 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     canvas.height = Math.max(1, Math.round(vp.height));
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("2D context unavailable");
+      ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
 
@@ -218,7 +220,7 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
       links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
     });
 
-    return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
+    return { url: canvas.toDataURL("image/png", 1.0), w: vp.width, h: vp.height, links };
   }
 
 
