@@ -112,16 +112,6 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
     })().catch(console.error);
   }, [pdfjs, file]);
 
-  useEffect(() => {
-  if (!pdfDoc) return;
-  cacheRef.current.clear();
-  warmPagesAround(currentIndex);
-  // невелика відкладена прогрівка, щоб уникнути стробінгу
-  const t = setTimeout(() => warmPagesAround(currentIndex), 60);
-  return () => clearTimeout(t);
-}, [fitScale, pageW, pageH, pdfDoc, currentIndex]);
-
-
   /* ---------- глобальна висота + fullscreen ---------- */
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -201,50 +191,35 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
 async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-  if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-  const page = await pdfDoc.getPage(pageNum);
+    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
+    const page = await pdfDoc.getPage(pageNum);
 
-  const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-  const DPR_CAP = 7, QUALITY = 3; // твої робочі значення
-  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
+    const DPR_CAP = 7, QUALITY = 5;
+    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
+    const vp = page.getViewport({ scale });
 
-  // підрівнюємо scale, щоб уникнути «кривих» viewport width/height з копійками
-  const rawScale = (css.w / pageW) * dpr * QUALITY;
-  const scale = Math.max(0.1, Math.round(rawScale * 100) / 100);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(vp.width));
+    canvas.height = Math.max(1, Math.round(vp.height));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("2D context unavailable");
+await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
-  const vp0 = page.getViewport({ scale });
-  const cw = Math.max(1, Math.round(vp0.width));
-  const ch = Math.max(1, Math.round(vp0.height));
-  const vp = page.getViewport({ scale: cw / (vp0.width || 1) * scale });
 
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(vp.width));
-  canvas.height = Math.max(1, Math.round(vp.height));
-
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) throw new Error("2D context unavailable");
-
-  await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
-
-  const anns = await page.getAnnotations({ intent: "display" });
-  const links: PageBmp["links"] = [];
-  anns.forEach((a: any) => {
-    if (a.subtype !== "Link") return;
-    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-    const left = Math.min(x1, x2), top = Math.min(y1, y2);
-    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-    links.push({
-      x: left / vp.width,
-      y: top / vp.height,
-      w: w / vp.width,
-      h: h / vp.height,
-      href: sanitizeLink(a) || undefined,
-      dest: a.dest
+    const anns = await page.getAnnotations({ intent: "display" });
+    const links: PageBmp["links"] = [];
+    anns.forEach((a: any) => {
+      if (a.subtype !== "Link") return;
+      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+      const left = Math.min(x1, x2), top = Math.min(y1, y2);
+      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
     });
-  });
 
-  return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
-}
+    return { url: canvas.toDataURL("image/png"), w: vp.width, h: vp.height, links };
+  }
 
 
 

@@ -98,14 +98,6 @@ React.useEffect(() => {
     );
   }
 
-// === PAGE SIZE (цілі px, щоб уникнути сабпіксельного блюра) ===
-const pageWpx = Math.round(ctrl.baseSize.w * ctrl.fitScale);
-const pageHpx = Math.round(ctrl.baseSize.h * ctrl.fitScale);
-
-// Зсув обкладинки лише в цілих px
-const coverShiftPx = (!ctrl.single && ctrl.currentIndex === 0)
-  ? Math.round(pageWpx * 0.24)
-  : 0;
 
 
 return (
@@ -132,224 +124,269 @@ return (
     />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
+  {/* НОВИЙ внутрішній контейнер, який резервує місце симетрично всередині сцени */}
   <div className="stage-rail">
     <div
       className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
       style={{
+        transition: "transform 500ms ease-in-out",
         margin: "0 auto",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: ctrl.single ? pageWpx : pageWpx * 2,
-        height: pageHpx,
+        width: ctrl.single
+          ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
+          : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+        height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+        // ВАЖЛИВО: щоб «книга» не виходила за межі stage-rail навіть з translateX
         maxWidth: "100%",
         maxHeight: "100%",
         position: "relative",
-        transform: coverShiftPx ? `translateX(${-coverShiftPx}px)` : "none",
       }}
     >
-      <FlipBook
-        ref={ctrl.bookRef}
-        width={pageWpx}
-        height={pageHpx}
-        size="fixed"
-        usePortrait={ctrl.single}
-        showCover={!ctrl.single}
-        flippingTime={900}
-        maxShadowOpacity={0.2}
-        drawShadow
-        mobileScrollSupport
-        startPage={(initPageRef.current ?? 0) as number}
-        onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-        style={{ width: pageWpx, height: pageHpx }}
-      >
-        {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-          const pageNum = i + 1;
-          const bmp = ctrl!.cacheRef.current.get(pageNum);
-          const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
-            (bmp?.links as any) ?? [];
+          <FlipBook
+            ref={ctrl.bookRef}
+            width={ctrl.baseSize.w}
+            height={ctrl.baseSize.h}
+            size="stretch"
+            usePortrait={ctrl.single}
+            showCover={!ctrl.single}
+            flippingTime={900}
+            maxShadowOpacity={0.2}
+            drawShadow
+            mobileScrollSupport
+            startPage={(initPageRef.current ?? 0) as number}
+            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+            style={{
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+            }}
+          >
 
-          return (
-            <div
-              key={i}
-              style={{ width: pageWpx, height: pageHpx, background: "#fff", position: "relative" }}
-              onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-              onMouseLeave={ctrl!.handlePageMouseLeave}
-            >
-              {bmp ? (
-                <>
-                  {/* PAGE IMAGE — рендер строго у px, без % */}
-                  <img
-                    src={bmp.url}
-                    alt={`p${pageNum}`}
-                    data-page-img="true"
-                    draggable={false}
-                    width={pageWpx}
-                    height={pageHpx}
-                    style={{
-                      width: pageWpx,
-                      height: pageHpx,
-                      objectFit: "contain",
-                      pointerEvents: "none",
-                      borderRadius: 2,
-                      display: "block",
-                    }}
-                  />
+            {Array.from({ length: ctrl.totalPages }).map((_, i) => {
+  const pageNum = i + 1;
+  const bmp = ctrl!.cacheRef.current.get(pageNum);
+  const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
+    (bmp?.links as any) ?? [];
 
-                  {/* === HIGHLIGHTS LAYER === */}
-                  <div className="hl-layer" aria-hidden>
-                    {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map((r: any, j: number) => {
-                      const isActive = typeof r.hitIndex === "number" && r.hitIndex === (ctrl as any).activeHit;
-                      return (
-                        <div
-                          key={j}
-                          className={`hl${isActive ? " is-active" : ""}`}
-                          style={{
-                            position: "absolute",
-                            left: `${r.x * 100}%`,
-                            top: `${r.y * 100}%`,
-                            width: `${r.w * 100}%`,
-                            height: `${r.h * 100}%`,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
 
-                  {/* PDF LINKS */}
-                  {links?.length
-                    ? links.map((L, idx) =>
-                        L.href ? (
-                          <a
-                            key={idx}
-                            href={L.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="pdf-link"
-                            style={{
-                              position: "absolute",
-                              left: `${L.x * 100}%`,
-                              top: `${L.y * 100}%`,
-                              width: `${L.w * 100}%`,
-                              height: `${L.h * 100}%`,
-                            }}
-                          />
-                        ) : (
-                          <button
-                            key={idx}
-                            className="pdf-link"
-                            title="Go to"
-                            onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                            style={{
-                              position: "absolute",
-                              left: `${L.x * 100}%`,
-                              top: `${L.y * 100}%`,
-                              width: `${L.w * 100}%`,
-                              height: `${L.h * 100}%`,
-                            }}
-                          />
-                        )
-                      )
-                    : null}
-                </>
-              ) : (
-                <div style={{ textAlign: "center", lineHeight: `${pageHpx}px`, color: "#bbb" }}>
-                  Рендер сторінки…
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </FlipBook>
 
-      {/* OVERLAY закладок — без змін, як у тебе */}
-      {(bookmarks?.length ?? 0) > 0 && (
-        <div
-          className="bm-tabs-overlay"
+  return (
+    <div
+      key={i}
+      style={{ width: "100%", height: "100%", background: "#fff", position: "relative" }}
+      onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+      onMouseLeave={ctrl!.handlePageMouseLeave}
+    >
+      {bmp ? (
+        <>
+          {/* PAGE IMAGE */}
+          <img
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              pointerEvents: "none",
+              borderRadius: 2,
+              display: "block",
+            }}
+          />
+
+
+
+
+
+
+
+{/* === HIGHLIGHTS LAYER === */}
+<div className="hl-layer" aria-hidden>
+  {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map((r: any, j: number) => {
+    const isActive = typeof r.hitIndex === "number" && r.hitIndex === (ctrl as any).activeHit;
+    return (
+      <div
+        key={j}
+        className={`hl${isActive ? " is-active" : ""}`}
+        style={{
+          position: "absolute",
+          left: `${r.x * 100}%`,
+          top: `${r.y * 100}%`,
+          width: `${r.w * 100}%`,
+          height: `${r.h * 100}%`,
+        }}
+      />
+    );
+  })}
+</div>
+{/* === /HIGHLIGHTS LAYER === */}
+
+{/* PDF LINKS */}
+{links?.length
+  ? links.map((L, idx) =>
+      L.href ? (
+        <a
+          key={idx}
+          href={L.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pdf-link"
           style={{
             position: "absolute",
-            inset: 0,
-            zIndex: 200,
-            overflow: "visible",
-            pointerEvents: "none",
-            ["--tabThickness" as any]: "36px",
-            ["--tabLength" as any]: "140px",
-            ["--tabTop" as any]: "36px",
-            ["--tabGap" as any]: "0px",
-          } as React.CSSProperties}
-        >
-          {(() => {
-            const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
-            const curr = ctrl!.currentIndex + 1;
-            const leftNow  = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-            const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
+            left: `${L.x * 100}%`,
+            top: `${L.y * 100}%`,
+            width: `${L.w * 100}%`,
+            height: `${L.h * 100}%`,
+          }}
+        />
+      ) : (
+        <button
+          key={idx}
+          className="pdf-link"
+          title="Go to"
+          onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+          style={{
+            position: "absolute",
+            left: `${L.x * 100}%`,
+            top: `${L.y * 100}%`,
+            width: `${L.w * 100}%`,
+            height: `${L.h * 100}%`,
+          }}
+        />
+      )
+    )
+  : null}
 
-            return sorted.map((bm, i) => {
-              const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
 
-              const baseStyle: React.CSSProperties = {
-                position: "absolute",
-                top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-                width: "var(--tabThickness)",
-                height: "var(--tabLength)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 800,
-                lineHeight: 1,
-                border: "1px solid rgba(0,0,0,.18)",
-                boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                opacity: 0.98,
-                transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-                pointerEvents: "auto",
-                background: bm.color || "#f47e20",
-                borderRadius: "0 10px 10px 0",
-              };
-
-              const sideStyle: React.CSSProperties = sideIsLeft
-                ? { left: 0, transformOrigin: "center center",
-                    transform: "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))" }
-                : { right: 0, transformOrigin: "center center",
-                    transform: "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))" };
-
-              return (
-                <button
-                  key={bm.id}
-                  className={`bm-tab ${sideIsLeft ? "left" : "right"}${(bm.page === leftNow || bm.page === rightNow) ? " active" : ""}`}
-                  title={`${bm.label} (p.${bm.page})`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
-                    if (typeof ctrl!.goToPage === "function") ctrl!.goToPage(pageIndex);
-                    else (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
-                  }}
-                  style={{ ...baseStyle, ...sideStyle }}
-                >
-                  <span
-                    className="bm-tab__label"
-                    style={{
-                      maxHeight: "calc(var(--tabLength) - 10px)",
-                      padding: "4px 0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      writingMode: "vertical-rl",
-                      textOrientation: "mixed",
-                    } as React.CSSProperties}
-                  >
-                    {bm.label}
-                  </span>
-                </button>
-              );
-            });
-          })()}
+          
+        </>
+      ) : (
+        <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
+          Рендер сторінки…
         </div>
       )}
     </div>
-  </div>
-</section>
+  );
+})}
 
+          </FlipBook>
+
+          {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
+{(bookmarks?.length ?? 0) > 0 && (
+  <div
+    className="bm-tabs-overlay"
+    style={{
+      position: "absolute",
+      inset: 0,
+      zIndex: 200,
+      overflow: "visible",
+      pointerEvents: "none",
+      ["--tabThickness" as any]: "36px",
+      ["--tabLength" as any]: "140px",
+      ["--tabTop" as any]: "36px",
+      ["--tabGap" as any]: "0px",
+    } as React.CSSProperties}
+  >
+    {(() => {
+      const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
+
+      // поточний розворот
+      const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
+const leftNow  = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
+
+      return sorted.map((bm, i) => {
+        const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+        const baseStyle: React.CSSProperties = {
+          position: "absolute",
+          top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
+          width: "var(--tabThickness)",
+          height: "var(--tabLength)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontSize: 15,
+          fontWeight: 800,
+          lineHeight: 1,
+          border: "1px solid rgba(0,0,0,.18)",
+          boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+          opacity: 0.98,
+          transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
+          pointerEvents: "auto",
+          background: bm.color || "#f47e20",
+          borderRadius: "0 10px 10px 0",
+        };
+
+const sideStyle: React.CSSProperties = sideIsLeft
+  ? {
+      // Ліва: якір у самісінькому лівому краї
+      left: 0,
+      transformOrigin: "center center",
+      // 1) виносимо таб назовні: translateX(-100%)
+      // 2) компенсуємо приріст ширини при scaleX, щоб край залишався біля сторінки
+      transform:
+        "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
+    }
+  : {
+      // Права: якір у правому краї
+      right: 0,
+      transformOrigin: "center center",
+      // Аналогічна компенсація, але у протилежний бік
+      transform:
+        "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
+    };
+
+
+        return (
+          <button
+            key={bm.id}
+            className={`bm-tab ${sideIsLeft ? "left" : "right"}${
+              (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
+            }`}
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => {
+  e.preventDefault();
+  const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
+  if (typeof ctrl!.goToPage === "function") {
+    ctrl!.goToPage(pageIndex);
+  } else {
+    (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+  }
+}}
+
+            style={{ ...baseStyle, ...sideStyle }}
+          >
+            <span
+              className="bm-tab__label"
+              style={{
+                maxHeight: "calc(var(--tabLength) - 10px)",
+                padding: "4px 0",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+              } as React.CSSProperties}
+            >
+              {bm.label}
+            </span>
+          </button>
+        );
+      });
+    })()}
+  </div>
+)}
+{/* === /OVERLAY ЗАКЛАДОК === */}
+</div>
+
+        </div>
+      </section>
 {/* === RIGHT SEARCH FLYOUT (не впливає на лейаут) === */}
 {q.trim().length > 0 && (
   <aside className="search-flyout" role="region" aria-label="Search results">
@@ -456,9 +493,8 @@ return (
         button[aria-label="Publish"] { display: none !important; }
         .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
         .viewer-stage { flex: 1 1 auto; width: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .book-container { /* без transform для уникнення субпіксельного зсуву */ }
-.book-container.is-cover { /* зсув робимо тільки в px через inline-style */ }
-
+        .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
+        .book-container.is-cover { transform: translateX(-24%); }
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
         /* Закладка може виходити за межі сторінки FlipBook */
@@ -571,13 +607,6 @@ return (
   background: rgba(56, 189, 248, .25);             /* блакитний для активного */
   outline-color: rgba(56, 189, 248, .95);
   box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
-}
-
-/* Заборона проміжних трансформів, що псують піксельну сітку */
-.page, .page > div, .page .page-content {
-  transform: none !important;
-  backface-visibility: hidden;
-  will-change: auto;
 }
 
 
