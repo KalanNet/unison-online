@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-
 import dynamic from "next/dynamic";
 import { useViewerController } from "../secure/editor/useEditorController";
 import EditorHeader from "../secure/editor/EditorHeader";
@@ -17,7 +16,6 @@ type Bookmark = { id: string; page: number; label: string; color?: string | null
 
 /* --- публічний в’ювер з пробросом закладок --- */
 export default function PublicViewer({
-  
   file,
   title,
   bookmarks = [],
@@ -27,7 +25,6 @@ export default function PublicViewer({
   bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
 }) {
 
-  const [isFlipping, setIsFlipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // --- Search UI state (for header) ---
@@ -159,10 +156,14 @@ return (
             drawShadow
             mobileScrollSupport
             startPage={(initPageRef.current ?? 0) as number}
-              onFlip={() => {
-    setIsFlipping(true);
-    setTimeout(() => setIsFlipping(false), 900); 
-  }}
+            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+            style={{
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+            }}
           >
 
             {Array.from({ length: ctrl.totalPages }).map((_, i) => {
@@ -184,26 +185,19 @@ return (
         <>
           {/* PAGE IMAGE */}
           <img
-  src={bmp.url}
- alt={`p${pageNum}`}
-  data-page-img={true}
-  draggable={false}
-  style={{
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-    objectPosition: 'left top',
-    pointerEvents: 'none',
-    borderRadius: 2,
-    display: 'block',
-    transition: 'none', // <--- додати!
-  }}
-  className={isFlipping ? 'img-noflip' : ''}
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              pointerEvents: "none",
+              borderRadius: 2,
+              display: "block",
+            }}
           />
-
-
-
-
 
 
 
@@ -610,7 +604,6 @@ const sideStyle: React.CSSProperties = sideIsLeft
   outline-color: rgba(56, 189, 248, .95);
   box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
 }
-
 
 
       `}</style>
