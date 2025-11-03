@@ -30,6 +30,7 @@ export default function PublicViewer({
   // --- Search UI state (for header) ---
 const [searchOpen, setSearchOpen] = useState(false);
 const [q, setQ] = useState("");
+const initPageRef = React.useRef<number | null>(null);
 
 
 
@@ -42,6 +43,12 @@ const [q, setQ] = useState("");
     setError(typeof err === "string" ? err : err?.message || "Viewer component error");
   }
 
+    // ⬇️⬇️ ВСТАВИТИ СЮДИ (РІВНО ПІСЛЯ try/catch і ПЕРЕД // === AUTO-SEARCH)
+  if (ctrl && initPageRef.current === null) {
+    initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
+  }
+  // ⬆️⬆️ КІНЕЦЬ ВСТАВКИ
+  
  // === AUTO-SEARCH (debounced, only on q/file change) ===
 const lastSigRef = React.useRef<string>("");
 
@@ -89,12 +96,6 @@ React.useEffect(() => {
       </div>
     );
   }
-// === fix: startPage лише один раз ===
-const initPageRef = React.useRef<number | null>(null);
-if (initPageRef.current === null) {
-  initPageRef.current = ctrl.currentIndex; // зафіксувати стартовий індекс
-}
-// === /fix ===
 
 
 
@@ -153,7 +154,7 @@ return (
             maxShadowOpacity={0.2}
             drawShadow
             mobileScrollSupport
-            startPage={initPageRef.current as number}
+            startPage={(initPageRef.current ?? 0) as number}
             onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
             style={{
               width: "100%",
