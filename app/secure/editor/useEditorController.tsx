@@ -195,8 +195,8 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 3;
-    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+    const DPR_CAP = 7, QUALITY = 5;
+    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 2);
     const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
     const vp = page.getViewport({ scale });
 
