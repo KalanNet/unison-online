@@ -95,14 +95,13 @@ const tY = Math.max(-maxPan, Math.min(maxPan, ty));
 
 
   // ===== 2) Висота: рівно видима зона без скролу сторінки =====
-  const headerH = 56;   // висота MobileHeader
-  const footerH = 56;   // висота тулбара
-  const rootStyle: React.CSSProperties = {
-    height: `calc(100svh - ${headerH}px)`,
-    display: "grid",
-    gridTemplateRows: `1fr ${footerH}px`,
-    background: "#21353a",
-  };
+const footerPx = 56;
+const rootStyle: React.CSSProperties = {
+  height: `100dvh`,                 // ← стабільна висота екрана на мобільних
+  display: "grid",
+  gridTemplateRows: `1fr ${footerPx}px`,
+  background: "#21353a"
+};
 
   return (
     <div
