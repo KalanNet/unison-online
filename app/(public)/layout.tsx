@@ -42,7 +42,7 @@ export default function DirectoryLayout({ children }: { children: ReactNode }) {
         dangerouslySetInnerHTML={{
           __html: `
 html, body { background:#21353a; }
-:root { --app-h: 100svh; --logo-size:128px; }
+:root { --app-h: 100dvh; --logo-size:128px; }
 body { min-height: var(--app-h); }
 html { scrollbar-gutter: stable both-edges; }
 body > footer, .site-footer { display:none !important; }

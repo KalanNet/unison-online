@@ -10,7 +10,7 @@ type Props = {
   file: string;
   title?: string;
 
-  // з MobileHeader (сумісність)
+  // з MobileHeader (проброс — лишаємо для сумісності)
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   runSearch: (q: string) => void;
@@ -23,7 +23,7 @@ type Props = {
 export default function MobilePager(p: Props) {
   const { ctrl } = p;
 
-  // ---- Рендеримо лише поточну та підігріваємо сусідів ----
+  // ===== 1) Рендеримо лише поточну та підігріваємо сусідів =====
   const pageNum = ctrl.currentIndex + 1;
   useEffect(() => {
     try { ctrl.ensureRendered?.(ctrl.currentIndex); } catch {}
@@ -32,206 +32,201 @@ export default function MobilePager(p: Props) {
 
   const bmp = ctrl.cacheRef.current.get(pageNum);
 
-  // ===== ЗУМ/ПАНОРАМУВАННЯ (локальний стейт) =====
-  const pageRef = React.useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = React.useState(1);
-  const [tx, setTx]   = React.useState(0);
-  const [ty, setTy]   = React.useState(0);
+  // === Зум + панорамування сторінки (стейт на рівні MobilePager) ===
+const pageRef = React.useRef<HTMLDivElement>(null);
 
-  // double-tap (перемикач 1x/2x)
-  const lastTapRef = React.useRef(0);
-  const onTap = () => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 260) {
-      setZoom(z => (z === 1 ? 2 : 1));
-      if (zoom !== 1) { setTx(0); setTy(0); } // скинути пан після відзуму
-    }
-    lastTapRef.current = now;
-  };
+const [zoom, setZoom] = React.useState(1);
+const [tx, setTx] = React.useState(0);
+const [ty, setTy] = React.useState(0);
 
-  // pinch-to-zoom через Pointer Events
-  const pts = React.useRef<Map<number, { x:number; y:number }>>(new Map());
-  const baseDist = React.useRef<number | null>(null);
-  const baseZoom = React.useRef(1);
+// double-tap
+const lastTapRef = React.useRef(0);
+const onTap = () => {
+  const now = Date.now();
+  if (now - lastTapRef.current < 260) {
+    setZoom(z => (z === 1 ? 2 : 1));
+    if (zoom !== 1) { setTx(0); setTy(0); } // скинути пан при відзумі
+  }
+  lastTapRef.current = now;
+};
 
-  const dist = () => {
-    const a = [...pts.current.values()];
-    if (a.length < 2) return 0;
-    const [p1, p2] = a;
-    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
-  };
+// pinch-to-zoom (pointer)
+const pts = React.useRef<Map<number, {x:number,y:number}>>(new Map());
+const baseDist = React.useRef<number | null>(null);
+const baseZoom = React.useRef(1);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.current.size === 2) {
-      baseDist.current = dist();
-      baseZoom.current = zoom;
-    }
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!pts.current.has(e.pointerId)) return;
-    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+function dist() {
+  const a = [...pts.current.values()];
+  if (a.length < 2) return 0;
+  const [p1, p2] = a; const dx = p1.x - p2.x, dy = p1.y - p2.y;
+  return Math.hypot(dx, dy);
+}
 
-    if (pts.current.size === 2 && baseDist.current) {
-      const ratio = dist() / baseDist.current;
-      const next  = Math.min(4, Math.max(1, baseZoom.current * ratio));
-      setZoom(next);
-    } else if (pts.current.size === 1 && zoom > 1) {
-      setTx(x => x + e.movementX);
-      setTy(y => y + e.movementY);
-    }
-  };
-  const onPointerUp = (e: React.PointerEvent) => {
-    pts.current.delete(e.pointerId);
-    if (pts.current.size < 2) baseDist.current = null;
-  };
+const onPointerDown = (e: React.PointerEvent) => {
+  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pts.current.size === 2) {
+    baseDist.current = dist();
+    baseZoom.current = zoom;
+  }
+};
+const onPointerMove = (e: React.PointerEvent) => {
+  if (!pts.current.has(e.pointerId)) return;
+  pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  // м’які межі пану
-  const maxPan = 180;
-  const tX = Math.max(-maxPan, Math.min(maxPan, tx));
-  const tY = Math.max(-maxPan, Math.min(maxPan, ty));
+  if (pts.current.size === 2 && baseDist.current) {
+    const ratio = dist() / baseDist.current;
+    const next = Math.min(4, Math.max(1, baseZoom.current * ratio));
+    setZoom(next);
+  } else if (pts.current.size === 1 && zoom > 1) {
+    setTx(x => x + e.movementX);
+    setTy(y => y + e.movementY);
+  }
+};
+const onPointerUp = (e: React.PointerEvent) => {
+  pts.current.delete(e.pointerId);
+  if (pts.current.size < 2) baseDist.current = null;
+};
 
-  // ===== ЛЕЙАУТ: сцена між хедером і локальним футером =====
-  // На мобільному хедер окремим компонентом зверху (56px).
-  const HEADER_PX = 56;
-  const FOOTER_PX = 56;
+// обмеження пана (м’які межі)
+const maxPan = 180;
+const tX = Math.max(-maxPan, Math.min(maxPan, tx));
+const tY = Math.max(-maxPan, Math.min(maxPan, ty));
 
+
+  // ===== 2) Висота: рівно видима зона без скролу сторінки =====
+  const headerH = 56;   // висота MobileHeader
+  const footerH = 56;   // висота тулбара
   const rootStyle: React.CSSProperties = {
-    height: `calc(100dvh - ${HEADER_PX}px)`, // рівно нижче хедера
+    height: `calc(100svh - ${headerH}px)`,
     display: "grid",
-    gridTemplateRows: `1fr ${FOOTER_PX}px`,  // канва + футер
+    gridTemplateRows: `1fr ${footerH}px`,
     background: "#21353a",
-    minHeight: 0,                             // щоб внутрішній контент не випирав
   };
 
   return (
-    <div ref={ctrl.stageRef} className="mpg-root" style={rootStyle}>
-      {/* Канва з однією сторінкою */}
-      <div
-        className="mpg-canvas"
-        style={{
-          display: "grid",
-          placeItems: "center",
-          padding: "10px 10px 12px",
-          overflow: "hidden",
-          minHeight: 0, // критично для grid-рядка 1fr
-        }}
-      >
-        <MobileSwipe
-          key={ctrl.currentIndex}                            // усуває "відкат" після переходів
-          onSwipeLeft={() => ctrl.canNext && ctrl.goNext()}
-          onSwipeRight={() => ctrl.canPrev && ctrl.goPrev()}
-          threshold={80}
-          panEl={pageRef.current}                            // даємо елемент для детекту прокрутки/зуму
-          isZoomed={zoom > 1}                                // явний прапор — блокує свайп під час зуму
-        >
-          <div
-            ref={pageRef}
-            className="mpg-page"
+    <div
+      ref={ctrl.stageRef}
+      className="mpg-root"
+      style={rootStyle}
+    >
+      {/* Полотно з ОДНІЄЮ сторінкою */}
+<div
+  className="mpg-canvas"
+  style={{ display: "grid", placeItems: "center", padding: "10px 10px 12px", overflow: "hidden" }}
+>
+  <MobileSwipe
+    key={ctrl.currentIndex}                       // анти-«залипання» після переходів
+    onSwipeLeft={() => ctrl.canNext && ctrl.goNext()}
+    onSwipeRight={() => ctrl.canPrev && ctrl.goPrev()}
+    threshold={80}
+    panEl={pageRef.current}                       // ← даємо MobileSwipe “панель” для детекту зуму
+    isZoomed={zoom > 1}                           // ← явний прапорець, коли зум увімкнено
+  >
+    <div
+      ref={pageRef}
+      className="mpg-page"
+      style={{
+        width: "100%",
+        maxWidth: "980px",
+        aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+        background: "#fff",
+        borderRadius: 4,
+        position: "relative",
+        overflow: "auto",                         // при зумі контент більший — з’являється пан
+        touchAction: zoom > 1 ? "none" : "pan-y", // зум → жести всередині; без зуму → свайп бере кермо
+      }}
+      onMouseMove={(e) => ctrl.handlePageMouseMove(e, pageNum)}
+      onMouseLeave={ctrl.handlePageMouseLeave}
+      onClick={onTap}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {bmp ? (
+        <>
+          <img
+            src={bmp.url}
+            alt={`p${pageNum}`}
+            data-page-img="true"
+            draggable={false}
             style={{
               width: "100%",
-              maxWidth: "980px",
-              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-              background: "#fff",
-              borderRadius: 4,
-              position: "relative",
-              overflow: "auto",                               // коли scale>1 — дозволяємо панування
-              touchAction: zoom > 1 ? "none" : "pan-y",
-              minHeight: 0,
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+              pointerEvents: "none",
+              transform: `translate3d(${tX}px, ${tY}px, 0) scale(${zoom})`,
+              transformOrigin: "center center",
+              willChange: "transform",
+              transition: zoom === 1 ? "transform 180ms ease-out" : "none",
             }}
-            onMouseMove={(e) => ctrl.handlePageMouseMove(e, pageNum)}
-            onMouseLeave={ctrl.handlePageMouseLeave}
-            onClick={onTap}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            {bmp ? (
-              <>
-                <img
-                  src={bmp.url}
-                  alt={`p${pageNum}`}
-                  data-page-img="true"
-                  draggable={false}
+          />
+
+          {(bmp.links || []).map((L: any, i: number) =>
+            L?.href ? (
+              <a
+                key={i}
+                href={L.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pdf-link"
+                style={{
+                  position: "absolute",
+                  left: `${L.x * 100}%`,
+                  top: `${L.y * 100}%`,
+                  width: `${L.w * 100}%`,
+                  height: `${L.h * 100}%`,
+                }}
+              />
+            ) : (
+              <button
+                key={i}
+                className="pdf-link"
+                title="Go to"
+                onClick={() => (L.dest ? ctrl.goToDest?.(L.dest) : null)}
+                style={{
+                  position: "absolute",
+                  left: `${L.x * 100}%`,
+                  top: `${L.y * 100}%`,
+                  width: `${L.w * 100}%`,
+                  height: `${L.h * 100}%`,
+                }}
+              />
+            )
+          )}
+
+          <div aria-hidden className="hl-layer">
+            {(ctrl.pageHighlights?.get?.(pageNum) ?? []).map((r: any, j: number) => {
+              const isActive = typeof r.hitIndex === "number" && r.hitIndex === ctrl.activeHit;
+              return (
+                <div
+                  key={j}
+                  className={`hl${isActive ? " is-active" : ""}`}
                   style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    display: "block",
-                    pointerEvents: "none",
-                    transform: `translate3d(${tX}px, ${tY}px, 0) scale(${zoom})`,
-                    transformOrigin: "center center",
-                    willChange: "transform",
-                    transition: zoom === 1 ? "transform 180ms ease-out" : "none",
+                    position: "absolute",
+                    left: `${r.x * 100}%`,
+                    top: `${r.y * 100}%`,
+                    width: `${r.w * 100}%`,
+                    height: `${r.h * 100}%`,
                   }}
                 />
-
-                {/* PDF links */}
-                {(bmp.links || []).map((L: any, i: number) =>
-                  L?.href ? (
-                    <a
-                      key={i}
-                      href={L.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="pdf-link"
-                      style={{
-                        position: "absolute",
-                        left: `${L.x * 100}%`,
-                        top: `${L.y * 100}%`,
-                        width: `${L.w * 100}%`,
-                        height: `${L.h * 100}%`,
-                      }}
-                    />
-                  ) : (
-                    <button
-                      key={i}
-                      className="pdf-link"
-                      title="Go to"
-                      onClick={() => (L.dest ? ctrl.goToDest?.(L.dest) : null)}
-                      style={{
-                        position: "absolute",
-                        left: `${L.x * 100}%`,
-                        top: `${L.y * 100}%`,
-                        width: `${L.w * 100}%`,
-                        height: `${L.h * 100}%`,
-                      }}
-                    />
-                  )
-                )}
-
-                {/* Хайлайти пошуку */}
-                <div aria-hidden className="hl-layer">
-                  {(ctrl.pageHighlights?.get?.(pageNum) ?? []).map((r: any, j: number) => {
-                    const isActive = typeof r.hitIndex === "number" && r.hitIndex === ctrl.activeHit;
-                    return (
-                      <div
-                        key={j}
-                        className={`hl${isActive ? " is-active" : ""}`}
-                        style={{
-                          position: "absolute",
-                          left: `${r.x * 100}%`,
-                          top: `${r.y * 100}%`,
-                          width: `${r.w * 100}%`,
-                          height: `${r.h * 100}%`,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div style={{ color: "#8aa0a6", display: "grid", placeItems: "center", height: "100%" }}>
-                Рендер сторінки…
-              </div>
-            )}
+              );
+            })}
           </div>
-        </MobileSwipe>
-      </div>
+        </>
+      ) : (
+        <div style={{ color: "#8aa0a6", display: "grid", placeItems: "center", height: "100%" }}>
+          Рендер сторінки…
+        </div>
+      )}
+    </div>
+  </MobileSwipe>
+</div>
 
-      {/* Локальний мобільний футер */}
+
+      {/* Мобільний тулбар */}
       <footer className="mpg-bar">
         <div className="mpg-bar__grid">
           <button className="mpg-btn" onClick={ctrl.goPrev} disabled={!ctrl.canPrev} aria-label="Previous" title="Previous">◀</button>
@@ -257,6 +252,7 @@ export default function MobilePager(p: Props) {
 
       <style jsx global>{`
         .mpg-root { color:#2d3018; }
+
         .mpg-bar{
           height:56px;
           background:#ffffffef;
@@ -278,6 +274,7 @@ export default function MobilePager(p: Props) {
         .mpg-total{ color:#2d3018; }
 
         .pdf-link{ border:0; background:transparent; display:block; }
+
         .hl{ background:#f4ce6944; outline:1px solid #f4ce69; border-radius:3px; }
         .hl.is-active{ background:#f47e2050; outline-color:#f47e20; }
       `}</style>

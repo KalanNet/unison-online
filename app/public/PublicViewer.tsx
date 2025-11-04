@@ -173,8 +173,8 @@ const mCtrl = {
 
       {/* тільки для мобільного режиму — блокуємо прокрутку всього документу */}
       <style jsx global>{`
-        html, body { height: 100dvh; overflow: hidden; }
-        .viewer-root { min-height: 100dvh; }
+        html, body { height: 100svh; overflow: hidden; }
+        .viewer-root { min-height: 100svh; }
       `}</style>
     </div>
   );
