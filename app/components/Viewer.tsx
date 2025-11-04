@@ -575,7 +575,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           :root { --hdr: 56px; --ftr: 72px; }
         }
         .viewer-root {
-  min-height: 100svh;
+  min-height: 100dvh;
   width: 100vw;
   display: flex;
   flex-direction: column;
@@ -670,7 +670,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-sticky-panel{
           position: fixed; left: 16px; top: calc(var(--hdr) + 16px);
           width: 320px; /* збільшено */
-          max-height: calc(100svh - var(--hdr) - 32px);
+          max-height: calc(100dvh - var(--hdr) - 32px);
           overflow: auto; z-index: 999;
           padding: 12px; background:#ffffffef; backdrop-filter: blur(6px);
           border:1px solid #e7ebdf; border-radius:.9rem;
