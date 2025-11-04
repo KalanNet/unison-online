@@ -10,7 +10,7 @@ type Props = {
   file: string;
   title?: string;
 
-  // з MobileHeader (проброс — лишаємо для сумісності)
+  // з MobileHeader (сумісність)
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   runSearch: (q: string) => void;
@@ -23,34 +23,33 @@ type Props = {
 export default function MobilePager(p: Props) {
   const { ctrl } = p;
 
-  // ===== 1) Рендеримо лише поточну (підігріваємо сусідні) =====
+  // ---- Рендеримо лише поточну та підігріваємо сусідів ----
   const pageNum = ctrl.currentIndex + 1;
   useEffect(() => {
     try { ctrl.ensureRendered?.(ctrl.currentIndex); } catch {}
     try { ctrl.warmPagesAround?.(ctrl.currentIndex); } catch {}
   }, [ctrl.currentIndex]);
+
   const bmp = ctrl.cacheRef.current.get(pageNum);
 
-  // ===== 2) Зум + панорамування (локальний стейт) =====
+  // ===== ЗУМ/ПАНОРАМУВАННЯ (локальний стейт) =====
   const pageRef = React.useRef<HTMLDivElement>(null);
-
   const [zoom, setZoom] = React.useState(1);
   const [tx, setTx]   = React.useState(0);
   const [ty, setTy]   = React.useState(0);
 
-  // double-tap
+  // double-tap (перемикач 1x/2x)
   const lastTapRef = React.useRef(0);
   const onTap = () => {
     const now = Date.now();
     if (now - lastTapRef.current < 260) {
       setZoom(z => (z === 1 ? 2 : 1));
-      // при відзумі — скинути пан
-      if (zoom !== 1) { setTx(0); setTy(0); }
+      if (zoom !== 1) { setTx(0); setTy(0); } // скинути пан після відзуму
     }
     lastTapRef.current = now;
   };
 
-  // pinch-to-zoom (Pointer Events)
+  // pinch-to-zoom через Pointer Events
   const pts = React.useRef<Map<number, { x:number; y:number }>>(new Map());
   const baseDist = React.useRef<number | null>(null);
   const baseZoom = React.useRef(1);
@@ -59,8 +58,7 @@ export default function MobilePager(p: Props) {
     const a = [...pts.current.values()];
     if (a.length < 2) return 0;
     const [p1, p2] = a;
-    const dx = p1.x - p2.x, dy = p1.y - p2.y;
-    return Math.hypot(dx, dy);
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -71,71 +69,76 @@ export default function MobilePager(p: Props) {
       baseZoom.current = zoom;
     }
   };
-
   const onPointerMove = (e: React.PointerEvent) => {
     if (!pts.current.has(e.pointerId)) return;
     pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (pts.current.size === 2 && baseDist.current) {
       const ratio = dist() / baseDist.current;
-      const next = Math.min(4, Math.max(1, baseZoom.current * ratio));
+      const next  = Math.min(4, Math.max(1, baseZoom.current * ratio));
       setZoom(next);
     } else if (pts.current.size === 1 && zoom > 1) {
       setTx(x => x + e.movementX);
       setTy(y => y + e.movementY);
     }
   };
-
   const onPointerUp = (e: React.PointerEvent) => {
     pts.current.delete(e.pointerId);
     if (pts.current.size < 2) baseDist.current = null;
   };
 
-  // м’які межі панорамування
+  // м’які межі пану
   const maxPan = 180;
   const tX = Math.max(-maxPan, Math.min(maxPan, tx));
   const tY = Math.max(-maxPan, Math.min(maxPan, ty));
 
-  // ===== 3) Сцена: рівно між хедером і футером =====
-  // ВАЖЛИВО: MobileHeader має 56px і знаходиться ЗГОРУ (поза цим компонентом),
-  // тому тут віднімаємо тільки хедер. Футер — це нижній ряд гріда.
-  const headerPx = 56;
-  const footerPx = 56;
+  // ===== ЛЕЙАУТ: сцена між хедером і локальним футером =====
+  // На мобільному хедер окремим компонентом зверху (56px).
+  const HEADER_PX = 56;
+  const FOOTER_PX = 56;
+
   const rootStyle: React.CSSProperties = {
-    height: `calc(100dvh - ${headerPx}px)`,
+    height: `calc(100dvh - ${HEADER_PX}px)`, // рівно нижче хедера
     display: "grid",
-    gridTemplateRows: `1fr ${footerPx}px`,
+    gridTemplateRows: `1fr ${FOOTER_PX}px`,  // канва + футер
     background: "#21353a",
+    minHeight: 0,                             // щоб внутрішній контент не випирав
   };
 
   return (
     <div ref={ctrl.stageRef} className="mpg-root" style={rootStyle}>
-      {/* Полотно з ОДНІЄЮ сторінкою */}
+      {/* Канва з однією сторінкою */}
       <div
         className="mpg-canvas"
-        style={{ display: "grid", placeItems: "center", padding: "10px 10px 12px", overflow: "hidden" }}
+        style={{
+          display: "grid",
+          placeItems: "center",
+          padding: "10px 10px 12px",
+          overflow: "hidden",
+          minHeight: 0, // критично для grid-рядка 1fr
+        }}
       >
         <MobileSwipe
-          key={ctrl.currentIndex} // анти-«відкатів» після переходу
+          key={ctrl.currentIndex}                            // усуває "відкат" після переходів
           onSwipeLeft={() => ctrl.canNext && ctrl.goNext()}
           onSwipeRight={() => ctrl.canPrev && ctrl.goPrev()}
           threshold={80}
-          panEl={pageRef.current}   // всередині контейнера
-          isZoomed={zoom > 1}       // блокуємо свайп під час зуму
+          panEl={pageRef.current}                            // даємо елемент для детекту прокрутки/зуму
+          isZoomed={zoom > 1}                                // явний прапор — блокує свайп під час зуму
         >
           <div
             ref={pageRef}
             className="mpg-page"
             style={{
-              // КЛЮЧ: без aspectRatio, висота береться від сцени -> низ не обрізає
               width: "100%",
               maxWidth: "980px",
-              height: "100%",
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
               background: "#fff",
               borderRadius: 4,
               position: "relative",
-              overflow: "auto",                 // дозволяє панинг у контенті при зумі
+              overflow: "auto",                               // коли scale>1 — дозволяємо панування
               touchAction: zoom > 1 ? "none" : "pan-y",
+              minHeight: 0,
             }}
             onMouseMove={(e) => ctrl.handlePageMouseMove(e, pageNum)}
             onMouseLeave={ctrl.handlePageMouseLeave}
@@ -165,7 +168,7 @@ export default function MobilePager(p: Props) {
                   }}
                 />
 
-                {/* Клікабельні області PDF */}
+                {/* PDF links */}
                 {(bmp.links || []).map((L: any, i: number) =>
                   L?.href ? (
                     <a
@@ -228,7 +231,7 @@ export default function MobilePager(p: Props) {
         </MobileSwipe>
       </div>
 
-      {/* Мобільний тулбар */}
+      {/* Локальний мобільний футер */}
       <footer className="mpg-bar">
         <div className="mpg-bar__grid">
           <button className="mpg-btn" onClick={ctrl.goPrev} disabled={!ctrl.canPrev} aria-label="Previous" title="Previous">◀</button>
@@ -254,7 +257,6 @@ export default function MobilePager(p: Props) {
 
       <style jsx global>{`
         .mpg-root { color:#2d3018; }
-
         .mpg-bar{
           height:56px;
           background:#ffffffef;
@@ -276,7 +278,6 @@ export default function MobilePager(p: Props) {
         .mpg-total{ color:#2d3018; }
 
         .pdf-link{ border:0; background:transparent; display:block; }
-
         .hl{ background:#f4ce6944; outline:1px solid #f4ce69; border-radius:3px; }
         .hl.is-active{ background:#f47e2050; outline-color:#f47e20; }
       `}</style>
