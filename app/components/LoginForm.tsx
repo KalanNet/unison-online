@@ -1,71 +1,83 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-export default function LoginForm() {
+type Props = {
+  /** Куди редіректити після успішного логіну; якщо не вказано — читаємо ?next=... або /secure/editor */
+  nextUrl?: string;
+};
+
+export default function LoginForm({ nextUrl }: Props) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Обчислюємо надійний next: пропс -> query (?next=) -> дефолт
+  const effectiveNext = useMemo(() => {
+    const fromQuery =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("next")
+        : null;
+    return nextUrl || fromQuery || "/secure/editor";
+  }, [nextUrl]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      const fd = new FormData(e.currentTarget);
-      // якщо в урлі немає ?next=..., дефолт -> /secure/editor
-      if (!fd.get("next")) fd.set("next", "/secure/editor");
+      const form = new FormData(e.currentTarget);
+      // гарантуємо, що next завжди є у payload
+      if (!form.get("next")) form.set("next", effectiveNext);
 
-      const res = await fetch("/api/login", { method: "POST", body: fd });
+      const res = await fetch("/api/login", { method: "POST", body: form });
       const out = await res.json().catch(() => ({} as any));
       if (!res.ok) throw new Error(out?.error || "Login failed");
 
+      // пріоритет: те, що повернув бекенд -> effectiveNext
+      const redirectTo =
+        (out && (out.next as string)) ||
+        (typeof out === "string" ? out : "") ||
+        effectiveNext;
+
       if (typeof window !== "undefined") {
-        const sp = new URLSearchParams(location.search);
-        const nextUrl =
-          out?.next || sp.get("next") || "/secure/editor"; // <- головна зміна
-        window.location.href = nextUrl;
+        window.location.href = redirectTo;
       }
     } catch (ex: any) {
-      setErr(String(ex?.message || ex));
+      setErr(String(ex?.message || ex) || "Login error");
     } finally {
       setLoading(false);
     }
   }
 
-  // UI форми — без змін, окрім прихованого next із дефолтом
   return (
-    <form className="login-form" method="post" action="/api/login" onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} className="mx-auto max-w-sm p-6 space-y-4">
+      <h1 className="text-xl font-semibold">Secure Access</h1>
+
       <input
-        type="hidden"
-        name="next"
-        value={
-          typeof window !== "undefined"
-            ? new URLSearchParams(location.search).get("next") || "/secure/editor"
-            : "/secure/editor"
-        }
+        name="user"
+        placeholder="User"
+        className="w-full border px-3 py-2 rounded"
+        required
+        autoComplete="username"
       />
 
-      <label className="lf-field">
-        <span className="lf-lab">Username</span>
-        <input className="lf-inp" name="user" autoComplete="username" required />
-      </label>
+      <input
+        name="pass"
+        type="password"
+        placeholder="Password"
+        className="w-full border px-3 py-2 rounded"
+        required
+        autoComplete="current-password"
+      />
 
-      <label className="lf-field">
-        <span className="lf-lab">Password</span>
-        <input
-          className="lf-inp"
-          name="pass"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-      </label>
+      {err && <p className="text-red-600 text-sm">{err}</p>}
 
-      {err && <div className="lf-err">{err}</div>}
-
-      <button className="lf-btn" disabled={loading}>
-        {loading ? "Signing in…" : "Sign in"}
+      <button disabled={loading} className="w-full rounded bg-black text-white py-2">
+        {loading ? "Signing in..." : "Sign in"}
       </button>
+
+      {/* Передаємо next до API та тримаємо fallback на /secure/editor */}
+      <input type="hidden" name="next" value={effectiveNext} />
     </form>
   );
 }

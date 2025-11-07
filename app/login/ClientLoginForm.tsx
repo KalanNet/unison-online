@@ -1,18 +1,14 @@
-// app/(login)/ClientLoginForm.tsx
 "use client";
 
-import React from "react";
-import dynamic from "next/dynamic";
+import LoginForm from "../components/LoginForm";
 
-/** Пропси, які очікує форма логіну */
 export type LoginFormProps = {
-  nextUrl: string;
+  /** Куди редіректити після успішного логіну; за замовчуванням -> /secure/editor */
+  nextUrl?: string;
 };
 
-/** Динамічне підвантаження компонента з еліасом '@/components/…' */
-const LoginForm = dynamic(() => import("app/components/LoginForm"), { ssr: false });
-
-
 export default function ClientLoginForm(props: LoginFormProps) {
-  return <LoginForm {...props} />;
+  // гарантуємо дефолт на /secure/editor, навіть якщо пропсів немає
+  const effectiveNext = props.nextUrl ?? "/secure/editor";
+  return <LoginForm nextUrl={effectiveNext} />;
 }
