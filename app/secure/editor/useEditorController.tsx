@@ -542,15 +542,24 @@ function goToBookmark(id: string) {
 }
 
 
-/** Публікація meta.json/featured: надсилає на /api/publish */
-async function publishMetaAndBookmarks() {
+/* ---------- bookmarks & meta ---------- */
+// …(існуючий код цієї секції вище не чіпаємо)
+
+/* ---------- publish: meta + bookmarks ---------- */
+async function publishMetaAndBookmarks(): Promise<{
+  slug?: string;
+  urlPath?: string;
+  publicUrl?: string;
+  metaJsonUrl?: string;
+}> {
+  // готуємо тіло запиту — як і раніше, але тепер чекаємо відповідь
   const payload = {
-    file,  // PDF public URL
+    file,
     meta: {
-      title: meta.title?.trim() || "",
-      description: meta.description?.trim() || "",
-      slug: (meta.slug || "").trim(),
+      title: meta.title || title || "",
+      description: meta.description || "",
       featuredUrl: meta.featuredUrl || null,
+      slug: meta.slug || (title || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-"),
     },
     bookmarks: bookmarks.map((b) => ({
       id: b.id,
@@ -560,11 +569,30 @@ async function publishMetaAndBookmarks() {
     })),
   };
 
-  await fetch("/api/publish", {
+  const res = await fetch("/api/publish", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
+
+  const out = await res.json().catch(() => ({} as any));
+  if (!res.ok) throw new Error(out?.error || "Publish failed");
+
+  // намагаємось дістати slug/url із відповіді API
+  const slugFromApi: string | undefined = out?.stored?.slug || out?.slug || payload.meta.slug;
+  const urlPath: string | undefined =
+    out?.urlPath || (slugFromApi ? `/directory/${slugFromApi}` : undefined);
+
+  const publicUrl =
+    typeof window !== "undefined" && urlPath
+      ? new URL(urlPath, window.location.origin).href
+      : undefined;
+
+  // невеликий "хінт", як і раніше
+  setShareHint("Published");
+  setTimeout(() => setShareHint(""), 1800);
+
+  return { slug: slugFromApi, urlPath, publicUrl, metaJsonUrl: out?.metaJsonUrl };
 }
 
 

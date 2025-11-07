@@ -110,41 +110,85 @@ function SlugInput({
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
 
+  // Ініціалізація контролера з безпечним catch (без setState у рендері)
   let ctrl: ReturnType<typeof useViewerController> | null = null;
+  let initErr: string | null = null;
   try {
     ctrl = useViewerController({ file, title });
   } catch (err: any) {
-    setError(typeof err === "string" ? err : err?.message || "Viewer component error");
+    initErr = typeof err === "string" ? err : err?.message || "Viewer component error";
   }
 
+  // Валідація джерела PDF — повідомлення таке ж, як у тебе
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Файл не знайдено або неправильний формат!</h2>
-        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>Передай коректний PDF через upload або URL.</div>
+      <div
+        style={{
+          background: "#21353a",
+          minHeight: "100vh",
+          color: "#fff",
+          padding: "80px 12px",
+          textAlign: "center",
+        }}
+      >
+        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
+          Файл не знайдено або неправильний формат!
+        </h2>
+        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>
+          Передай коректний PDF через upload або URL.
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  // Помилка ініціалізації/роботи компонента
+  if (initErr || error) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
+      <div
+        style={{
+          background: "#21353a",
+          minHeight: "100vh",
+          color: "#fff",
+          padding: "80px 12px",
+          textAlign: "center",
+        }}
+      >
         <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Помилка перегляду PDF!</h2>
-        <div style={{ color: "#aaa", marginTop: 12 }}>{error}</div>
+        <div style={{ color: "#aaa", marginTop: 12 }}>{initErr || error}</div>
       </div>
     );
   }
 
+  // Очікуємо ініціалізацію контролера/документа
   if (!ctrl || !ctrl.pdfDoc) {
     return (
-      <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
+      <div
+        style={{
+          background: "#21353a",
+          minHeight: "100vh",
+          color: "#fff",
+          padding: "80px 12px",
+          textAlign: "center",
+        }}
+      >
         <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження Flipbook…</h2>
       </div>
     );
   }
 
   /* брендова палітра для закладок */
-  const brandColors = ["#f47e20","#00647b","#54c2bb","#ac1f23","#6b7034","#fff4e7","#eeece8","#bdcbdb","#4e667a","#2d3018"];
+  const brandColors = [
+    "#f47e20",
+    "#00647b",
+    "#54c2bb",
+    "#ac1f23",
+    "#6b7034",
+    "#fff4e7",
+    "#eeece8",
+    "#bdcbdb",
+    "#4e667a",
+    "#2d3018",
+  ];
 
   return (
     <div className="viewer-root">
@@ -158,6 +202,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         handleShare={ctrl.handleShare}
         onPublish={ctrl.publishMetaAndBookmarks}
       />
+
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
       <aside className="fb-sticky-panel" role="complementary" aria-label="Bookmarks & Meta">
