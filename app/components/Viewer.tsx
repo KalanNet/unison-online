@@ -7,6 +7,67 @@ import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
 
+/* --- SEO limits (golden standards) --- */
+const SEO = {
+  TITLE_MAX: 60,   // title ~50–60 chars
+  DESC_MAX: 155,   // meta description ~155–160 chars
+  SLUG_MAX: 60,    // короткі й чисті урли
+  LABEL_MAX: 10,   // вимога користувача
+};
+const SLUG_RE = /^[a-z0-9-]+$/;
+
+/* просте сповіщення */
+const notify = (msg: string) => { if (typeof window !== "undefined") alert(msg); };
+
+/* підготовка featured-картинки: ≤200KB, max width 1080, збереження пропорцій */
+async function prepareFeaturedUnder200KB(file: File): Promise<File> {
+  const MAX_UPLOAD = 2 * 1024 * 1024; // 2MB hard limit
+  if (file.size > MAX_UPLOAD) throw new Error("Image must be ≤ 2MB.");
+
+  // якщо вже webp ≤200KB і ширина ≤1080 — нічого не робимо
+  if (file.type === "image/webp") {
+    const bmp0 = await createImageBitmap(file);
+    if (bmp0.width <= 1080 && file.size <= 200 * 1024) return file;
+  }
+
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1080 / bmp.width);
+  const targetW = Math.max(1, Math.round(bmp.width * scale));
+  const targetH = Math.max(1, Math.round(bmp.height * scale));
+
+  const c = document.createElement("canvas");
+  c.width = targetW; c.height = targetH;
+  const ctx = c.getContext("2d")!;
+  ctx.drawImage(bmp, 0, 0, targetW, targetH);
+
+  const qualities = [0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4];
+
+  async function tryQualities(): Promise<Blob | null> {
+    let cand: Blob | null = null;
+    for (const q of qualities) {
+      const b = await new Promise<Blob | null>(r => c.toBlob(r, "image/webp", q));
+      if (!b) continue;
+      cand = b;
+      if (b.size <= 200 * 1024) return b;
+    }
+    return cand; // може бути >200KB — далі спробуємо даунскейл
+  }
+
+  let blob = await tryQualities();
+  let w = targetW, h = targetH;
+
+  while (blob && blob.size > 200 * 1024 && w > 360 && h > 360) {
+    w = Math.round(w * 0.9); h = Math.round(h * 0.9);
+    c.width = w; c.height = h;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    blob = await tryQualities();
+  }
+
+  if (!blob) throw new Error("Failed to convert to WebP.");
+  return new File([blob], file.name.replace(/\.\w+$/i, ".webp"), { type: "image/webp" });
+}
+
+
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 /* ---------- slug helpers (Unicode-safe) ---------- */
@@ -59,52 +120,63 @@ function SlugInput({
   value,
   title,
   onChange,
+  maxLen = SEO.SLUG_MAX,
 }: {
   value: string;
   title?: string;
   onChange: (v: string) => void;
+  maxLen?: number;
 }) {
   const [slugInput, setSlugInput] = React.useState<string>(value || "");
   const dirtyRef = React.useRef(false);
 
-  // синхронізуємося із зовнішнім value
   React.useEffect(() => { setSlugInput(value || ""); }, [value]);
 
-  // автогенерація зі зміненого Title, якщо користувач ще не редагував
   React.useEffect(() => {
     if (!dirtyRef.current && (!slugInput || slugInput.length === 0)) {
       const auto = autoFromTitle(title || "");
       if (auto) { setSlugInput(auto); onChange(auto); }
     }
-  }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [title]); // eslint-disable-line
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     dirtyRef.current = true;
-    const live = slugLive(e.target.value);
+    let live = slugLive(e.target.value);
+    if (live.length > maxLen) live = live.slice(0, maxLen);
     setSlugInput(live);
     onChange(live);
   };
 
   const handleBlur = () => {
-    const fin = slugFinal(slugInput);
+    let fin = slugFinal(slugInput);
+    if (fin.length > maxLen) fin = fin.slice(0, maxLen);
     setSlugInput(fin);
     onChange(fin);
   };
 
+  const len = slugInput.length;
+  const bad = len > maxLen || !SLUG_RE.test(slugInput || "");
+
   return (
-    <input
-      className="fb-inp"
-      value={slugInput}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      placeholder="auto-from-title"
-      autoCapitalize="none"
-      autoCorrect="off"
-      spellCheck={false}
-      inputMode="text"
-    />
+    <div>
+      <input
+        className="fb-inp"
+        value={slugInput}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder="auto-from-title"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="text"
+        maxLength={maxLen}
+      />
+      <div className={`fb-help ${bad ? "err" : ""}`}>{len}/{maxLen}</div>
+      {bad && <div className="fb-help err">Only a–z, 0–9 and “-” are allowed</div>}
+    </div>
   );
 }
+
 
 
 export default function Viewer({ file, title }: { file: string; title?: string }) {
@@ -205,17 +277,28 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         handleShare={ctrl.handleShare}
         // NEW: показуємо модалку після успішної публікації (без зміни типу пропса)
         onPublish={() => {
-          ctrl!.publishMetaAndBookmarks()
-            .then((r) => {
-              const origin = typeof window !== "undefined" ? window.location.origin : "";
-              const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
-              if (full) setPub({ url: full });
-            })
-            .catch((e) => {
-              console.error(e);
-              alert((e as any)?.message || "Publish failed");
-            });
-        }}
+  const title = (ctrl!.meta.title || "").trim();
+  const desc  = (ctrl!.meta.description || "").trim();
+  const slug  = (ctrl!.meta.slug || "").trim();
+
+  const errs: string[] = [];
+  if (!title) errs.push("Title is required");
+  if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
+  if (desc.length > SEO.DESC_MAX)   errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
+  if (slug.length > SEO.SLUG_MAX)   errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
+  if (!SLUG_RE.test(slug))          errs.push("Slug may contain only a–z, 0–9 and '-'");
+
+  if (errs.length) { notify(errs.join("\n")); return; }
+
+  ctrl!.publishMetaAndBookmarks()
+    .then((r) => {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
+      if (full) setPub({ url: full });
+    })
+    .catch((e) => { console.error(e); notify((e as any)?.message || "Publish failed"); });
+}}
+
       />
 
 
@@ -225,70 +308,103 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         <div className="fb-panel-sec">
           <div className="fb-sec-h">Meta</div>
 
-          <label className="fb-field">
-            <div className="fb-lab">Title</div>
-            <input
-              className="fb-inp"
-              value={ctrl.meta.title}
-              onChange={(e) => {
-                const v = e.target.value;
-                // якщо slug порожній — автогенерація зі зміненого title
-                if (!ctrl.meta.slug || ctrl.meta.slug.length === 0) {
-  const auto = autoFromTitle(v);
-  ctrl.setMeta({ title: v, slug: auto as any });
-} else {
-  ctrl.setMeta({ title: v });
-}
+          {/* --- TITLE --- */}
+    <label className="fb-field">
+      <div className="fb-lab">Title</div>
+      <input
+        className="fb-inp"
+        value={ctrl.meta.title}
+        maxLength={SEO.TITLE_MAX}
+        onChange={(e) => {
+          const v = e.target.value;
+          // якщо slug порожній — автогенерація зі зміненого title
+          if (!ctrl.meta.slug || ctrl.meta.slug.length === 0) {
+            const auto = autoFromTitle(v);
+            ctrl.setMeta({ title: v, slug: auto as any });
+          } else {
+            ctrl.setMeta({ title: v });
+          }
+        }}
+      />
+      <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
+        {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
+      </div>
+    </label>
 
-              }}
-            />
-          </label>
+          {/* --- META DESCRIPTION --- */}
+    <label className="fb-field">
+      <div className="fb-lab">Meta description</div>
+      <textarea
+        className="fb-txt"
+        rows={3}
+        value={ctrl.meta.description}
+        maxLength={SEO.DESC_MAX}
+        onChange={(e) => ctrl.setMeta({ description: e.target.value })}
+      />
+      <div className={`fb-help ${((ctrl.meta.description || "").length > SEO.DESC_MAX) ? "err" : ""}`}>
+        {(ctrl.meta.description || "").length}/{SEO.DESC_MAX}
+      </div>
+    </label>
 
-          <label className="fb-field">
-            <div className="fb-lab">Meta description</div>
-            <textarea
-              className="fb-txt"
-              rows={3}
-              value={ctrl.meta.description}
-              onChange={(e) => ctrl.setMeta({ description: e.target.value })}
-            />
-          </label>
-
-          {/* --- S L U G --- */}
-<label className="fb-field">
-  <div className="fb-lab">Slug</div>
-  <SlugInput
-    value={ctrl.meta.slug ?? ""}
-    title={ctrl.meta.title || ctrl.title}
-    onChange={(v) => ctrl.setMeta({ slug: v as any })}
-  />
-</label>
+           {/* --- SLUG --- */}
+    <label className="fb-field">
+      <div className="fb-lab">Slug</div>
+      <SlugInput
+        value={ctrl.meta.slug ?? ""}
+        title={ctrl.meta.title || ctrl.title}
+        onChange={(v) => ctrl.setMeta({ slug: v as any })}
+        maxLen={SEO.SLUG_MAX}
+      />
+      <div className="fb-help">Only a–z, 0–9 and “-”. Max {SEO.SLUG_MAX} chars.</div>
+    </label>
 
 
 
-          <div className="fb-field">
-            <div className="fb-lab">Featured image</div>
-            <div className="fb-row">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0]; if (!f) return;
-                  const fd = new FormData(); fd.append("image", f);
-                  const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
-                  const out = await res.json();
-                  if (out?.url) ctrl.setFeatured(out.url);
-                }}
-              />
-            </div>
-            {ctrl.meta.featuredUrl && (
-              <div className="fb-thumb">
-                <img src={ctrl.meta.featuredUrl} alt="Featured" />
-                <button className="fb-x" onClick={() => ctrl.setFeatured(null)} title="Remove">×</button>
-              </div>
-            )}
-          </div>
+           {/* --- FEATURED IMAGE --- */}
+    <div className="fb-field">
+      <div className="fb-lab">Featured image</div>
+      <div className="fb-row">
+        <input
+          type="file"
+          accept="image/*"
+          onChange={async (e) => {
+            const f = e.target.files?.[0]; if (!f) return;
+
+            // 2MB hard limit
+            if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
+
+            // автопідготовка: якщо потрібно — WebP ≤200KB, max width 1080 з фіксацією пропорцій
+            let toSend = f;
+            try {
+              // функція має бути оголошена вище в цьому файлі (див. попередні інструкції)
+              toSend = await prepareFeaturedUnder200KB(f);
+            } catch (ex) {
+              console.warn(ex);
+              // якщо конвертація не вдалася — залишаємо оригінал (він вже ≤2MB)
+            }
+
+            const fd = new FormData();
+            fd.append("image", toSend);
+            if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug); // скласти в directory/<slug>/*
+
+            const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
+            const out = await res.json();
+            if (out?.url) ctrl.setFeatured(out.url);
+            else notify(out?.error || "Upload failed");
+          }}
+        />
+      </div>
+      <div className="fb-help">Max 2 MB; auto-convert to WebP ≤200 KB; max width 1080px.</div>
+
+      {ctrl.meta.featuredUrl && (
+        <div className="fb-thumb">
+          <img src={ctrl.meta.featuredUrl} alt="Featured" />
+          <button className="fb-x" onClick={() => ctrl.setFeatured(null)} title="Remove">×</button>
         </div>
+      )}
+    </div>
+  </div>
+
 
         <div className="fb-panel-sec">
           <div className="fb-sec-h">Bookmarks</div>
