@@ -128,19 +128,27 @@ function SlugInput({
   maxLen?: number;
 }) {
   const [slugInput, setSlugInput] = React.useState<string>(value || "");
-  const dirtyRef = React.useRef(false);
+  const dirtyRef = React.useRef(false); // стає true лише коли юзер міняє саме slug вручну
 
+  // тримаємо локальний стейт у синхроні з пропсом value (коли приходить зовнішня зміна)
   React.useEffect(() => { setSlugInput(value || ""); }, [value]);
 
+  // АВТОСИНХРОНІЗАЦІЯ: доки юзер не редагував slug, оновлюємо його при зміні title
   React.useEffect(() => {
-    if (!dirtyRef.current && (!slugInput || slugInput.length === 0)) {
+    if (!dirtyRef.current) {
       const auto = autoFromTitle(title || "");
-      if (auto) { setSlugInput(auto); onChange(auto); }
+      if (auto) {
+        const trimmed = auto.slice(0, maxLen);
+        if (trimmed !== slugInput) {
+          setSlugInput(trimmed);
+          onChange(trimmed);
+        }
+      }
     }
-  }, [title]); // eslint-disable-line
+  }, [title, maxLen]); // навмисно не додаємо slugInput, щоб не зациклити
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    dirtyRef.current = true;
+    dirtyRef.current = true; // відтепер юзер керує полем сам
     let live = slugLive(e.target.value);
     if (live.length > maxLen) live = live.slice(0, maxLen);
     setSlugInput(live);
@@ -176,6 +184,7 @@ function SlugInput({
     </div>
   );
 }
+
 
 
 
@@ -309,27 +318,22 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           <div className="fb-sec-h">Meta</div>
 
           {/* --- TITLE --- */}
-    <label className="fb-field">
-      <div className="fb-lab">Title</div>
-      <input
-        className="fb-inp"
-        value={ctrl.meta.title}
-        maxLength={SEO.TITLE_MAX}
-        onChange={(e) => {
-          const v = e.target.value;
-          // якщо slug порожній — автогенерація зі зміненого title
-          if (!ctrl.meta.slug || ctrl.meta.slug.length === 0) {
-            const auto = autoFromTitle(v);
-            ctrl.setMeta({ title: v, slug: auto as any });
-          } else {
-            ctrl.setMeta({ title: v });
-          }
-        }}
-      />
-      <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
-        {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
-      </div>
-    </label>
+<label className="fb-field">
+  <div className="fb-lab">Title</div>
+  <input
+    className="fb-inp"
+    value={ctrl.meta.title}
+    maxLength={SEO.TITLE_MAX}
+    onChange={(e) => {
+      // ВАЖЛИВО: більше НЕ чіпаємо slug тут
+      ctrl.setMeta({ title: e.target.value });
+    }}
+  />
+  <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
+    {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
+  </div>
+</label>
+
 
           {/* --- META DESCRIPTION --- */}
     <label className="fb-field">
@@ -394,7 +398,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           }}
         />
       </div>
-      <div className="fb-help">Max 2 MB; auto-convert to WebP ≤200 KB; max width 1080px.</div>
+      <div className="fb-help">Max 2 MB.</div>
 
       {ctrl.meta.featuredUrl && (
         <div className="fb-thumb">
