@@ -639,21 +639,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
               <button className="ua-btn slim" onClick={() => setPub(null)} title="Close">Close</button>
             </div>
           </div>
-
-          <style jsx>{`
-            .pub-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(10,14,14,.6);backdrop-filter:blur(2px)}
-            .pub-card{width:min(680px,92vw);border-radius:16px;padding:22px 22px 18px;background:#fff;color:#1f2a22;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:pop-in .24s cubic-bezier(.2,.8,.2,1)}
-            @keyframes pop-in{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
-            .pub-check{width:84px;height:84px;margin:4px auto 10px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 50%,#b6e3a2 0%,#79c266 100%);color:#0f3d1a;animation:pulse 880ms ease-out}
-            .pub-check svg{width:44px;height:44px}
-            @keyframes pulse{0%{transform:scale(.6);filter:saturate(.8);opacity:.5}60%{transform:scale(1.08)}100%{transform:scale(1);filter:saturate(1);opacity:1}}
-            h3{margin:6px 0 10px;font-size:22px;font-weight:800;color:#21353a}
-            .pub-url{margin:6px auto 14px;padding:10px 12px;max-width:100%;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:14px;line-height:1.3;border-radius:10px;background:#f5f7f2;color:#2a3328;word-break:break-all;border:1px solid #e5e9e0}
-            .pub-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-            .ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
-            .ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
-            .ua-btn.slim{padding:8px 12px}
-          `}</style>
         </div>
       )}
 
@@ -802,6 +787,19 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-color-picker.mini{ width:32px; height:28px; }
 
         @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 360px); } }
+
+        .pub-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(10,14,14,.6);backdrop-filter:blur(2px)}
+            .pub-card{width:min(680px,92vw);border-radius:16px;padding:22px 22px 18px;background:#fff;color:#1f2a22;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:pop-in .24s cubic-bezier(.2,.8,.2,1)}
+            @keyframes pop-in{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+            .pub-check{width:84px;height:84px;margin:4px auto 10px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 50%,#b6e3a2 0%,#79c266 100%);color:#0f3d1a;animation:pulse 880ms ease-out}
+            .pub-check svg{width:44px;height:44px}
+            @keyframes pulse{0%{transform:scale(.6);filter:saturate(.8);opacity:.5}60%{transform:scale(1.08)}100%{transform:scale(1);filter:saturate(1);opacity:1}}
+            h3{margin:6px 0 10px;font-size:22px;font-weight:800;color:#21353a}
+            .pub-url{margin:6px auto 14px;padding:10px 12px;max-width:100%;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:14px;line-height:1.3;border-radius:10px;background:#f5f7f2;color:#2a3328;word-break:break-all;border:1px solid #e5e9e0}
+            .pub-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+            .ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
+            .ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
+            .ua-btn.slim{padding:8px 12px}
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
