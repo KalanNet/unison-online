@@ -110,6 +110,9 @@ function SlugInput({
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
 
+  // NEW: стан для модалки після успішної публікації
+  const [pub, setPub] = useState<{ url: string } | null>(null);
+
   // Ініціалізація контролера з безпечним catch (без setState у рендері)
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   let initErr: string | null = null;
@@ -200,8 +203,21 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         isFs={ctrl.isFs}
         toggleFullscreen={ctrl.toggleFullscreen}
         handleShare={ctrl.handleShare}
-        onPublish={ctrl.publishMetaAndBookmarks}
+        // NEW: показуємо модалку після успішної публікації (без зміни типу пропса)
+        onPublish={() => {
+          ctrl!.publishMetaAndBookmarks()
+            .then((r) => {
+              const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
+              if (full) setPub({ url: full });
+            })
+            .catch((e) => {
+              console.error(e);
+              alert((e as any)?.message || "Publish failed");
+            });
+        }}
       />
+
 
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
@@ -605,6 +621,42 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_SIZE={ctrl.LOUPE_SIZE}
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
+
+            {/* === Success Publish Modal === */}
+      {pub && (
+        <div className="pub-overlay" role="dialog" aria-modal="true" aria-labelledby="pub-title">
+          <div className="pub-card">
+            <div className="pub-check" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M20 7L9 18l-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <h3 id="pub-title">Published successfully</h3>
+            <p className="pub-url" title={pub.url}>{pub.url}</p>
+            <div className="pub-actions">
+              <button className="ua-btn" onClick={() => navigator.clipboard?.writeText(pub.url)} title="Copy link">Copy link</button>
+              <a className="ua-btn ua-btn--dark" href={pub.url} target="_blank" rel="noopener noreferrer" title="Open">Open</a>
+              <button className="ua-btn slim" onClick={() => setPub(null)} title="Close">Close</button>
+            </div>
+          </div>
+
+          <style jsx>{`
+            .pub-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(10,14,14,.6);backdrop-filter:blur(2px)}
+            .pub-card{width:min(680px,92vw);border-radius:16px;padding:22px 22px 18px;background:#fff;color:#1f2a22;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:pop-in .24s cubic-bezier(.2,.8,.2,1)}
+            @keyframes pop-in{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+            .pub-check{width:84px;height:84px;margin:4px auto 10px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 50%,#b6e3a2 0%,#79c266 100%);color:#0f3d1a;animation:pulse 880ms ease-out}
+            .pub-check svg{width:44px;height:44px}
+            @keyframes pulse{0%{transform:scale(.6);filter:saturate(.8);opacity:.5}60%{transform:scale(1.08)}100%{transform:scale(1);filter:saturate(1);opacity:1}}
+            h3{margin:6px 0 10px;font-size:22px;font-weight:800;color:#21353a}
+            .pub-url{margin:6px auto 14px;padding:10px 12px;max-width:100%;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:14px;line-height:1.3;border-radius:10px;background:#f5f7f2;color:#2a3328;word-break:break-all;border:1px solid #e5e9e0}
+            .pub-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+            .ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
+            .ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
+            .ua-btn.slim{padding:8px 12px}
+          `}</style>
+        </div>
+      )}
+
 
       {/* СТИЛІ */}
       <style jsx global>{`
