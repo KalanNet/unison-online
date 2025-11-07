@@ -4,8 +4,7 @@
 import LoginForm from "../components/LoginForm";
 
 export type LoginFormProps = {
-  /** Куди редіректити після успішного логіну; дефолт -> /secure/editor */
-  nextUrl?: string;
+  nextUrl?: string; // куди редіректити після успіху
 };
 
 function normalizeNext(raw?: string) {
@@ -19,7 +18,6 @@ function normalizeNext(raw?: string) {
 }
 
 export default function ClientLoginForm(props: LoginFormProps) {
-  // навіть якщо зверху випадково прокинуть "/", тут підмінемо на /secure/editor
-  const effectiveNext = normalizeNext(props.nextUrl);
-  return <LoginForm nextUrl={effectiveNext} />;
+  const nextUrl = normalizeNext(props.nextUrl);
+  return <LoginForm nextUrl={nextUrl} />;
 }

@@ -2,28 +2,22 @@
 import type { Metadata } from "next";
 import ClientLoginForm from "./ClientLoginForm";
 
-export const dynamic = "force-dynamic"; // ВАЖЛИВО: дозволяє читати ?next=... на рендері
+export const runtime = "edge";          // <-- ВАЖЛИВО для Cloudflare Pages
+export const dynamic = "force-dynamic"; // читаємо ?next=... на рендері
 
 export const metadata: Metadata = {
   title: "Secure Access",
   robots: { index: false, follow: false, nocache: true },
 };
 
-// санітизація next, щоб не було open redirect
+// санітизація next, щоб уникнути open redirect
 function normalizeNext(raw?: string) {
   const def = "/secure/editor";
   if (!raw) return def;
-
-  // забороняємо протоколи / зовнішні хости / подвійний слеш
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return def;
-  if (raw.startsWith("//")) return def;
-
-  // має бути внутрішній абсолютний шлях
-  if (!raw.startsWith("/")) return def;
-
-  // якщо передали домашню, все одно йдемо в редактор
-  if (raw === "/") return def;
-
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return def; // протоколи
+  if (raw.startsWith("//")) return def;                   // двійний слеш (інший хост)
+  if (!raw.startsWith("/")) return def;                   // має бути внутрішній шлях
+  if (raw === "/") return def;                            // не ведемо на домашню
   return raw;
 }
 

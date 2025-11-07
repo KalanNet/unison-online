@@ -1,23 +1,38 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Props = {
   /** Куди редіректити після успішного логіну; якщо не вказано — читаємо ?next=... або /secure/editor */
   nextUrl?: string;
 };
 
+function normalizeNext(raw?: string) {
+  const def = "/secure/editor";
+  if (!raw) return def;
+  // забороняємо зовнішні протоколи та протокольні-агностичні посилання
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return def;
+  if (raw.startsWith("//")) return def;
+  // має бути внутрішній шлях
+  if (!raw.startsWith("/")) return def;
+  // не дозволяємо рівно "/" — завжди ведемо в редактор
+  if (raw === "/") return def;
+  return raw;
+}
+
 export default function LoginForm({ nextUrl }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Обчислюємо надійний next: пропс -> query (?next=) -> дефолт
+  // Пропс -> query (?next=) -> дефолт; все через sanitize
   const effectiveNext = useMemo(() => {
     const fromQuery =
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("next")
         : null;
-    return nextUrl || fromQuery || "/secure/editor";
+    return normalizeNext(nextUrl || fromQuery || "/secure/editor");
   }, [nextUrl]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -26,22 +41,22 @@ export default function LoginForm({ nextUrl }: Props) {
     setLoading(true);
     try {
       const form = new FormData(e.currentTarget);
-      // гарантуємо, що next завжди є у payload
       if (!form.get("next")) form.set("next", effectiveNext);
 
       const res = await fetch("/api/login", { method: "POST", body: form });
-      const out = await res.json().catch(() => ({} as any));
+      // якщо бекенд повернув HTML (через redirect), не валимо форму:
+      let out: any = {};
+      try { out = await res.json(); } catch {}
+
       if (!res.ok) throw new Error(out?.error || "Login failed");
 
-      // пріоритет: те, що повернув бекенд -> effectiveNext
-      const redirectTo =
-        (out && (out.next as string)) ||
-        (typeof out === "string" ? out : "") ||
-        effectiveNext;
+      // пріоритет next від бекенда, але теж санітизуємо
+      const fromApi =
+        typeof out === "string" ? out : (out && (out.next as string)) || "";
+      const target = normalizeNext(fromApi || effectiveNext);
 
-      if (typeof window !== "undefined") {
-        window.location.href = redirectTo;
-      }
+      // Надійно міняємо URL (без історії назад на логін):
+      router.replace(target);
     } catch (ex: any) {
       setErr(String(ex?.message || ex) || "Login error");
     } finally {
@@ -76,7 +91,7 @@ export default function LoginForm({ nextUrl }: Props) {
         {loading ? "Signing in..." : "Sign in"}
       </button>
 
-      {/* Передаємо next до API та тримаємо fallback на /secure/editor */}
+      {/* Всегда відправляємо next у API */}
       <input type="hidden" name="next" value={effectiveNext} />
     </form>
   );
