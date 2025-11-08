@@ -13,15 +13,16 @@ const te = new TextEncoder();
 const enc = (s: string) => te.encode(s);
 
 function getEnv(): Env {
-  // Edge Runtime: process.env доступний без globalThis
+  // Тільки process.env!
   const e = process.env;
   return {
-    R2_ACCOUNT_ID: e.R2_ACCOUNT_ID!,
-    R2_BUCKET: e.R2_BUCKET!,
-    R2_ACCESS_KEY_ID: e.R2_ACCESS_KEY_ID!,
-    R2_SECRET_ACCESS_KEY: e.R2_SECRET_ACCESS_KEY!,
+    R2_ACCOUNT_ID: e.R2_ACCOUNT_ID || "",
+    R2_BUCKET: e.R2_BUCKET || "",
+    R2_ACCESS_KEY_ID: e.R2_ACCESS_KEY_ID || "",
+    R2_SECRET_ACCESS_KEY: e.R2_SECRET_ACCESS_KEY || "",
   };
 }
+
 
 const toAB = (v: ArrayBuffer | ArrayBufferView): ArrayBuffer =>
   v instanceof ArrayBuffer ? v : v.buffer as ArrayBuffer;
