@@ -116,6 +116,30 @@ function autoFromTitle(title?: string): string {
   return slugFinal(title);
 }
 
+/* --- Стислий статус-індикатор поля --- */
+function FieldStatus({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className={`fb-status ${ok ? "ok" : "bad"}`}
+      aria-label={ok ? "Valid" : "Invalid"}
+      title={ok ? "Valid" : "Invalid"}
+    >
+      {ok ? "✓" : "!"}
+    </span>
+  );
+}
+const Req = () => <span className="fb-req" aria-hidden="true">*</span>;
+
+/* --- Коротка назва файлу: перші 10 символів + … + розширення --- */
+function shortFileName(name: string) {
+  const base = name.split(/[/\\]/).pop() || name;
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot + 1) : "";
+  const s = stem.length > 10 ? stem.slice(0, 10) + "…" : stem;
+  return ext ? `${s}.${ext}` : s;
+}
+
 function SlugInput({
   value,
   title,
@@ -128,31 +152,32 @@ function SlugInput({
   maxLen?: number;
 }) {
   const [slugInput, setSlugInput] = React.useState<string>(value || "");
-  const dirtyRef = React.useRef(false); // стає true лише коли юзер міняє саме slug вручну
+  const dirtyRef = React.useRef(false); // true — коли юзер редагував slug вручну і він НЕ порожній
 
-  // тримаємо локальний стейт у синхроні з пропсом value (коли приходить зовнішня зміна)
+  // синхронізація ззовні
   React.useEffect(() => { setSlugInput(value || ""); }, [value]);
 
-  // АВТОСИНХРОНІЗАЦІЯ: доки юзер не редагував slug, оновлюємо його при зміні title
+  // ВАЖЛИВО: якщо slug порожній — знову дозволяємо автогенерацію з title
   React.useEffect(() => {
-    if (!dirtyRef.current) {
+    const shouldAuto = !dirtyRef.current || slugInput.length === 0;
+    if (shouldAuto) {
       const auto = autoFromTitle(title || "");
-      if (auto) {
-        const trimmed = auto.slice(0, maxLen);
-        if (trimmed !== slugInput) {
-          setSlugInput(trimmed);
-          onChange(trimmed);
-        }
+      const trimmed = auto.slice(0, maxLen);
+      if (trimmed !== slugInput) {
+        setSlugInput(trimmed);
+        onChange(trimmed);
       }
     }
-  }, [title, maxLen]); // навмисно не додаємо slugInput, щоб не зациклити
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, maxLen, slugInput]); // slugInput у deps — безкінечного циклу не буде через перевірку
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    dirtyRef.current = true; // відтепер юзер керує полем сам
     let live = slugLive(e.target.value);
     if (live.length > maxLen) live = live.slice(0, maxLen);
     setSlugInput(live);
     onChange(live);
+    // dirty = лише коли є хоч один символ; якщо стерли все — знову не dirty
+    dirtyRef.current = live.length > 0;
   };
 
   const handleBlur = () => {
@@ -163,7 +188,7 @@ function SlugInput({
   };
 
   const len = slugInput.length;
-  const bad = len > maxLen || !SLUG_RE.test(slugInput || "");
+  const bad = len > maxLen || (len > 0 && !SLUG_RE.test(slugInput));
 
   return (
     <div>
@@ -185,14 +210,13 @@ function SlugInput({
   );
 }
 
-
-
-
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
 
   // NEW: стан для модалки після успішної публікації
   const [pub, setPub] = useState<{ url: string } | null>(null);
+  // Локальна назва завантаженого файлу (для відображення короткої назви)
+  const [featuredName, setFeaturedName] = useState<string | null>(null);
 
   // Ініціалізація контролера з безпечним catch (без setState у рендері)
   let ctrl: ReturnType<typeof useViewerController> | null = null;
@@ -274,6 +298,15 @@ export default function Viewer({ file, title }: { file: string; title?: string }
     "#2d3018",
   ];
 
+  // --- Валідації для статус-індикаторів ---
+  const t = (ctrl.meta.title || "").trim();
+  const d = (ctrl.meta.description || "").trim();
+  const s = (ctrl.meta.slug || "").trim();
+  const titleOk = t.length >= 10 && t.length <= SEO.TITLE_MAX;
+  const descOk = d.length >= 80 && d.length <= SEO.DESC_MAX;
+  const slugOk = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
+  const imageOk = !!ctrl.meta.featuredUrl;
+
   return (
     <div className="viewer-root">
       <EditorHeader
@@ -286,31 +319,36 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         handleShare={ctrl.handleShare}
         // NEW: показуємо модалку після успішної публікації (без зміни типу пропса)
         onPublish={() => {
-  const title = (ctrl!.meta.title || "").trim();
-  const desc  = (ctrl!.meta.description || "").trim();
-  const slug  = (ctrl!.meta.slug || "").trim();
+          const title = (ctrl!.meta.title || "").trim();
+          const desc  = (ctrl!.meta.description || "").trim();
+          const slug  = (ctrl!.meta.slug || "").trim();
 
-  const errs: string[] = [];
-  if (!title) errs.push("Title is required");
-  if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
-  if (desc.length > SEO.DESC_MAX)   errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
-  if (slug.length > SEO.SLUG_MAX)   errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
-  if (!SLUG_RE.test(slug))          errs.push("Slug may contain only a–z, 0–9 and '-'");
+          const errs: string[] = [];
+          if (!title) errs.push("Title is required");
+          if (title.length < 10) errs.push("Title must be at least 10 characters");
+          if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
 
-  if (errs.length) { notify(errs.join("\n")); return; }
+          if (!desc) errs.push("Meta description is required");
+          if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
+          if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
 
-  ctrl!.publishMetaAndBookmarks()
-    .then((r) => {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
-      if (full) setPub({ url: full });
-    })
-    .catch((e) => { console.error(e); notify((e as any)?.message || "Publish failed"); });
-}}
+          if (!slug) errs.push("Slug is required");
+          if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
+          if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
 
+          if (!ctrl!.meta.featuredUrl) errs.push("Featured image is required");
+
+          if (errs.length) { notify(errs.join("\n")); return; }
+
+          ctrl!.publishMetaAndBookmarks()
+            .then((r) => {
+              const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
+              if (full) setPub({ url: full });
+            })
+            .catch((e) => { console.error(e); notify((e as any)?.message || "Publish failed"); });
+        }}
       />
-
-
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
       <aside className="fb-sticky-panel" role="complementary" aria-label="Bookmarks & Meta">
@@ -318,97 +356,120 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           <div className="fb-sec-h">Meta</div>
 
           {/* --- TITLE --- */}
-<label className="fb-field">
-  <div className="fb-lab">Title</div>
-  <input
-    className="fb-inp"
-    value={ctrl.meta.title}
-    maxLength={SEO.TITLE_MAX}
-    onChange={(e) => {
-      // ВАЖЛИВО: більше НЕ чіпаємо slug тут
-      ctrl.setMeta({ title: e.target.value });
-    }}
-  />
-  <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
-    {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
-  </div>
-</label>
-
+          <label className="fb-field">
+            <div className="fb-lab">
+              Title <Req /> <FieldStatus ok={titleOk} />
+            </div>
+            <input
+              className="fb-inp"
+              value={ctrl.meta.title}
+              maxLength={SEO.TITLE_MAX}
+              onChange={(e) => {
+                // НЕ чіпаємо slug тут (slug сам підписаний на title через SlugInput)
+                ctrl.setMeta({ title: e.target.value });
+              }}
+            />
+            <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
+              {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
+            </div>
+          </label>
 
           {/* --- META DESCRIPTION --- */}
-    <label className="fb-field">
-      <div className="fb-lab">Meta description</div>
-      <textarea
-        className="fb-txt"
-        rows={3}
-        value={ctrl.meta.description}
-        maxLength={SEO.DESC_MAX}
-        onChange={(e) => ctrl.setMeta({ description: e.target.value })}
-      />
-      <div className={`fb-help ${((ctrl.meta.description || "").length > SEO.DESC_MAX) ? "err" : ""}`}>
-        {(ctrl.meta.description || "").length}/{SEO.DESC_MAX}
-      </div>
-    </label>
+          <label className="fb-field">
+            <div className="fb-lab">
+              Meta description <Req /> <FieldStatus ok={descOk} />
+            </div>
+            <textarea
+              className="fb-txt"
+              rows={3}
+              value={ctrl.meta.description}
+              maxLength={SEO.DESC_MAX}
+              onChange={(e) => ctrl.setMeta({ description: e.target.value })}
+            />
+            <div className={`fb-help ${((ctrl.meta.description || "").length > SEO.DESC_MAX) ? "err" : ""}`}>
+              {(ctrl.meta.description || "").length}/{SEO.DESC_MAX}
+            </div>
+          </label>
 
-           {/* --- SLUG --- */}
-    <label className="fb-field">
-      <div className="fb-lab">Slug</div>
-      <SlugInput
-        value={ctrl.meta.slug ?? ""}
-        title={ctrl.meta.title || ctrl.title}
-        onChange={(v) => ctrl.setMeta({ slug: v as any })}
-        maxLen={SEO.SLUG_MAX}
-      />
-      <div className="fb-help">Only a–z, 0–9 and “-”. Max {SEO.SLUG_MAX} chars.</div>
-    </label>
+          {/* --- SLUG --- */}
+          <label className="fb-field">
+            <div className="fb-lab">
+              Slug <Req /> <FieldStatus ok={slugOk} />
+            </div>
+            <SlugInput
+              value={ctrl.meta.slug ?? ""}
+              title={ctrl.meta.title || ctrl.title}
+              onChange={(v) => ctrl.setMeta({ slug: v as any })}
+              maxLen={SEO.SLUG_MAX}
+            />
+            {/* прибрано зайвий статичний текст */}
+          </label>
 
+          {/* --- FEATURED IMAGE --- */}
+          <div className="fb-field">
+            <div className="fb-lab">
+              Featured image <Req /> <FieldStatus ok={imageOk} />
+            </div>
 
+            {/* прихований інпут + нормальна кнопка */}
+            <input
+              id="featured-upload"
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const f = e.target.files?.[0]; if (!f) return;
 
-           {/* --- FEATURED IMAGE --- */}
-    <div className="fb-field">
-      <div className="fb-lab">Featured image</div>
-      <div className="fb-row">
-        <input
-          type="file"
-          accept="image/*"
-          onChange={async (e) => {
-            const f = e.target.files?.[0]; if (!f) return;
+                // 2MB hard limit
+                if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
 
-            // 2MB hard limit
-            if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
+                let toSend = f;
+                try {
+                  toSend = await prepareFeaturedUnder200KB(f);
+                } catch (ex) {
+                  console.warn(ex);
+                }
 
-            // автопідготовка: якщо потрібно — WebP ≤200KB, max width 1080 з фіксацією пропорцій
-            let toSend = f;
-            try {
-              // функція має бути оголошена вище в цьому файлі (див. попередні інструкції)
-              toSend = await prepareFeaturedUnder200KB(f);
-            } catch (ex) {
-              console.warn(ex);
-              // якщо конвертація не вдалася — залишаємо оригінал (він вже ≤2MB)
-            }
+                const fd = new FormData();
+                fd.append("image", toSend);
+                if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug); // скласти в directory/<slug>/*
 
-            const fd = new FormData();
-            fd.append("image", toSend);
-            if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug); // скласти в directory/<slug>/*
+                const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
+                const out = await res.json();
+                if (out?.url) {
+                  ctrl.setFeatured(out.url);
+                  setFeaturedName(shortFileName(toSend.name));
+                } else {
+                  notify(out?.error || "Upload failed");
+                }
+              }}
+            />
 
-            const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
-            const out = await res.json();
-            if (out?.url) ctrl.setFeatured(out.url);
-            else notify(out?.error || "Upload failed");
-          }}
-        />
-      </div>
-      <div className="fb-help">Max 2 MB.</div>
+            <div className="fb-row">
+              <label htmlFor="featured-upload" className="ua-btn file" title="Choose file">Choose File</label>
+              <span className="fb-file-name">
+                {featuredName
+                  ? featuredName
+                  : (ctrl.meta.featuredUrl ? "uploaded.webp" : "No file chosen")}
+              </span>
+            </div>
 
-      {ctrl.meta.featuredUrl && (
-        <div className="fb-thumb">
-          <img src={ctrl.meta.featuredUrl} alt="Featured" />
-          <button className="fb-x" onClick={() => ctrl.setFeatured(null)} title="Remove">×</button>
+            <div className="fb-help">Max 2 MB.</div>
+
+            {ctrl.meta.featuredUrl && (
+              <div className="fb-thumb">
+                <img src={ctrl.meta.featuredUrl} alt="Featured" />
+                <button
+                  className="fb-x"
+                  onClick={() => { ctrl.setFeatured(null); setFeaturedName(null); }}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  </div>
-
 
         <div className="fb-panel-sec">
           <div className="fb-sec-h">Bookmarks</div>
@@ -509,217 +570,213 @@ export default function Viewer({ file, title }: { file: string; title?: string }
       </aside>
 
       {/* Сцена між header/footer */}
-<section ref={ctrl.stageRef} className="viewer-stage">
-  <div
-    className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
-    style={{
-      transition: "transform 500ms ease-in-out",
-      margin: "0 auto",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
-      height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
-      maxWidth: "100vw",
-      maxHeight: "100vh",
-      position: "relative",
-      overflow: "visible",          // ← залишаємо
-    }}
-  >
-    <FlipBook
-      ref={ctrl.bookRef}
-      width={ctrl.baseSize.w}
-      height={ctrl.baseSize.h}
-      size="stretch"
-      usePortrait={ctrl.single}
-      showCover={!ctrl.single}
-      flippingTime={600}
-      maxShadowOpacity={0.2}
-      drawShadow
-      mobileScrollSupport
-      startPage={ctrl.currentIndex}
-      onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-      style={{
-        width: "100%",
-        height: "100%",
-        minWidth: 0,
-        minHeight: 0,
-        aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-        overflow: "visible",        // ← залишаємо
-      }}
-    >
-      {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-        const pageNum = i + 1;
-        const bmp = ctrl!.cacheRef.current.get(pageNum);
-        const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
-
-        return (
-          <div
-            key={i}
+      <section ref={ctrl.stageRef} className="viewer-stage">
+        <div
+          className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+          style={{
+            transition: "transform 500ms ease-in-out",
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: ctrl.single ? Math.round(ctrl.baseSize.w * ctrl.fitScale) : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+            height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+            maxWidth: "100vw",
+            maxHeight: "100vh",
+            position: "relative",
+            overflow: "visible",
+          }}
+        >
+          <FlipBook
+            ref={ctrl.bookRef}
+            width={ctrl.baseSize.w}
+            height={ctrl.baseSize.h}
+            size="stretch"
+            usePortrait={ctrl.single}
+            showCover={!ctrl.single}
+            flippingTime={600}
+            maxShadowOpacity={0.2}
+            drawShadow
+            mobileScrollSupport
+            startPage={ctrl.currentIndex}
+            onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
             style={{
               width: "100%",
               height: "100%",
-              background: "#fff",
-              position: "relative"
+              minWidth: 0,
+              minHeight: 0,
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+              overflow: "visible",
             }}
-            onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
-            onMouseLeave={ctrl!.handlePageMouseLeave}
           >
-            {/* СТОРІНКА */}
-            {bmp ? (
-              <>
-                <img
-                  src={bmp.url}
-                  alt={`p${pageNum}`}
-                  data-page-img="true"
-                  draggable={false}
+            {Array.from({ length: ctrl.totalPages }).map((_, i) => {
+              const pageNum = i + 1;
+              const bmp = ctrl!.cacheRef.current.get(pageNum);
+              const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> = (bmp?.links as any) ?? [];
+
+              return (
+                <div
+                  key={i}
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
-                    pointerEvents: "none",
-                    borderRadius: 2,
-                    display: "block"
+                    background: "#fff",
+                    position: "relative"
                   }}
-                />
-                {links?.length
-                  ? links.map((L: typeof links[0], idx: number) =>
-                      L.href ? (
-                        <a
-                          key={idx}
-                          href={L.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="pdf-link"
-                          style={{
-                            position: "absolute",
-                            left: `${L.x * 100}%`,
-                            top: `${L.y * 100}%`,
-                            width: `${L.w * 100}%`,
-                            height: `${L.h * 100}%`,
-                          }}
-                        />
-                      ) : (
-                        <button
-                          key={idx}
-                          className="pdf-link"
-                          title="Go to"
-                          onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
-                          style={{
-                            position: "absolute",
-                            left: `${L.x * 100}%`,
-                            top: `${L.y * 100}%`,
-                            width: `${L.w * 100}%`,
-                            height: `${L.h * 100}%`,
-                          }}
-                        />
-                      )
-                    )
-                  : null}
-              </>
-            ) : (
-              <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
-            )}
-          </div>
-        );
-      })}
-    </FlipBook>
-
-    {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
-    {ctrl.bookmarks.length > 0 && (
-      <div
-        className="bm-tabs-overlay"
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 200,
-          overflow: "visible",
-          pointerEvents: "none", // клікабельні лише самі таби
-          // змінні (можеш забрати в CSS, якщо хочеш):
-          // @ts-ignore
-          ["--tabThickness" as any]: "36px",  // виліт назовні
-          ["--tabLength" as any]: "140px",    // довжина вздовж сторінки
-          ["--tabTop" as any]: "36px",
-          ["--tabGap" as any]: "0px",
-        } as React.CSSProperties}
-      >
-        {(() => {
-          const sorted = [...ctrl.bookmarks].sort((a, b) => a.page - b.page);
-
-          // поточний лівий номер сторінки розвороту
-          const leftNow = ctrl.single
-            ? ctrl.currentIndex + 1
-            : (ctrl.currentIndex % 2 === 0 ? ctrl.currentIndex + 1 : ctrl.currentIndex);
-          const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
-
-          return sorted.map((bm, i) => {
-            // все, що позаду розвороту — ліворуч; активний і майбутній — праворуч
-            const sideIsLeft = ctrl.single ? bm.page < (ctrl.currentIndex + 1) : bm.page < leftNow;
-
-            const baseStyle: React.CSSProperties = {
-              position: "absolute",
-              top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-              width: "var(--tabThickness)",
-              height: "var(--tabLength)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              fontSize: 15,
-              fontWeight: 800,
-              lineHeight: 1,
-              border: "1px solid rgba(0,0,0,.18)",
-              boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-              opacity: 0.98,
-              transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-              pointerEvents: "auto",
-              background: (bm as any).color || "#f47e20",
-              borderRadius: "0 10px 10px 0",
-            };
-
-            const sideStyle: React.CSSProperties = sideIsLeft
-              ? {
-                  left: "calc(var(--tabThickness) * -1)",
-                  transform: "rotate(180deg)",           // реверс для коректного читання зліва
-                  transformOrigin: "center",
-                }
-              : {
-                  right: "calc(var(--tabThickness) * -1)",
-                };
-
-            return (
-              <button
-                key={bm.id}
-                className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-                  (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
-                }`}
-                title={`${bm.label} (p.${bm.page})`}
-                onClick={(e) => { e.preventDefault(); ctrl!.goToBookmark(bm.id); }}
-                style={{ ...baseStyle, ...sideStyle }}
-              >
-                <span
-                  className="bm-tab__label"
-                  style={{
-                    maxHeight: "calc(var(--tabLength) - 10px)",
-                    padding: "4px 0",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    writingMode: "vertical-rl",
-                    textOrientation: "mixed",
-                  } as React.CSSProperties}
+                  onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+                  onMouseLeave={ctrl!.handlePageMouseLeave}
                 >
-                  {bm.label}
-                </span>
-              </button>
-            );
-          });
-        })()}
-      </div>
-    )}
-    {/* === /OVERLAY ЗАКЛАДОК === */}
-  </div>
-</section>
+                  {/* СТОРІНКА */}
+                  {bmp ? (
+                    <>
+                      <img
+                        src={bmp.url}
+                        alt={`p${pageNum}`}
+                        data-page-img="true"
+                        draggable={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          pointerEvents: "none",
+                          borderRadius: 2,
+                          display: "block"
+                        }}
+                      />
+                      {links?.length
+                        ? links.map((L: typeof links[0], idx: number) =>
+                            L.href ? (
+                              <a
+                                key={idx}
+                                href={L.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="pdf-link"
+                                style={{
+                                  position: "absolute",
+                                  left: `${L.x * 100}%`,
+                                  top: `${L.y * 100}%`,
+                                  width: `${L.w * 100}%`,
+                                  height: `${L.h * 100}%`,
+                                }}
+                              />
+                            ) : (
+                              <button
+                                key={idx}
+                                className="pdf-link"
+                                title="Go to"
+                                onClick={() => (L.dest ? (ctrl as any).goToDest?.(L.dest) : null)}
+                                style={{
+                                  position: "absolute",
+                                  left: `${L.x * 100}%`,
+                                  top: `${L.y * 100}%`,
+                                  width: `${L.w * 100}%`,
+                                  height: `${L.h * 100}%`,
+                                }}
+                              />
+                            )
+                          )
+                        : null}
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
+                  )}
+                </div>
+              );
+            })}
+          </FlipBook>
 
+          {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
+          {ctrl.bookmarks.length > 0 && (
+            <div
+              className="bm-tabs-overlay"
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 200,
+                overflow: "visible",
+                pointerEvents: "none",
+                // змінні
+                ["--tabThickness" as any]: "36px",
+                ["--tabLength" as any]: "140px",
+                ["--tabTop" as any]: "36px",
+                ["--tabGap" as any]: "0px",
+              } as React.CSSProperties}
+            >
+              {(() => {
+                const sorted = [...ctrl.bookmarks].sort((a, b) => a.page - b.page);
+
+                const leftNow = ctrl.single
+                  ? ctrl.currentIndex + 1
+                  : (ctrl.currentIndex % 2 === 0 ? ctrl.currentIndex + 1 : ctrl.currentIndex);
+                const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+
+                return sorted.map((bm, i) => {
+                  const sideIsLeft = ctrl.single ? bm.page < (ctrl.currentIndex + 1) : bm.page < leftNow;
+
+                  const baseStyle: React.CSSProperties = {
+                    position: "absolute",
+                    top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
+                    width: "var(--tabThickness)",
+                    height: "var(--tabLength)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontSize: 15,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    border: "1px solid rgba(0,0,0,.18)",
+                    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                    opacity: 0.98,
+                    transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
+                    pointerEvents: "auto",
+                    background: (bm as any).color || "#f47e20",
+                    borderRadius: "0 10px 10px 0",
+                  };
+
+                  const sideStyle: React.CSSProperties = sideIsLeft
+                    ? {
+                        left: "calc(var(--tabThickness) * -1)",
+                        transform: "rotate(180deg)",
+                        transformOrigin: "center",
+                      }
+                    : {
+                        right: "calc(var(--tabThickness) * -1)",
+                      };
+
+                  return (
+                    <button
+                      key={bm.id}
+                      className={`bm-tab ${sideIsLeft ? "left" : "right"}${
+                        (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
+                      }`}
+                      title={`${bm.label} (p.${bm.page})`}
+                      onClick={(e) => { e.preventDefault(); ctrl!.goToBookmark(bm.id); }}
+                      style={{ ...baseStyle, ...sideStyle }}
+                    >
+                      <span
+                        className="bm-tab__label"
+                        style={{
+                          maxHeight: "calc(var(--tabLength) - 10px)",
+                          padding: "4px 0",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          writingMode: "vertical-rl",
+                          textOrientation: "mixed",
+                        } as React.CSSProperties}
+                      >
+                        {bm.label}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          )}
+          {/* === /OVERLAY ЗАКЛАДОК === */}
+        </div>
+      </section>
 
       <ViewerFooter
         refEl={ctrl.toolbarRef}
@@ -742,7 +799,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-            {/* === Success Publish Modal === */}
+      {/* === Success Publish Modal === */}
       {pub && (
         <div className="pub-overlay" role="dialog" aria-modal="true" aria-labelledby="pub-title">
           <div className="pub-card">
@@ -762,7 +819,6 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         </div>
       )}
 
-
       {/* СТИЛІ */}
       <style jsx global>{`
         html, body {
@@ -777,69 +833,50 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           :root { --hdr: 56px; --ftr: 72px; }
         }
         .viewer-root {
-  min-height: 100dvh;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  color: #fff;
-  background: #21353a;
-  overflow: hidden;
-}
+          min-height: 100dvh;
+          width: 100vw;
+          display: flex;
+          flex-direction: column;
+          color: #fff;
+          background: #21353a;
+          overflow: hidden;
+        }
 
-/* Закладка може виходити за межі сторінки FlipBook */
-/* щоб елементи могли виходити за межі сторінки */
-.page, .page > div, .page .page-content { overflow: visible !important; }
-.page .page-content { position: relative; }
+        /* Закладка може виходити за межі сторінки FlipBook */
+        .page, .page > div, .page .page-content { overflow: visible !important; }
+        .page .page-content { position: relative; }
 
-.page-bookmark{
-  transition:
-    transform 0.21s cubic-bezier(.7,0,.2,1),
-    width 0.21s cubic-bezier(.7,0,.2,1),
-    height 0.21s cubic-bezier(.7,0,.2,1),
-    font-size 0.21s cubic-bezier(.7,0,.2,1);
-}
+        .page-bookmark{
+          transition:
+            transform 0.21s cubic-bezier(.7,0,.2,1),
+            width 0.21s cubic-bezier(.7,0,.2,1),
+            height 0.21s cubic-bezier(.7,0,.2,1),
+            font-size 0.21s cubic-bezier(.7,0,.2,1);
+        }
+        .page-bookmark.right:hover,
+        .page-bookmark.left:hover{
+          --bmScale: 1.07;
+          width: 88px;
+          height: 43px;
+          font-size: 1.07em;
+        }
+        .page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
+        .page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
+        .page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
 
-/* правий/лівий — різні селектори збережені */
-.page-bookmark.right:hover,
-.page-bookmark.left:hover{
-  --bmScale: 1.07;     /* <- працює поверх inline, бо це змінна */
-  width: 88px;
-  height: 43px;
-  font-size: 1.07em;
-}
+        .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
+        .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
 
-
-/* Текст на лівій закладці читається нормально */
-.page-bookmark.left { transform: translateX(calc(-100% + 2px)) scaleX(-1); }
-.page-bookmark.left .page-bookmark__txt { display:inline-block; transform: scaleX(-1); }
-
-/* Не зникає на звороті під час перегортання */
-.page-bookmark { backface-visibility: hidden; transform-style: preserve-3d; }
-
-.local-header {
-  /* ! Немає position: fixed ! */
-  height: var(--hdr);
-  min-height: var(--hdr);
-  z-index: 120;
-}
-
-.local-footer {
-  /* ! Немає position: fixed ! */
-  height: var(--ftr);
-  min-height: var(--ftr);
-  z-index: 101;
-}
-
-.viewer-stage {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
+        .viewer-stage {
+          flex: 1 1 auto;
+          width: 100%;
+          min-height: 0;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justifyContent: center;
+          overflow: hidden;
+        }
 
         .book-container {
           display: flex;
@@ -850,28 +887,16 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           min-height: 0;
           transition: transform 500ms cubic-bezier(.7,0,.2,1);
         }
-        .book-container.is-cover {
-          transform: translateX(-24%);
-        }
-        @keyframes book-opening {
-          0% { transform: translateX(-24%); }
-          100% { transform: translateX(0); }
-        }
-        .pdf-link {
-          border: 0;
-          background: transparent;
-          cursor: pointer;
-          display: block;
-        }
-        .pdf-link:focus-visible {
-          outline: 2px dashed rgba(28,121,228,.6);
-          outline-offset: 1px;
-        }
+        .book-container.is-cover { transform: translateX(-24%); }
+        @keyframes book-opening { 0% { transform: translateX(-24%); } 100% { transform: translateX(0); } }
+
+        .pdf-link { border: 0; background: transparent; cursor: pointer; display: block; }
+        .pdf-link:focus-visible { outline: 2px dashed rgba(28,121,228,.6); outline-offset: 1px; }
 
         /* --- Sticky left panel (overlay) --- */
         .fb-sticky-panel{
           position: fixed; left: 16px; top: calc(var(--hdr) + 16px);
-          width: 320px; /* збільшено */
+          width: 340px; /* +20px */
           max-height: calc(100dvh - var(--hdr) - 32px);
           overflow: auto; z-index: 999;
           padding: 12px; background:#ffffffef; backdrop-filter: blur(6px);
@@ -882,13 +907,26 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-panel-sec + .fb-panel-sec{ margin-top:12px; }
         .fb-sec-h{ font-weight:900; color:#2d3018; margin-bottom:6px; }
         .fb-field{ display:block; margin-bottom:8px; }
-        .fb-lab{ font-size:12px; color:#5c6750; margin-bottom:4px; }
+        .fb-lab{ font-size:12px; color:#5c6750; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+        .fb-req{ color:#c63; font-weight:900; }
+        .fb-status{
+          display:inline-flex; align-items:center; justify-content:center;
+          width:16px; height:16px; border-radius:999px; font-size:12px; line-height:1;
+          border:1px solid currentColor; user-select:none;
+        }
+        .fb-status.ok { color:#2b7a36; background:#e8f6ea; }
+        .fb-status.bad{ color:#a32020; background:#fdeaea; }
+
         .fb-inp, .fb-txt{ width:100%; border:1px solid #e7ebdf; border-radius:.6rem; padding:.45rem .6rem; color:#2d3018; background:#fff; }
         .fb-inp-narrow{ width:110px; }
         .fb-inp-num{ width:72px; text-align:center; }
         .fb-inp-grow{ flex:1; min-width:0; }
         .fb-row{ display:flex; align-items:center; gap:8px; }
         .fb-row-wrap{ flex-wrap:wrap; }
+        .fb-help{ font-size:11px; color:#7b8571; margin-top:4px; }
+        .fb-help.err{ color:#a32020; }
+
+        .fb-file-name{ font-size:12px; color:#5c6750; }
 
         .fb-thumb{ position:relative; margin-top:8px; }
         .fb-thumb img{ width:100%; display:block; border-radius:.6rem; border:1px solid #e7ebdf; }
@@ -906,25 +944,24 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-color-picker{ width:40px; height:32px; border:1px solid #e7ebdf; border-radius:.55rem; background:#fff; padding:0; }
         .fb-color-picker.mini{ width:32px; height:28px; }
 
+        .ua-btn.file{ padding:6px 10px; }
+
         @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 360px); } }
 
         .pub-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(10,14,14,.6);backdrop-filter:blur(2px)}
-            .pub-card{width:min(680px,92vw);border-radius:16px;padding:22px 22px 18px;background:#fff;color:#1f2a22;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:pop-in .24s cubic-bezier(.2,.8,.2,1)}
-            @keyframes pop-in{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
-            .pub-check{width:84px;height:84px;margin:4px auto 10px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 50%,#b6e3a2 0%,#79c266 100%);color:#0f3d1a;animation:pulse 880ms ease-out}
-            .pub-check svg{width:44px;height:44px}
-            @keyframes pulse{0%{transform:scale(.6);filter:saturate(.8);opacity:.5}60%{transform:scale(1.08)}100%{transform:scale(1);filter:saturate(1);opacity:1}}
-            h3{margin:6px 0 10px;font-size:22px;font-weight:800;color:#21353a}
-            .pub-url{margin:6px auto 14px;padding:10px 12px;max-width:100%;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:14px;line-height:1.3;border-radius:10px;background:#f5f7f2;color:#2a3328;word-break:break-all;border:1px solid #e5e9e0}
-            .pub-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
-.ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
-.ua-btn.slim{padding:8px 12px}
-
-/* hover */
-.ua-btn:hover{background:#f7faf4;border-color:#bfcdb0}
-.ua-btn--dark:hover{background:#2a4a56;border-color:#2a4a56}
-
+        .pub-card{width:min(680px,92vw);border-radius:16px;padding:22px 22px 18px;background:#fff;color:#1f2a22;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:pop-in .24s cubic-bezier(.2,.8,.2,1)}
+        @keyframes pop-in{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+        .pub-check{width:84px;height:84px;margin:4px auto 10px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 50%,#b6e3a2 0%,#79c266 100%);color:#0f3d1a;animation:pulse 880ms ease-out}
+        .pub-check svg{width:44px;height:44px}
+        @keyframes pulse{0%{transform:scale(.6);filter:saturate(.8);opacity:.5}60%{transform:scale(1.08)}100%{transform:scale(1);filter:saturate(1);opacity:1}}
+        h3{margin:6px 0 10px;font-size:22px;font-weight:800;color:#21353a}
+        .pub-url{margin:6px auto 14px;padding:10px 12px;max-width:100%;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:14px;line-height:1.3;border-radius:10px;background:#f5f7f2;color:#2a3328;word-break:break-all;border:1px solid #e5e9e0}
+        .pub-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+        .ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
+        .ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
+        .ua-btn.slim{padding:8px 12px}
+        .ua-btn:hover{background:#f7faf4;border-color:#bfcdb0}
+        .ua-btn--dark:hover{background:#2a4a56;border-color:#2a4a56}
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>

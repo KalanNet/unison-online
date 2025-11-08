@@ -1,3 +1,5 @@
+// app/secure/editor/ClientEditor.tsx
+
 "use client";
 
 import React, { useState } from "react";
@@ -33,7 +35,7 @@ export default function ClientEditor() {
     <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "0 0 0 0" }}>
       {!fileUrl ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 80 }}>
-          <h1 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 28, marginBottom: 32 }}>Flipbook Editor</h1>
+          <h1 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 28, marginBottom: 32 }}>Flipbook Creator/Editor</h1>
           <input
             type="file"
             accept="application/pdf"
@@ -45,7 +47,7 @@ export default function ClientEditor() {
             onChange={handleUpload}
           />
           <div style={{ marginTop: 22, color: "#bbb", fontSize: 17 }}>
-            {loading ? "Завантаження..." : "Оберіть PDF-файл для початку роботи"}
+            {loading ? "Завантаження..." : "Please select a PDF file to begin."}
           </div>
           {error && <div style={{ color: "#e54", marginTop: 20 }}>{error}</div>}
         </div>
