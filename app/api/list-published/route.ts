@@ -1,8 +1,9 @@
-// app/api/list-published/route.ts
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-export const runtime = "nodejs"; // <-- Ось це правильний варіант!
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 export async function GET() {
   const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
@@ -36,7 +37,8 @@ export async function GET() {
       .map(p => typeof p.Prefix === "string" ? p.Prefix.replace(/^directory\/|\/$/g, "") : "")
       .filter(Boolean);
 
-    const links = slugs.map(s => `/directory/${s}`);
+    // Формуємо список публічних лінків до каталогів!
+    const links = slugs.map(slug => `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}`);
 
     return new Response(JSON.stringify({ links }), {
       status: 200, headers: { "content-type": "application/json" }
