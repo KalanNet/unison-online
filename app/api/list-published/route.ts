@@ -1,7 +1,7 @@
 // app/api/list-published/route.ts
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-export const runtime = "edge";
+export const runtime = "node"; // <-- увімкни Node!
 export const dynamic = "force-dynamic";
 
 export async function GET() {
