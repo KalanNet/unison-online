@@ -1,7 +1,7 @@
 // app/api/list-published/route.ts
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-export const runtime = "node"; // <-- увімкни Node!
+export const runtime = "nodejs"; // <-- Ось це правильний варіант!
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -32,7 +32,6 @@ export async function GET() {
       Delimiter: "/"
     }));
 
-    // ПЕРЕВІРКА щоб уникнути undefined
     const slugs = (result.CommonPrefixes || [])
       .map(p => typeof p.Prefix === "string" ? p.Prefix.replace(/^directory\/|\/$/g, "") : "")
       .filter(Boolean);
