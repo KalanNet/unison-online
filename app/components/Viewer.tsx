@@ -419,69 +419,72 @@ const imageErr = imageOk ? "" : "Image required";
           </label>
 
           {/* --- FEATURED IMAGE --- */}
-          <div className="fb-field">
-            <div className="fb-lab">
-  Featured image <Req /> <FieldStatus ok={imageOk} msg={imageErr} />
+<div className="fb-field">
+  <div className="fb-lab">
+    Featured image <Req /> <FieldStatus ok={imageOk} msg={imageErr} />
+  </div>
+
+  {/* показуємо кнопку, назву файлу і підказку ТІЛЬКИ якщо зображення ще не завантажене */}
+  {!ctrl.meta.featuredUrl && (
+    <>
+      {/* прихований інпут + кнопка-виклик */}
+      <input
+        id="featured-upload"
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={async (e) => {
+          const f = e.target.files?.[0]; if (!f) return;
+
+          // 2MB hard limit
+          if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
+
+          let toSend = f;
+          try {
+            toSend = await prepareFeaturedUnder200KB(f);
+          } catch (ex) {
+            console.warn(ex);
+          }
+
+          const fd = new FormData();
+          fd.append("image", toSend);
+          if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug);
+
+          const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
+          const out = await res.json();
+          if (out?.url) {
+            ctrl.setFeatured(out.url);
+            setFeaturedName(shortFileName(toSend.name));
+          } else {
+            notify(out?.error || "Upload failed");
+          }
+        }}
+      />
+
+      <div className="fb-row">
+        <label htmlFor="featured-upload" className="ua-btn file" title="Choose file">Choose File</label>
+        <span className="fb-file-name">{featuredName ?? "No file chosen"}</span>
+      </div>
+
+      <div className="fb-help">Max 2 MB.</div>
+    </>
+  )}
+
+  {/* якщо є зображення — показуємо лише превʼю з хрестиком */}
+  {ctrl.meta.featuredUrl && (
+    <div className="fb-thumb">
+      <img src={ctrl.meta.featuredUrl} alt="Featured" />
+      <button
+        className="fb-x"
+        onClick={() => { ctrl.setFeatured(null); setFeaturedName(null); }}
+        title="Remove"
+      >
+        ×
+      </button>
+    </div>
+  )}
 </div>
 
-            {/* прихований інпут + нормальна кнопка */}
-            <input
-              id="featured-upload"
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={async (e) => {
-                const f = e.target.files?.[0]; if (!f) return;
-
-                // 2MB hard limit
-                if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
-
-                let toSend = f;
-                try {
-                  toSend = await prepareFeaturedUnder200KB(f);
-                } catch (ex) {
-                  console.warn(ex);
-                }
-
-                const fd = new FormData();
-                fd.append("image", toSend);
-                if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug); // скласти в directory/<slug>/*
-
-                const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
-                const out = await res.json();
-                if (out?.url) {
-                  ctrl.setFeatured(out.url);
-                  setFeaturedName(shortFileName(toSend.name));
-                } else {
-                  notify(out?.error || "Upload failed");
-                }
-              }}
-            />
-
-            <div className="fb-row">
-              <label htmlFor="featured-upload" className="ua-btn file" title="Choose file">Choose File</label>
-              <span className="fb-file-name">
-                {featuredName
-                  ? featuredName
-                  : (ctrl.meta.featuredUrl ? "uploaded.webp" : "No file chosen")}
-              </span>
-            </div>
-
-            {!ctrl.meta.featuredUrl && <div className="fb-help">Max 2 MB.</div>}
-
-            {ctrl.meta.featuredUrl && (
-              <div className="fb-thumb">
-                <img src={ctrl.meta.featuredUrl} alt="Featured" />
-                <button
-                  className="fb-x"
-                  onClick={() => { ctrl.setFeatured(null); setFeaturedName(null); }}
-                  title="Remove"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="fb-panel-sec">
