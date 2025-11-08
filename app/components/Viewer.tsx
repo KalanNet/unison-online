@@ -296,9 +296,6 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
     "#54c2bb",
     "#ac1f23",
     "#6b7034",
-    "#fff4e7",
-    "#eeece8",
-    "#bdcbdb",
     "#4e667a",
     "#2d3018",
   ];
