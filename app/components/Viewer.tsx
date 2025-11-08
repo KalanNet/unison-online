@@ -499,7 +499,7 @@ const imageErr = imageOk ? "" : "Image required";
             <input className="fb-inp fb-inp-narrow" placeholder={`Page#`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
           </div>
 
-          {/* палітра кольорів + custom + add без кольору */}
+          {/* палітра кольорів + custom (підтвердження через +) */}
 <div className="fb-row fb-colors">
   {brandColors.map((c) => (
     <button
@@ -524,7 +524,10 @@ const imageErr = imageOk ? "" : "Image required";
     />
   ))}
 
-  {/* Вибір кастомного кольору БЕЗ авто-створення */}
+  {/* label перед кастомним пікером */}
+  <span className="fb-color-label">Custom:</span>
+
+  {/* вибір кастомного кольору БЕЗ автостворення */}
   <input
     type="color"
     className="fb-color-picker"
@@ -533,10 +536,10 @@ const imageErr = imageOk ? "" : "Image required";
     onChange={(e) => setCustomColor(e.target.value || "#ffffff")}
   />
 
-  {/* Підтвердити додавання з кастомним кольором */}
+  {/* ПЛЮС = підтвердження додавання з обраним кастомним кольором */}
   <button
     className="lh-iconbtn"
-    title="Add with custom color"
+    title="Add with selected color"
     onClick={() => {
       const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
       const pageEl  = document.getElementById("fb-bmk-page")  as HTMLInputElement | null;
@@ -553,33 +556,12 @@ const imageErr = imageOk ? "" : "Image required";
     }}
     aria-label="Add bookmark with selected color"
   >
-    ✓
-  </button>
-
-  {/* Додати без кольору */}
-  <button
-    className="lh-iconbtn"
-    title="Add without color"
-    onClick={() => {
-      const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
-      const pageEl  = document.getElementById("fb-bmk-page")  as HTMLInputElement | null;
-      const pageVal = pageEl?.value?.trim();
-      const pageNum = pageVal ? Number(pageVal) : undefined;
-
-      ctrl.addBookmark({
-        page: isFinite(pageNum || NaN) ? pageNum : undefined,
-        label: labelEl?.value
-      });
-      if (labelEl) labelEl.value = "";
-      if (pageEl)  pageEl.value  = "";
-    }}
-    aria-label="Add bookmark"
-  >
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   </button>
 </div>
+
 
 
           {/* список з редагуванням */}
