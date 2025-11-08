@@ -297,7 +297,8 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
     "#ac1f23",
     "#6b7034",
     "#4e667a",
-    "#2d3018",
+    "#8a70a0",
+    "#7e2c42",
   ];
 
   // --- Валідації для статус-індикаторів ---
