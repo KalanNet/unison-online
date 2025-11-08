@@ -215,6 +215,9 @@ function SlugInput({
 export default function Viewer({ file, title }: { file: string; title?: string }) {
   const [error, setError] = useState<string | null>(null);
 
+// NEW: pending color для кастомної палітри (лише попередній вибір)
+const [customColor, setCustomColor] = useState<string>("#ffffff");
+
   // NEW: стан для модалки після успішної публікації
   const [pub, setPub] = useState<{ url: string } | null>(null);
   // Локальна назва завантаженого файлу (для відображення короткої назви)
@@ -493,93 +496,121 @@ const imageErr = imageOk ? "" : "Image required";
           {/* форма додавання: label + page (optional) */}
           <div className="fb-row fb-row-wrap">
             <input className="fb-inp" placeholder="Label (optional)" id="fb-bmk-label" />
-            <input className="fb-inp fb-inp-narrow" placeholder={`Page (optional)`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
+            <input className="fb-inp fb-inp-narrow" placeholder={`Page#`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
           </div>
 
           {/* палітра кольорів + custom + add без кольору */}
-          <div className="fb-row fb-colors">
-            {brandColors.map((c) => (
-              <button
-                key={c}
-                className="fb-color-swatch"
-                title={c}
-                style={{ background: c }}
-                onClick={() => {
-                  const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
-                  const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
-                  const pageVal = pageEl?.value?.trim();
-                  const pageNum = pageVal ? Number(pageVal) : undefined;
-                  ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value, color: c as any });
-                  if (labelEl) labelEl.value = "";
-                  if (pageEl) pageEl.value = "";
-                }}
-              />
-            ))}
-            <input
-              type="color"
-              className="fb-color-picker"
-              title="Custom color"
-              onChange={(e) => {
-                const custom = e.target.value || null;
-                const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
-                const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
-                const pageVal = pageEl?.value?.trim();
-                const pageNum = pageVal ? Number(pageVal) : undefined;
-                ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value, color: custom as any });
-                if (labelEl) labelEl.value = "";
-                if (pageEl) pageEl.value = "";
-                (e.target as HTMLInputElement).value = "#ffffff";
-              }}
-            />
-            <button
-              className="lh-iconbtn"
-              title="Add without color"
-              onClick={() => {
-                const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
-                const pageEl = document.getElementById("fb-bmk-page") as HTMLInputElement | null;
-                const pageVal = pageEl?.value?.trim();
-                const pageNum = pageVal ? Number(pageVal) : undefined;
-                ctrl.addBookmark({ page: isFinite(pageNum || NaN) ? pageNum : undefined, label: labelEl?.value });
-                if (labelEl) labelEl.value = "";
-                if (pageEl) pageEl.value = "";
-              }}
-              aria-label="Add bookmark"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
+<div className="fb-row fb-colors">
+  {brandColors.map((c) => (
+    <button
+      key={c}
+      className="fb-color-swatch"
+      title={c}
+      style={{ background: c }}
+      onClick={() => {
+        const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+        const pageEl  = document.getElementById("fb-bmk-page")  as HTMLInputElement | null;
+        const pageVal = pageEl?.value?.trim();
+        const pageNum = pageVal ? Number(pageVal) : undefined;
+
+        ctrl.addBookmark({
+          page: isFinite(pageNum || NaN) ? pageNum : undefined,
+          label: labelEl?.value,
+          color: c as any
+        });
+        if (labelEl) labelEl.value = "";
+        if (pageEl)  pageEl.value  = "";
+      }}
+    />
+  ))}
+
+  {/* Вибір кастомного кольору БЕЗ авто-створення */}
+  <input
+    type="color"
+    className="fb-color-picker"
+    title="Custom color"
+    value={customColor}
+    onChange={(e) => setCustomColor(e.target.value || "#ffffff")}
+  />
+
+  {/* Підтвердити додавання з кастомним кольором */}
+  <button
+    className="lh-iconbtn"
+    title="Add with custom color"
+    onClick={() => {
+      const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+      const pageEl  = document.getElementById("fb-bmk-page")  as HTMLInputElement | null;
+      const pageVal = pageEl?.value?.trim();
+      const pageNum = pageVal ? Number(pageVal) : undefined;
+
+      ctrl.addBookmark({
+        page: isFinite(pageNum || NaN) ? pageNum : undefined,
+        label: labelEl?.value,
+        color: (customColor || "#ffffff") as any
+      });
+      if (labelEl) labelEl.value = "";
+      if (pageEl)  pageEl.value  = "";
+    }}
+    aria-label="Add bookmark with selected color"
+  >
+    ✓
+  </button>
+
+  {/* Додати без кольору */}
+  <button
+    className="lh-iconbtn"
+    title="Add without color"
+    onClick={() => {
+      const labelEl = document.getElementById("fb-bmk-label") as HTMLInputElement | null;
+      const pageEl  = document.getElementById("fb-bmk-page")  as HTMLInputElement | null;
+      const pageVal = pageEl?.value?.trim();
+      const pageNum = pageVal ? Number(pageVal) : undefined;
+
+      ctrl.addBookmark({
+        page: isFinite(pageNum || NaN) ? pageNum : undefined,
+        label: labelEl?.value
+      });
+      if (labelEl) labelEl.value = "";
+      if (pageEl)  pageEl.value  = "";
+    }}
+    aria-label="Add bookmark"
+  >
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  </button>
+</div>
+
 
           {/* список з редагуванням */}
           <ul className="fb-list">
             {ctrl.bookmarks.map((b) => (
               <li key={b.id} className="fb-item">
-                <span className="fb-dot" style={{ background: (b as any).color || "#e7ebdf" }} />
-                <input
-                  className="fb-inp fb-inp-grow"
-                  value={b.label}
-                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { label: e.target.value })}
-                  title="Edit label"
-                />
-                <input
-                  className="fb-inp fb-inp-num"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={String(b.page)}
-                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { page: Number(e.target.value || 1) })}
-                  title="Edit page"
-                />
-                <input
-                  type="color"
-                  className="fb-color-picker mini"
-                  value={(b as any).color || "#ffffff"}
-                  onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { color: e.target.value as any })}
-                  title="Edit color"
-                />
-                <button className="fb-link" onClick={() => ctrl!.goToBookmark(b.id)} title={`Go to page ${b.page}`}>Go</button>
-                <button className="fb-del" onClick={() => ctrl!.removeBookmark(b.id)} title="Remove">✕</button>
-              </li>
+  <input
+    className="fb-inp fb-inp-grow"
+    value={b.label}
+    onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { label: e.target.value })}
+    title="Edit label"
+  />
+  <input
+    className="fb-inp fb-inp-num"
+    inputMode="numeric"
+    pattern="[0-9]*"
+    value={String(b.page)}
+    onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { page: Number(e.target.value || 1) })}
+    title="Edit page"
+  />
+  <input
+    type="color"
+    className="fb-color-picker mini"
+    value={(b as any).color || "#ffffff"}
+    onChange={(e) => (ctrl as any).updateBookmark?.(b.id, { color: e.target.value as any })}
+    title="Edit color"
+  />
+  <button className="fb-link" onClick={() => ctrl!.goToBookmark(b.id)} title={`Go to page ${b.page}`}>Go</button>
+  <button className="fb-del" onClick={() => ctrl!.removeBookmark(b.id)} title="Remove">✕</button>
+</li>
+
             ))}
           </ul>
         </div>
@@ -938,7 +969,7 @@ const imageErr = imageOk ? "" : "Image required";
         .fb-inp-num{ width:72px; text-align:center; }
         .fb-inp-grow{ flex:1; min-width:0; }
         .fb-row{ display:flex; align-items:center; gap:8px; }
-        .fb-row-wrap{ flex-wrap:wrap; }
+        .fb-row-wrap{ flex-wrap:wrap; margin-bottom:10px; }
         .fb-help{ font-size:11px; color:#7b8571; margin-top:4px; }
         .fb-help.err{ color:#a32020; }
 
@@ -955,7 +986,7 @@ const imageErr = imageOk ? "" : "Image required";
         .fb-link{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; padding:.35rem .55rem; }
         .fb-del{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; width:28px; height:28px; }
 
-        .fb-colors{ align-items:center; gap:8px; flex-wrap:wrap; }
+        .fb-colors{ align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
         .fb-color-swatch{ width:24px; height:24px; border-radius:50%; border:1px solid #d7dccf; }
         .fb-color-picker{ width:40px; height:32px; border:1px solid #e7ebdf; border-radius:.55rem; background:#fff; padding:0; }
         .fb-color-picker.mini{ width:32px; height:28px; }
