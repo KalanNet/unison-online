@@ -301,24 +301,16 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
     "#7e2c42",
   ];
 
-  // --- Валідації для статус-індикаторів ---
-  const t = (ctrl.meta.title || "").trim();
-  const d = (ctrl.meta.description || "").trim();
-  const s = (ctrl.meta.slug || "").trim();
-  const titleOk = t.length >= 10 && t.length <= SEO.TITLE_MAX;
-  const descOk = d.length >= 80 && d.length <= SEO.DESC_MAX;
-  const slugOk = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
-  const imageOk = !!ctrl.meta.featuredUrl;
-  const titleErr = titleOk ? "" :
-  (!t ? "Required" : t.length < 10 ? "Min 10 chars" : `Max ${SEO.TITLE_MAX} chars`);
+// --- Валідації для статус-індикаторів (іконки лише для Title і Meta description) ---
+const t = (ctrl.meta.title || "").trim();
+const d = (ctrl.meta.description || "").trim();
+const s = (ctrl.meta.slug || "").trim();
 
-const descErr = descOk ? "" :
-  (!d ? "Required" : d.length < 80 ? "Min 80 chars" : `Max ${SEO.DESC_MAX} chars`);
+const titleOk = t.length >= 10 && t.length <= SEO.TITLE_MAX;
+const descOk  = d.length >= 80 && d.length <= SEO.DESC_MAX;
+const slugOk  = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
+const imageOk = !!ctrl.meta.featuredUrl;
 
-const slugErr = slugOk ? "" :
-  (!s ? "Required" : s.length > SEO.SLUG_MAX ? `Max ${SEO.SLUG_MAX} chars` : "Only a–z, 0–9 and '-'");
-
-const imageErr = imageOk ? "" : "Image required";
 
 
   return (
@@ -371,64 +363,57 @@ const imageErr = imageOk ? "" : "Image required";
 
           {/* --- TITLE --- */}
           <label className="fb-field">
-            <div className="fb-lab">
-  Title <Req /> <FieldStatus ok={titleOk} msg={titleErr} />
-</div>
-            <input
-              className="fb-inp"
-              value={ctrl.meta.title}
-              maxLength={SEO.TITLE_MAX}
-              onChange={(e) => {
-                // НЕ чіпаємо slug тут (slug сам підписаний на title через SlugInput)
-                ctrl.setMeta({ title: e.target.value });
-              }}
-            />
-            <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
-              {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
-            </div>
-          </label>
+  <div className="fb-lab">
+    Title <Req /> <FieldStatus ok={titleOk} msg="10–60 chars" />
+  </div>
+  <input
+    className="fb-inp"
+    value={ctrl.meta.title}
+    maxLength={SEO.TITLE_MAX}
+    onChange={(e) => ctrl.setMeta({ title: e.target.value })}
+  />
+  <div className={`fb-help ${((ctrl.meta.title || "").length > SEO.TITLE_MAX) ? "err" : ""}`}>
+    {(ctrl.meta.title || "").length}/{SEO.TITLE_MAX}
+  </div>
+</label>
+
 
           {/* --- META DESCRIPTION --- */}
           <label className="fb-field">
-            <div className="fb-lab">
-  Meta description <Req /> <FieldStatus ok={descOk} msg={descErr} />
-</div>
-            <textarea
-              className="fb-txt"
-              rows={3}
-              value={ctrl.meta.description}
-              maxLength={SEO.DESC_MAX}
-              onChange={(e) => ctrl.setMeta({ description: e.target.value })}
-            />
-            <div className={`fb-help ${((ctrl.meta.description || "").length > SEO.DESC_MAX) ? "err" : ""}`}>
-              {(ctrl.meta.description || "").length}/{SEO.DESC_MAX}
-            </div>
-          </label>
+  <div className="fb-lab">
+    Meta description <Req /> <FieldStatus ok={descOk} msg="80–155 chars" />
+  </div>
+  <textarea
+    className="fb-txt"
+    rows={3}
+    value={ctrl.meta.description}
+    maxLength={SEO.DESC_MAX}
+    onChange={(e) => ctrl.setMeta({ description: e.target.value })}
+  />
+  <div className={`fb-help ${((ctrl.meta.description || "").length > SEO.DESC_MAX) ? "err" : ""}`}>
+    {(ctrl.meta.description || "").length}/{SEO.DESC_MAX}
+  </div>
+</label>
+
 
           {/* --- SLUG --- */}
           <label className="fb-field">
-            <div className="fb-lab">
-  Slug <Req /> <FieldStatus ok={slugOk} msg={slugErr} />
-</div>
-            <SlugInput
-              value={ctrl.meta.slug ?? ""}
-              title={ctrl.meta.title || ctrl.title}
-              onChange={(v) => ctrl.setMeta({ slug: v as any })}
-              maxLen={SEO.SLUG_MAX}
-            />
-            {/* прибрано зайвий статичний текст */}
-          </label>
+  <div className="fb-lab">Slug <Req /></div>
+  <SlugInput
+    value={ctrl.meta.slug ?? ""}
+    title={ctrl.meta.title || ctrl.title}
+    onChange={(v) => ctrl.setMeta({ slug: v as any })}
+    maxLen={SEO.SLUG_MAX}
+  />
+</label>
+
 
           {/* --- FEATURED IMAGE --- */}
 <div className="fb-field">
-  <div className="fb-lab">
-    Featured image <Req /> <FieldStatus ok={imageOk} msg={imageErr} />
-  </div>
+  <div className="fb-lab">Featured image <Req /></div>
 
-  {/* показуємо кнопку, назву файлу і підказку ТІЛЬКИ якщо зображення ще не завантажене */}
   {!ctrl.meta.featuredUrl && (
     <>
-      {/* прихований інпут + кнопка-виклик */}
       <input
         id="featured-upload"
         type="file"
@@ -437,15 +422,11 @@ const imageErr = imageOk ? "" : "Image required";
         onChange={async (e) => {
           const f = e.target.files?.[0]; if (!f) return;
 
-          // 2MB hard limit
+          // 2MB hard limit (сповіщення у модалці alert)
           if (f.size > 2 * 1024 * 1024) { notify("Image must be ≤ 2MB."); return; }
 
           let toSend = f;
-          try {
-            toSend = await prepareFeaturedUnder200KB(f);
-          } catch (ex) {
-            console.warn(ex);
-          }
+          try { toSend = await prepareFeaturedUnder200KB(f); } catch (ex) { console.warn(ex); }
 
           const fd = new FormData();
           fd.append("image", toSend);
@@ -453,31 +434,23 @@ const imageErr = imageOk ? "" : "Image required";
 
           const res = await fetch("/api/upload-featured", { method: "POST", body: fd });
           const out = await res.json();
-          if (out?.url) {
-            ctrl.setFeatured(out.url);
-            setFeaturedName(shortFileName(toSend.name));
-          } else {
-            notify(out?.error || "Upload failed");
-          }
+          if (out?.url) ctrl.setFeatured(out.url);
+          else notify(out?.error || "Upload failed");
         }}
       />
 
       <div className="fb-row">
-        <label htmlFor="featured-upload" className="ua-btn file" title="Choose file">Choose File</label>
-        <span className="fb-file-name">{featuredName ?? "No file chosen"}</span>
+        <label htmlFor="featured-upload" className="fb-link" title="Choose file">Choose File</label>
       </div>
-
-      <div className="fb-help">Max 2 MB.</div>
     </>
   )}
 
-  {/* якщо є зображення — показуємо лише превʼю з хрестиком */}
   {ctrl.meta.featuredUrl && (
     <div className="fb-thumb">
       <img src={ctrl.meta.featuredUrl} alt="Featured" />
       <button
         className="fb-x"
-        onClick={() => { ctrl.setFeatured(null); setFeaturedName(null); }}
+        onClick={() => { ctrl.setFeatured(null); }}
         title="Remove"
       >
         ×
@@ -486,6 +459,7 @@ const imageErr = imageOk ? "" : "Image required";
   )}
 </div>
 
+
         </div>
 
         <div className="fb-panel-sec">
@@ -493,7 +467,7 @@ const imageErr = imageOk ? "" : "Image required";
 
           {/* форма додавання: label + page (optional) */}
           <div className="fb-row fb-row-wrap">
-            <input className="fb-inp" placeholder="Label (optional)" id="fb-bmk-label" />
+            <input className="fb-inp" placeholder="Label" id="fb-bmk-label" />
             <input className="fb-inp fb-inp-narrow" placeholder={`Page#`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
           </div>
 
@@ -963,7 +937,17 @@ const imageErr = imageOk ? "" : "Image required";
         .fb-item{ display:flex; align-items:center; gap:6px; padding:6px 0; border-top:1px dashed #ecefe7; }
         .fb-item:first-child{ border-top:0; }
         .fb-dot{ width:14px; height:14px; border-radius:50%; border:1px solid #d7dccf; flex:0 0 14px; }
-        .fb-link{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; padding:.35rem .55rem; }
+        .fb-link{
+  background:#fff;
+  border:1px solid #e7ebdf;
+  border-radius:.55rem;
+  padding:.35rem .55rem;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  text-decoration:none;
+}
         .fb-del{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; width:28px; height:28px; }
 
         .fb-colors{ align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
