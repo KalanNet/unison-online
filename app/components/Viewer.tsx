@@ -364,7 +364,7 @@ const imageOk = !!ctrl.meta.featuredUrl;
           {/* --- TITLE --- */}
           <label className="fb-field">
   <div className="fb-lab">
-    Title <Req /> <FieldStatus ok={titleOk} msg="10–60 chars" />
+    Title <Req /> <FieldStatus ok={titleOk} msg="Min 10 & Max 60 characters" />
   </div>
   <input
     className="fb-inp"
@@ -381,7 +381,7 @@ const imageOk = !!ctrl.meta.featuredUrl;
           {/* --- META DESCRIPTION --- */}
           <label className="fb-field">
   <div className="fb-lab">
-    Meta description <Req /> <FieldStatus ok={descOk} msg="80–155 chars" />
+    Meta description <Req /> <FieldStatus ok={descOk} msg="Min 80 & Max 155 characters" />
   </div>
   <textarea
     className="fb-txt"
