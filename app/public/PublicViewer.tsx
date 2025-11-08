@@ -86,7 +86,7 @@ export default function PublicViewer({
   if (!ctrl || !ctrl.pdfDoc) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff", padding: "80px 12px", textAlign: "center" }}>
-        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження…</h2>
+        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Loading…</h2>
       </div>
     );
   }
@@ -334,7 +334,7 @@ const mCtrl = {
                       </>
                     ) : (
                       <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>
-                        Рендер сторінки…
+                        Page Loading…
                       </div>
                     )}
                   </div>

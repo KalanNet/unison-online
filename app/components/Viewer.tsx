@@ -117,17 +117,19 @@ function autoFromTitle(title?: string): string {
 }
 
 /* --- Стислий статус-індикатор поля --- */
-function FieldStatus({ ok }: { ok: boolean }) {
+function FieldStatus({ ok, msg }: { ok: boolean; msg?: string }) {
+  const tip = ok ? "OK" : (msg || "Invalid");
   return (
     <span
       className={`fb-status ${ok ? "ok" : "bad"}`}
-      aria-label={ok ? "Valid" : "Invalid"}
-      title={ok ? "Valid" : "Invalid"}
+      aria-label={tip}
+      title={tip}
     >
       {ok ? "✓" : "!"}
     </span>
   );
 }
+
 const Req = () => <span className="fb-req" aria-hidden="true">*</span>;
 
 /* --- Коротка назва файлу: перші 10 символів + … + розширення --- */
@@ -279,7 +281,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           textAlign: "center",
         }}
       >
-        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Завантаження Flipbook…</h2>
+        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Loading Flipbook…</h2>
       </div>
     );
   }
@@ -306,6 +308,17 @@ export default function Viewer({ file, title }: { file: string; title?: string }
   const descOk = d.length >= 80 && d.length <= SEO.DESC_MAX;
   const slugOk = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
   const imageOk = !!ctrl.meta.featuredUrl;
+  const titleErr = titleOk ? "" :
+  (!t ? "Required" : t.length < 10 ? "Min 10 chars" : `Max ${SEO.TITLE_MAX} chars`);
+
+const descErr = descOk ? "" :
+  (!d ? "Required" : d.length < 80 ? "Min 80 chars" : `Max ${SEO.DESC_MAX} chars`);
+
+const slugErr = slugOk ? "" :
+  (!s ? "Required" : s.length > SEO.SLUG_MAX ? `Max ${SEO.SLUG_MAX} chars` : "Only a–z, 0–9 and '-'");
+
+const imageErr = imageOk ? "" : "Image required";
+
 
   return (
     <div className="viewer-root">
@@ -358,8 +371,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           {/* --- TITLE --- */}
           <label className="fb-field">
             <div className="fb-lab">
-              Title <Req /> <FieldStatus ok={titleOk} />
-            </div>
+  Title <Req /> <FieldStatus ok={titleOk} msg={titleErr} />
+</div>
             <input
               className="fb-inp"
               value={ctrl.meta.title}
@@ -377,8 +390,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           {/* --- META DESCRIPTION --- */}
           <label className="fb-field">
             <div className="fb-lab">
-              Meta description <Req /> <FieldStatus ok={descOk} />
-            </div>
+  Meta description <Req /> <FieldStatus ok={descOk} msg={descErr} />
+</div>
             <textarea
               className="fb-txt"
               rows={3}
@@ -394,8 +407,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           {/* --- SLUG --- */}
           <label className="fb-field">
             <div className="fb-lab">
-              Slug <Req /> <FieldStatus ok={slugOk} />
-            </div>
+  Slug <Req /> <FieldStatus ok={slugOk} msg={slugErr} />
+</div>
             <SlugInput
               value={ctrl.meta.slug ?? ""}
               title={ctrl.meta.title || ctrl.title}
@@ -408,8 +421,8 @@ export default function Viewer({ file, title }: { file: string; title?: string }
           {/* --- FEATURED IMAGE --- */}
           <div className="fb-field">
             <div className="fb-lab">
-              Featured image <Req /> <FieldStatus ok={imageOk} />
-            </div>
+  Featured image <Req /> <FieldStatus ok={imageOk} msg={imageErr} />
+</div>
 
             {/* прихований інпут + нормальна кнопка */}
             <input
@@ -454,7 +467,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
               </span>
             </div>
 
-            <div className="fb-help">Max 2 MB.</div>
+            {!ctrl.meta.featuredUrl && <div className="fb-help">Max 2 MB.</div>}
 
             {ctrl.meta.featuredUrl && (
               <div className="fb-thumb">
@@ -679,7 +692,7 @@ export default function Viewer({ file, title }: { file: string; title?: string }
                         : null}
                     </>
                   ) : (
-                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Рендер сторінки…</div>
+                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Pege loading…</div>
                   )}
                 </div>
               );
@@ -944,7 +957,11 @@ export default function Viewer({ file, title }: { file: string; title?: string }
         .fb-color-picker{ width:40px; height:32px; border:1px solid #e7ebdf; border-radius:.55rem; background:#fff; padding:0; }
         .fb-color-picker.mini{ width:32px; height:28px; }
 
-        .ua-btn.file{ padding:6px 10px; }
+        .ua-btn.file{
+  font-size: 12px;
+  padding: 3px 6px;
+  line-height: 1.1;
+}
 
         @media (max-width: 860px){ .fb-sticky-panel{ left:8px; width:min(92vw, 360px); } }
 

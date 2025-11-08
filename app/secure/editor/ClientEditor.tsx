@@ -47,7 +47,7 @@ export default function ClientEditor() {
             onChange={handleUpload}
           />
           <div style={{ marginTop: 22, color: "#bbb", fontSize: 17 }}>
-            {loading ? "Завантаження..." : "Please select a PDF file to begin."}
+            {loading ? "Loading..." : "Please select a PDF file to begin."}
           </div>
           {error && <div style={{ color: "#e54", marginTop: 20 }}>{error}</div>}
         </div>
