@@ -1,17 +1,17 @@
 // app/(public)/directory/[slug]/page.tsx
-import { headers as nextHeaders } from "next/headers";
 import type { Metadata } from "next";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /* ---------- Config ---------- */
+const SITE_ORIGIN =
+  (process.env.NEXT_PUBLIC_SITE_URL || "https://unison-online-dev.pages.dev").replace(/\/$/, "");
 const R2_PUBLIC =
   process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
-
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   file?: string;
@@ -20,7 +20,8 @@ type MetaPayload = {
 };
 
 /* ---------- Helpers ---------- */
-/** Читаємо meta.json БЕЗПОСЕРЕДНЬО з CDN (а не через /api/...) */
+const abs = (p: string) => (/^https?:\/\//i.test(p) ? p : `${SITE_ORIGIN}${p.startsWith("/") ? "" : "/"}${p}`);
+
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   try {
     const r = await fetch(
@@ -34,7 +35,6 @@ async function getMeta(slug: string): Promise<MetaPayload | null> {
   }
 }
 
-/** Жорстка санітаризація + клон для безпечної серіалізації між SSR/CSR */
 function sanitizeBookmarks(input: unknown): Bookmark[] {
   if (!Array.isArray(input)) return [];
   const out: Bookmark[] = [];
@@ -58,32 +58,17 @@ export async function generateMetadata({
 }: {
   params: { slug: string | string[] };
 }): Promise<Metadata> {
-  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-
-  // Абсолютний origin для canonical/OG (важливо для соцмереж)
-  const h = await nextHeaders(); // <= головне виправлення
-  const envOrigin = process.env.NEXT_PUBLIC_SITE_URL; // якщо маєш – ще надійніше
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
-  const proto =
-    h.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") ? "http" : "https");
-  const origin =
-    envOrigin && /^https?:\/\//i.test(envOrigin)
-      ? envOrigin
-      : host
-      ? `${proto}://${host}`
-      : "https://unison-online-dev.pages.dev";
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
 
   const data = slug ? await getMeta(slug) : null;
 
-  const title = data?.meta?.title ?? `Directory — ${slug ?? ""}`;
-  const description = data?.meta?.description ?? "Unison Alberta directory viewer.";
-
-  const candidate = data?.meta?.featuredUrl ?? "";
-  const ogImg = /^https?:\/\//i.test(candidate) ? candidate : `${origin}/og.jpg`;
+  const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
+  const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
+  const candidate = (data?.meta?.featuredUrl ?? "").trim();
+  const ogImg = /^https?:\/\//i.test(candidate) ? candidate : `${SITE_ORIGIN}/og.jpg`;
 
   return {
-    metadataBase: new URL(origin),
+    metadataBase: new URL(SITE_ORIGIN),
     alternates: { canonical: `/directory/${slug}` },
 
     title,
@@ -91,7 +76,7 @@ export async function generateMetadata({
 
     openGraph: {
       type: "article",
-      url: `/directory/${slug}`,
+      url: abs(`/directory/${slug}`),
       siteName: "Unison Alberta",
       title,
       description,
@@ -115,12 +100,11 @@ export default async function Page({
   params: { slug: string | string[] };
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
 
-  // SSR-спроба отримати meta.json (через CDN)
   const data = slug ? await getMeta(slug) : null;
 
-  // Фолбек: якщо meta/file немає — дозволяємо прямий перегляд через ?file=
+  // Фолбек: прямий перегляд через ?file=
   if (!data?.file) {
     if (typeof searchParams.file === "string" && searchParams.file) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
@@ -132,7 +116,7 @@ export default async function Page({
     return <ClientFallback />;
   }
 
-  // Основний рендер публічного в’ювера
+  // Основний рендер
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title ?? slug;
   const safeBookmarks = sanitizeBookmarks(data.bookmarks);
