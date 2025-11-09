@@ -549,20 +549,26 @@ async function handlePublish(): Promise<void> {
     style={{ display: "none" }}
     onChange={handleReplacePdf}
   />
+
   <div className="fb-row">
-    <button
+    {/* Було <button className="fb-link" ...> */}
+    <label
+      htmlFor="replace-pdf"
       className="fb-link"
-      type="button"
       title="Replace the entire PDF"
-      onClick={() => (document.getElementById("replace-pdf") as HTMLInputElement | null)?.click()}
     >
       Replace PDF
-    </button>
-    <span className="fb-file-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    </label>
+
+    <span
+      className="fb-file-name"
+      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+    >
       {pdfUrl}
     </span>
   </div>
 </div>
+
 
 
           {/* --- FEATURED IMAGE --- */}
@@ -1111,6 +1117,12 @@ async function handlePublish(): Promise<void> {
   justify-content:center;
   cursor:pointer;
   text-decoration:none;
+    /* додайте для однаковості з label */
+  appearance:none;
+  -webkit-appearance:none;
+  font: inherit;
+  line-height: 1.1;
+  white-space: nowrap;
 }
         .fb-del{ background:#fff; border:1px solid #e7ebdf; border-radius:.55rem; width:28px; height:28px; }
 
