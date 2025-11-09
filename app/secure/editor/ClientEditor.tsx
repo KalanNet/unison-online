@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Viewer from "app/components/Viewer";
+import Link from "next/link";
 
 /* ---------- helpers ---------- */
 function getSlugFromPublicUrl(href: string): string | null {
@@ -186,18 +187,19 @@ export default function ClientEditor({ slug }: { slug?: string }) {
                         Go
                       </a>
                       {s ? (
-                        <a
-                          className="ua-btn"
-                          href={`/secure/editor?slug=${encodeURIComponent(s)}`}
-                          title="Edit"
-                        >
-                          Edit
-                        </a>
-                      ) : (
-                        <button className="ua-btn" disabled title="Edit unavailable">
-                          Edit
-                        </button>
-                      )}
+  <Link
+    className="ua-btn"
+    href={`/secure/editor?slug=${encodeURIComponent(s)}`}
+    title="Edit"
+  >
+    Edit
+  </Link>
+) : (
+  <button className="ua-btn" disabled title="Edit unavailable">
+    Edit
+  </button>
+)}
+
                     </li>
                   );
                 })}
