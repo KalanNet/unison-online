@@ -7,6 +7,20 @@ const FlipBook = HTMLFlipBook as unknown as React.ComponentType<any>;
 
 const MOBILE_BP = 600;
 
+// ——— WebP capability detector (кешований) ———
+let __WEBP_OK: boolean | null = null;
+function canEncodeWebP(): boolean {
+  if (__WEBP_OK !== null) return __WEBP_OK;
+  try {
+    const t = document.createElement("canvas").toDataURL("image/webp");
+    __WEBP_OK = typeof t === "string" && t.startsWith("data:image/webp");
+  } catch {
+    __WEBP_OK = false;
+  }
+  return __WEBP_OK;
+}
+
+
 type PDFJS = typeof import("pdfjs-dist");
 type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
 
@@ -220,7 +234,10 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
       links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
     });
 
-    return { url: canvas.toDataURL("image/png", 1.0), w: vp.width, h: vp.height, links };
+    const mime = canEncodeWebP() ? "image/webp" : "image/png";
+const quality = mime === "image/webp" ? 0.86 : 1.0; // PNG ігнорує параметр якості
+return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links };
+
   }
 
 
