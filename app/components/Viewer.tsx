@@ -239,18 +239,50 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
   // Локальна назва завантаженого файлу (для відображення короткої назви)
   const [featuredName, setFeaturedName] = useState<string | null>(null);
 
+  const [pdfUrl, setPdfUrl] = useState<string>(file);
   // Ініціалізація контролера з безпечним catch (без setState у рендері)
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   let initErr: string | null = null;
   try {
-    ctrl = useViewerController({ file, title });
+    ctrl = useViewerController({ file: pdfUrl, title });
   } catch (err: any) {
     initErr = typeof err === "string" ? err : err?.message || "Viewer component error";
   }
 
+  // ⬇️⬇️ ВСТАВИТИ ФУНКЦІЮ ОДРАЗУ ПІСЛЯ try/catch ⬇️⬇️
+  async function handleReplacePdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    if (f.type !== "application/pdf") {
+      notify("Only PDF allowed");
+      e.currentTarget.value = ""; // дозволяє одразу вибрати той самий файл знову
+      return;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append("pdf", f);
+      // (опційно) якщо хочеш, щоб бек знав для якого слугу кладеш:
+      if (ctrl?.meta?.slug) fd.append("slug", ctrl.meta.slug);
+
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const out = await res.json().catch(() => ({} as any));
+      if (!res.ok || !out?.url) throw new Error(out?.error || "Upload failed");
+
+      // підміняємо активний PDF → контролер підтягне новий документ
+      setPdfUrl(out.url);
+    } catch (err: any) {
+      notify(err?.message || "Replace failed");
+    } finally {
+      e.currentTarget.value = ""; // скинути інпут
+    }
+  }
+
+const prefilledRef = React.useRef(false);
 // --- EDIT MODE: preload meta + bookmarks (після готовності PDF) ---
 useEffect(() => {
-  if (!ctrl || !ctrl.pdfDoc) return;  // дочекайся, поки PDF завантажиться
+  if (!ctrl || !ctrl.pdfDoc || prefilledRef.current) return;
 
   // 1) META
   if (initialMeta) {
@@ -273,13 +305,14 @@ useEffect(() => {
     // Використовуємо setBookmarks, якщо експортнутий з контролера; інакше fallback на replaceBookmarks
     (ctrl as any).setBookmarks?.(safe) ?? (ctrl as any).replaceBookmarks?.(safe);
   }
+  prefilledRef.current = true;
 }, [ctrl?.pdfDoc, initialMeta, initialBookmarks]);
 
 // Режим редагування: є initialMeta.slug → slug фіксований (read-only у UI)
 const isEdit = !!initialMeta?.slug;
 
 // Валідація джерела PDF — залишаємо як було
-if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
+if (!pdfUrl || typeof pdfUrl !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(pdfUrl)) {
   return (
     <div
       style={{
@@ -386,15 +419,15 @@ async function handlePublish(): Promise<void> {
     // EDIT: оновлення існуючої сторінки
     if (initialMeta?.slug) {
       const body: any = {
-        meta: {
-          title: ctrl.meta.title,
-          description: ctrl.meta.description,
-          // не змінюємо шлях через slug у цьому запиті
-          featuredUrl: ctrl.meta.featuredUrl ?? null,
-        },
-        bookmarks: ctrl.bookmarks,
-        file: ((ctrl as any).fileUrl as string) || file,
-      };
+  meta: {
+    title: ctrl.meta.title,
+    description: ctrl.meta.description,
+    featuredUrl: ctrl.meta.featuredUrl ?? null,
+  },
+  bookmarks: ctrl.bookmarks,
+  file: pdfUrl, // ← ТАК, відправляємо новий/поточний PDF
+};
+
       if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
 
       const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
@@ -432,76 +465,13 @@ async function handlePublish(): Promise<void> {
   title={ctrl.title}
   onSearch={ctrl.runSearch}
   isSearching={(ctrl as any).searching ?? false}
-  file={file}
+  file={pdfUrl}
   isFs={ctrl.isFs}
   toggleFullscreen={ctrl.toggleFullscreen}
   handleShare={ctrl.handleShare}
-  onPublish={async () => {
-    if (!ctrl) return;
-
-    const title = (ctrl.meta.title || "").trim();
-    const desc  = (ctrl.meta.description || "").trim();
-    const slug  = (ctrl.meta.slug || "").trim();
-
-    const errs: string[] = [];
-    if (!title) errs.push("Title is required");
-    if (title.length < 10) errs.push("Title must be at least 10 characters");
-    if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
-
-    if (!desc) errs.push("Meta description is required");
-    if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
-    if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
-
-    if (!slug) errs.push("Slug is required");
-    if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
-    if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
-
-    if (!ctrl.meta.featuredUrl) errs.push("Featured image is required");
-
-    if (errs.length) { notify(errs.join("\n")); return; }
-
-    try {
-      // EDIT: оновлення існуючої сторінки
-      if (initialMeta?.slug) {
-        const body: any = {
-          meta: {
-            title: ctrl.meta.title,
-            description: ctrl.meta.description,
-            // не змінюємо шлях через slug у цьому запиті
-            featuredUrl: ctrl.meta.featuredUrl ?? null,
-          },
-          bookmarks: ctrl.bookmarks,
-          file: ((ctrl as any).fileUrl as string) || file,
-        };
-        if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
-
-        const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j?.error || "Update failed");
-
-        const origin = typeof window !== "undefined" ? window.location.origin : "";
-        const full =
-          j?.publicUrl ||
-          (j?.urlPath && origin ? origin + j.urlPath : `${origin}/directory/${initialMeta.slug}`);
-        if (full) setPub({ url: full });
-        return;
-      }
-
-      // NEW: публікація нового запису
-      const r = await ctrl.publishMetaAndBookmarks();
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
-      if (full) setPub({ url: full });
-    } catch (e: any) {
-      console.error(e);
-      notify(e?.message || "Publish failed");
-    }
-  }}
+  onPublish={() => { void handlePublish(); }}
 />
+
 
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
@@ -568,6 +538,31 @@ async function handlePublish(): Promise<void> {
   )}
 </label>
 
+{/* --- REPLACE WHOLE PDF --- */}
+<div className="fb-field">
+  <div className="fb-lab">Source PDF</div>
+
+  <input
+    id="replace-pdf"
+    type="file"
+    accept="application/pdf"
+    style={{ display: "none" }}
+    onChange={handleReplacePdf}
+  />
+  <div className="fb-row">
+    <button
+      className="fb-link"
+      type="button"
+      title="Replace the entire PDF"
+      onClick={() => (document.getElementById("replace-pdf") as HTMLInputElement | null)?.click()}
+    >
+      Replace PDF
+    </button>
+    <span className="fb-file-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {pdfUrl}
+    </span>
+  </div>
+</div>
 
 
           {/* --- FEATURED IMAGE --- */}
@@ -842,7 +837,7 @@ async function handlePublish(): Promise<void> {
                         : null}
                     </>
                   ) : (
-                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Pege loading…</div>
+                    <div style={{ textAlign: "center", lineHeight: "350px", color: "#bbb" }}>Page loading…</div>
                   )}
                 </div>
               );
