@@ -20,15 +20,9 @@ const s3 = new S3Client({
   },
 });
 
-/* ---------- helpers ---------- */
-function ok(data: unknown, code = 200) {
-  return NextResponse.json(data, { status: code });
-}
-function err(error: string, code = 400) {
-  return NextResponse.json({ error }, { status: code });
-}
+function ok(data: unknown, code = 200) { return NextResponse.json(data, { status: code }); }
+function err(error: string, code = 400) { return NextResponse.json({ error }, { status: code }); }
 
-/** Нормалізація slug: латиниця/цифри/- ; пробіли→- ; злиття дефісів; обрізання країв. */
 function slugify(input: string): string {
   const base = (input || "")
     .normalize("NFKD")
@@ -50,18 +44,15 @@ function inferExtFromMime(mime?: string | null) {
   return ".png";
 }
 
-/* ---------- POST ---------- */
 export async function POST(req: NextRequest) {
   try {
-    /* --- Auth by cookie --- */
     const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "ua_sid";
     const cookieHeader = req.headers.get("cookie") || "";
     const authed = cookieHeader.split(/;\s*/).some((c) => c.startsWith(`${COOKIE_NAME}=`));
     if (!authed) return err("Unauthorized", 401);
 
-    /* --- Parse body: JSON або multipart/form-data --- */
     const ctype = req.headers.get("content-type") || "";
-    let file = ""; // PDF public URL
+    let file = "";
     let meta: { title?: string; description?: string; featuredUrl?: string | null; slug?: string } = {};
     let bookmarks: Array<{ id: string; page: number; label: string; color?: string | null }> = [];
     let featuredFile: File | null = null;
@@ -71,56 +62,40 @@ export async function POST(req: NextRequest) {
       file = body?.file || body?.pdfUrl || "";
       meta = body?.meta || {};
       bookmarks = Array.isArray(body?.bookmarks) ? body.bookmarks : [];
-      // featuredUrl у JSON-режимі — уже готовий URL
     } else if (ctype.includes("multipart/form-data")) {
       const fd = await req.formData();
       file = String(fd.get("file") || fd.get("pdfUrl") || "");
-      try {
-        meta = fd.get("meta") ? JSON.parse(String(fd.get("meta"))) : {};
-      } catch {
-        meta = {};
-      }
-      try {
-        bookmarks = fd.get("bookmarks") ? JSON.parse(String(fd.get("bookmarks"))) : [];
-      } catch {
-        bookmarks = [];
-      }
-      featuredFile = (fd.get("featured") as File) || null; // опційно
+      try { meta = fd.get("meta") ? JSON.parse(String(fd.get("meta"))) : {}; } catch { meta = {}; }
+      try { bookmarks = fd.get("bookmarks") ? JSON.parse(String(fd.get("bookmarks"))) : []; } catch { bookmarks = []; }
+      featuredFile = (fd.get("featured") as File) || null;
     } else {
       return err("Unsupported content-type", 415);
     }
 
     if (!file) return err("`file` (PDF public URL) is required", 422);
 
-    /* --- Сформувати/перевірити slug --- */
     const rawSlug = (meta?.slug ?? "").toString().trim();
     const titleForSlug = (meta?.title ?? "").toString().trim();
     const finalSlug = slugify(rawSlug || titleForSlug);
     if (!/^[a-z0-9-]+$/.test(finalSlug)) return err("Invalid slug", 422);
 
-    /* --- Куди пишемо артефакти --- */
     const basePrefix = `directory/${finalSlug}`;
     const metaJsonKey = `${basePrefix}/meta.json`;
 
-    /* --- Якщо прийшов файл-картинка — заливаємо у directory/<slug>/featured.ext --- */
     let featuredPublicUrl = meta?.featuredUrl || null;
     if (featuredFile) {
       const ext = inferExtFromMime(featuredFile.type);
       const featuredKey = `${basePrefix}/featured${ext}`;
       const arr = await featuredFile.arrayBuffer();
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: R2_BUCKET,
-          Key: featuredKey,
-          Body: new Uint8Array(arr),
-          ContentType: featuredFile.type || "image/png",
-          CacheControl: "public, max-age=31536000, immutable",
-        })
-      );
+      await s3.send(new PutObjectCommand({
+        Bucket: R2_BUCKET, Key: featuredKey,
+        Body: new Uint8Array(arr),
+        ContentType: featuredFile.type || "image/png",
+        CacheControl: "public, max-age=31536000, immutable",
+      }));
       featuredPublicUrl = `${R2_PUBLIC_URL}/${featuredKey}`;
     }
 
-    /* --- Готуємо meta.json --- */
     const metaPayload: MetaJson = {
       meta: {
         title: (meta?.title || "").trim(),
@@ -136,25 +111,22 @@ export async function POST(req: NextRequest) {
             color: b.color ?? null,
           }))
         : [],
-      file, // канонічний публічний URL PDF
+      file,
       publishedAt: new Date().toISOString(),
     };
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: metaJsonKey,
-        Body: JSON.stringify(metaPayload, null, 2),
-        ContentType: "application/json; charset=utf-8",
-        CacheControl: "no-cache",
-      })
-    );
+    await s3.send(new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: metaJsonKey,
+      Body: JSON.stringify(metaPayload, null, 2),
+      ContentType: "application/json; charset=utf-8",
+      CacheControl: "no-cache",
+    }));
 
-    /* --- ОНОВИТИ directory/index.json (change-log) --- */
+    /* --- оновити directory/index.json (Edge-safe) --- */
     try {
-      // Викликаємо локальний POST, який upsert-не індекс і зафіксує зміни
       const origin = new URL(req.url).origin;
-      await fetch(`${origin}/api/directory/list-published`, {
+      await fetch(`${origin}/api/list-published`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -167,15 +139,11 @@ export async function POST(req: NextRequest) {
           file: metaPayload.file,
           publishedAt: metaPayload.publishedAt,
           bookmarks: metaPayload.bookmarks,
-          // prev можна не передавати — але якщо потрібно точніше,
-          // можна завантажити старий meta.json тут і передати як prev
+          // prev можна додати у майбутньому для точнішого diff закладок
         }),
       }).catch(() => null);
-    } catch {
-      // не зриваємо основну публікацію, якщо індекс не оновився
-    }
+    } catch { /* не ламаємо публікацію, якщо індекс не оновився */ }
 
-    /* --- Відповідь --- */
     return ok({
       ok: true,
       stored: {
@@ -183,7 +151,6 @@ export async function POST(req: NextRequest) {
         metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
         featuredUrl: featuredPublicUrl,
       },
-      // опційно для UI
       urlPath: `/directory/${finalSlug}`,
       publicUrl: `${R2_PUBLIC_URL}/directory/${finalSlug}`,
     });
@@ -192,7 +159,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/* --- локальні типи для цього файлу --- */
+/* локальні типи */
 type MetaJson = {
   meta: { title: string; description: string; featuredUrl?: string | null; slug: string };
   bookmarks?: Array<{ id: string; page: number; label: string; color?: string | null }>;

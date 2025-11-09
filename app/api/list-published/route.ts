@@ -1,8 +1,8 @@
-// app/api/directory/list-published/route.ts
+// app/api/list-published/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, PutObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-export const runtime = "nodejs";           // <-- ВАЖЛИВО: Node.js, не Edge
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /* ---------- ENV ---------- */
@@ -15,7 +15,7 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const s3 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  forcePathStyle: true, // R2 friendly
+  // ВАЖЛИВО: ListObjects ми не використовуємо — лише PutObject (Edge-safe)
   credentials: { accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY },
 });
 
@@ -44,7 +44,7 @@ type IndexJson = { generatedAt: string; items: IndexItem[] };
 const INDEX_KEY = "directory/index.json";
 
 /* ---------- helpers ---------- */
-const ok = (data: unknown, code = 200) => NextResponse.json(data, { status: code });
+const ok  = (data: unknown, code = 200) => NextResponse.json(data, { status: code });
 const err = (error: string, code = 400) => NextResponse.json({ error }, { status: code });
 
 async function readIndexFromCDN(): Promise<IndexJson | null> {
@@ -70,58 +70,19 @@ async function writeIndexToR2(index: IndexJson) {
   );
 }
 
-/** Згенерувати directory/index.json, якщо його немає */
-async function bootstrapIndexIfMissing(): Promise<IndexJson> {
-  const existing = await readIndexFromCDN();
-  if (existing) return existing;
-
-  const list = await s3.send(
-    new ListObjectsV2Command({ Bucket: R2_BUCKET, Prefix: "directory/", Delimiter: "/" })
-  );
-
-  const prefixes =
-    (list.CommonPrefixes || [])
-      .map((p) => (typeof p.Prefix === "string" ? p.Prefix.replace(/^directory\/|\/$/g, "") : ""))
-      .filter(Boolean) || [];
-
-  const items: IndexItem[] = [];
-  for (const slug of prefixes) {
-    if (slug.startsWith("https-")) continue; // сміттєві каталоги
-    try {
-      const r = await fetch(`${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`, {
-        cache: "no-store",
-      });
-      if (!r.ok) continue;
-      const meta = (await r.json()) as MetaJson;
-
-      const now = new Date().toISOString();
-      items.push({
-        slug,
-        title: (meta?.meta?.title || "").trim(),
-        description: (meta?.meta?.description || "").trim(),
-        featuredUrl: meta?.meta?.featuredUrl ?? null,
-        urlPath: `/directory/${slug}`,
-        file: meta?.file || "",
-        publishedAt: meta?.publishedAt || now,
-        updatedAt: now,
-        version: 1,
-        changes: [],
-      });
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const index: IndexJson = { generatedAt: new Date().toISOString(), items };
-  await writeIndexToR2(index);
-  return index;
+async function ensureIndex(): Promise<IndexJson> {
+  const got = await readIndexFromCDN();
+  if (got) return got;
+  const fresh: IndexJson = { generatedAt: new Date().toISOString(), items: [] };
+  await writeIndexToR2(fresh);
+  return fresh;
 }
 
 function bookmarksChanged(
   a: MetaJson["bookmarks"] | undefined,
   b: MetaJson["bookmarks"] | undefined
 ) {
-  const normalize = (arr?: MetaJson["bookmarks"]) =>
+  const norm = (arr?: MetaJson["bookmarks"]) =>
     JSON.stringify(
       (arr || [])
         .map((x) => ({
@@ -131,13 +92,13 @@ function bookmarksChanged(
         }))
         .sort((x, y) => (x.page === y.page ? x.label.localeCompare(y.label) : x.page - y.page))
     );
-  return normalize(a) !== normalize(b);
+  return norm(a) !== norm(b);
 }
 
-/* ---------- GET: віддати список (і створити index.json за потреби) ---------- */
+/* ---------- GET: створити index.json якщо відсутній, і віддати дані ---------- */
 export async function GET() {
   try {
-    const index = await bootstrapIndexIfMissing();
+    const index = await ensureIndex();
     const links = index.items
       .map((it) => `${R2_PUBLIC}/directory/${encodeURIComponent(it.slug)}`)
       .sort((a, b) => a.localeCompare(b));
@@ -147,7 +108,7 @@ export async function GET() {
   }
 }
 
-/* ---------- POST: upsert запис і зафіксувати change-log ---------- */
+/* ---------- POST: upsert запис і change-log ---------- */
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as {
@@ -156,14 +117,14 @@ export async function POST(req: NextRequest) {
       file?: string;
       publishedAt?: string;
       bookmarks?: Array<{ id?: string; page?: number; label?: string; color?: string | null }>;
-      prev?: MetaJson | null;
+      prev?: MetaJson | null; // опціонально — для точнішого diff закладок
     };
 
     const slug = (body.slug || "").trim();
     if (!slug) return err("Missing slug", 422);
 
     const now = new Date().toISOString();
-    const index = (await readIndexFromCDN()) || (await bootstrapIndexIfMissing());
+    const index = await ensureIndex();
 
     const current = index.items.find((x) => x.slug === slug);
     const nextTitle = (body.meta?.title || current?.title || "").trim();
@@ -184,7 +145,8 @@ export async function POST(req: NextRequest) {
       const prevMeta: MetaJson | null = body.prev || null;
       if (prevMeta) {
         const nextBookmarks = body.bookmarks as MetaJson["bookmarks"];
-        if (bookmarksChanged(prevMeta.bookmarks, nextBookmarks)) changes.push({ ts: now, action: "bookmarks" });
+        if (bookmarksChanged(prevMeta.bookmarks, nextBookmarks))
+          changes.push({ ts: now, action: "bookmarks" });
       } else if (body.bookmarks) {
         changes.push({ ts: now, action: "bookmarks" });
       }
