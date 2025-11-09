@@ -1,12 +1,13 @@
 // app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
-import MetaHead from "app/(public)/directory/[slug]/MetaHead";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /* ---------- Config ---------- */
 const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://unison-online-dev.pages.dev").replace(/\/$/, "");
+const R2_PUBLIC   = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
@@ -22,11 +23,9 @@ const abs = (p: string) => (/^https?:\/\//i.test(p) ? p : `${SITE_ORIGIN}${p.sta
 
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   try {
-    // йдемо у власний API, щоб не впиратись у кеш CDN
-    const r = await fetch(abs(`/api/directory/${encodeURIComponent(slug)}`), {
-      cache: "no-store",
-      next: { revalidate: 0 },
-    });
+    // 🔑 беремо прямо з CDN (а не з /api), щоб metadata гарантовано мали дані на сервері
+    const url = `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`;
+    const r = await fetch(url, { cache: "no-store", next: { revalidate: 0 } });
     if (!r.ok) return null;
     return (await r.json()) as MetaPayload;
   } catch {
@@ -51,14 +50,6 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return JSON.parse(JSON.stringify(out));
 }
 
-function pickOgImage(featuredUrl?: string | null) {
-  const raw = (featuredUrl ?? "").trim();
-  const isAbs = /^https?:\/\//i.test(raw);
-  const isWebp = /\.webp(\?|#|$)/i.test(raw);
-  // Телега/FB часом ігнорять webp → фолбек на /og.jpg
-  return (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
-}
-
 /* ---------- Dynamic metadata per slug ---------- */
 export async function generateMetadata(
   { params }: { params: { slug: string | string[] } }
@@ -68,7 +59,12 @@ export async function generateMetadata(
 
   const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
   const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
-  const ogImg = pickOgImage(data?.meta?.featuredUrl);
+
+  // Картинку для соцмереж даємо стабільну (без важких builder-роутів)
+  const raw  = (data?.meta?.featuredUrl ?? "").trim();
+  const isAbs  = /^https?:\/\//i.test(raw);
+  const isWebp = /\.webp(\?|#|$)/i.test(raw);
+  const ogImg  = (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -98,41 +94,21 @@ export default async function Page({
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
   const data = slug ? await getMeta(slug) : null;
 
-  // Значення для <head>
-  const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
-  const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
-  const url = abs(`/directory/${slug}`);
-  const ogImg = pickOgImage(data?.meta?.featuredUrl);
-
   // Фолбек: прямий перегляд через ?file=
   if (!data?.file) {
     if (typeof searchParams.file === "string" && searchParams.file) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
       const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
-      return (
-        <>
-          <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
-          <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />
-        </>
-      );
+      const title = data?.meta?.title || slug || "Preview";
+      return <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />;
     }
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
-    return (
-      <>
-        <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
-        <ClientFallback />
-      </>
-    );
+    return <ClientFallback />;
   }
 
-  // Основний рендер
   const PublicViewer = (await import("app/public/PublicViewer")).default;
+  const title = data.meta?.title ?? slug;
   const safeBookmarks = sanitizeBookmarks(data.bookmarks);
 
-  return (
-    <>
-      <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
-      <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />
-    </>
-  );
+  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />;
 }
