@@ -79,17 +79,23 @@ export default function ClientEditor({ slug }: { slug?: string }) {
     try {
       const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || "Failed to load");
-      if (!alive) return;
+if (!r.ok) throw new Error(j?.error || "Failed to load");
 
-      setFileUrl(j?.file || null);
-      setInitialMeta({
-        title: j?.meta?.title || "",
-        description: j?.meta?.description || "",
-        slug,
-        featuredUrl: j?.meta?.featuredUrl ?? null,
-      });
-      setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
+const origin = typeof window !== "undefined" ? window.location.origin : "";
+const fileFromApi =
+  j?.file ||
+  j?.pdfUrl ||
+  j?.publicUrl ||
+  (j?.urlPath ? origin + j.urlPath : null);
+
+setFileUrl(fileFromApi);
+setInitialMeta({
+  title: j?.meta?.title || "",
+  description: j?.meta?.description || "",
+  slug,
+  featuredUrl: j?.meta?.featuredUrl ?? null,
+});
+setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
     } catch {
       if (!alive) return;
       setError("Cannot load meta or file.");
@@ -219,12 +225,15 @@ const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                       </a>
                       {s ? (
   <Link
-    className="ua-btn"
-    href={`/secure/editor?slug=${encodeURIComponent(s)}`}
-    title="Edit"
-  >
-    Edit
-  </Link>
+  className="ua-btn"
+  href={{ pathname: "/secure/editor", query: { slug: s } }}
+  prefetch={false}
+  replace
+  title="Edit"
+>
+  Edit
+</Link>
+
 ) : (
   <button className="ua-btn" disabled title="Edit unavailable">
     Edit
