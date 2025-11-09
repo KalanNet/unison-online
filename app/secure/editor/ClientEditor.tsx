@@ -59,31 +59,46 @@ export default function ClientEditor({ slug }: { slug?: string }) {
 
   // If opened with ?slug=... → preload meta.json and open Viewer in edit-mode
   useEffect(() => {
-    if (!slug) return;
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || "Failed to load");
-        if (!alive) return;
+  // NEW MODE: якщо slug немає — скидаємо все, залишаємо fileUrl null (тобто uploader)
+  if (!slug) {
+    setFileUrl(null);
+    setInitialMeta(null);
+    setInitialBookmarks([]);
+    setError(null);
+    return;
+  }
 
-        setFileUrl(j?.file || null);
-        setInitialMeta({
-          title: j?.meta?.title || "",
-          description: j?.meta?.description || "",
-          slug,
-          featuredUrl: j?.meta?.featuredUrl ?? null,
-        });
-        setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [slug]);
+  // EDIT MODE: підтягуємо meta+file для slug
+  setFileUrl(null); // clear while loading!
+  setInitialMeta(null);
+  setInitialBookmarks([]);
+  setError(null);
+
+  let alive = true;
+  (async () => {
+    try {
+      const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || "Failed to load");
+      if (!alive) return;
+
+      setFileUrl(j?.file || null);
+      setInitialMeta({
+        title: j?.meta?.title || "",
+        description: j?.meta?.description || "",
+        slug,
+        featuredUrl: j?.meta?.featuredUrl ?? null,
+      });
+      setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
+    } catch {
+      if (!alive) return;
+      setError("Cannot load meta or file.");
+    }
+  })();
+  return () => {
+    alive = false;
+  };
+}, [slug]);
 
 const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   setError(null);
