@@ -85,25 +85,41 @@ export default function ClientEditor({ slug }: { slug?: string }) {
     };
   }, [slug]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setLoading(true);
-    try {
-      const fd = new FormData();
-      fd.append("pdf", f);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("Upload failed");
-      const out = await res.json();
-      if (!out.url) throw new Error("No URL received from API");
-      setFileUrl(out.url);
-    } catch (ex: any) {
-      setError(typeof ex === "string" ? ex : ex?.message || "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  setError(null);
+
+  // Скидаємо весь стан EDIT-режиму:
+  setInitialMeta(null);
+  setInitialBookmarks([]);
+  setFileUrl(null);
+  // Якщо у тебе є setSlug або подібне — додай теж:
+  // setSlug(null);
+
+  const f = e.target.files?.[0];
+  if (!f) return;
+  setLoading(true);
+
+  try {
+    const fd = new FormData();
+    fd.append("pdf", f);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error("Upload failed");
+    const out = await res.json();
+    if (!out.url) throw new Error("No URL received from API");
+
+    setFileUrl(out.url);
+
+    // Тут явно вказуємо, що це новий файл, не редагування:
+    // setInitialMeta(null); // ще раз можна, але вже вище скинули
+    // setInitialBookmarks([]); // вже вище скинули
+
+  } catch (ex: any) {
+    setError(typeof ex === "string" ? ex : ex?.message || "Unknown error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // If no file yet → show uploader + published list
   if (!fileUrl) {
