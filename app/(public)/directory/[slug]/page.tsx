@@ -75,8 +75,8 @@ export async function generateMetadata({ params }: { params: { slug: string | st
 
   const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
   const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
-  const candidate = (data?.meta?.featuredUrl ?? "").trim();
-  const ogImg = /^https?:\/\//i.test(candidate) ? candidate : `${SITE_ORIGIN}/og.jpg`;
+  const ogRoute = abs(`/directory/${slug}/opengraph-image`);
+;
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -84,19 +84,20 @@ export async function generateMetadata({ params }: { params: { slug: string | st
     title,
     description,
     openGraph: {
-      type: "article",
-      url: abs(`/directory/${slug}`),
-      siteName: "Unison Alberta",
-      title,
-      description,
-      images: [{ url: ogImg, width: 1200, height: 630, alt: title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImg],
-    },
+  type: "article",
+  url: abs(`/directory/${slug}`),
+  siteName: "Unison Alberta",
+  title,
+  description,
+  images: [{ url: ogRoute, width: 1200, height: 630, alt: title }],
+},
+twitter: {
+  card: "summary_large_image",
+  title,
+  description,
+  images: [ogRoute],
+},
+
   };
 }
 
