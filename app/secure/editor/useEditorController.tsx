@@ -75,6 +75,20 @@ export function useViewerController({ file, title }: { file: string; title?: str
 
   const cacheRef = useRef<Map<number, PageBmp>>(new Map());
 
+  function freeBmp(b?: PageBmp) {
+  try { if (b?.url && b.url.startsWith("blob:")) URL.revokeObjectURL(b.url); } catch {}
+}
+function clearCache() {
+  cacheRef.current.forEach(freeBmp);
+  cacheRef.current.clear();
+}
+function purgeCacheExcept(keep: Set<number>) {
+  cacheRef.current.forEach((bmp, k) => {
+    if (!keep.has(k)) { freeBmp(bmp); cacheRef.current.delete(k); }
+  });
+}
+
+
   // пошук
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -103,7 +117,12 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
       (lib as any).GlobalWorkerOptions.workerPort = worker;
       if (mounted) setPdfjs(lib);
     })();
-    return () => { mounted = false; try { worker?.terminate(); } catch {} };
+    return () => { 
+  mounted = false; 
+  clearCache();              // ← додати
+  try { worker?.terminate(); } catch {}
+};
+
   }, []);
 
   /* ---------- load file ---------- */
@@ -115,7 +134,7 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
       const task = pdfjs.getDocument({ data: buf });
       const doc = await task.promise;
 
-      cacheRef.current.clear();
+      clearCache();
       setPdfDoc(doc); setCurrentIndex(0);
 
       const p1 = await doc.getPage(1);
@@ -209,10 +228,19 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 4;
-    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
-    const vp = page.getViewport({ scale });
+    const DPR_CAP = 2;            // жорсткий ліміт DPI
+const QUALITY = 1;            // без 4x oversampling
+const MAX_MP = 5.5;           // бюджет ~5.5 мегапікселів на сторінку
+
+const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+const baseScale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
+
+// ліміт за мегапікселями
+const maxScaleByBudget = Math.sqrt((MAX_MP * 1_000_000) / (pageW * pageH));
+const scale = Math.min(baseScale, maxScaleByBudget);
+
+const vp = page.getViewport({ scale });
+
 
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(vp.width));
@@ -235,8 +263,13 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
     });
 
     const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? 0.86 : 1.0; // PNG ігнорує параметр якості
-return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links };
+const quality = mime === "image/webp" ? 0.82 : 1.0;
+const blob: Blob = await new Promise((resolve, reject) =>
+  canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), mime, quality)
+);
+const url = URL.createObjectURL(blob);
+return { url, w: vp.width, h: vp.height, links };
+
 
   }
 
@@ -251,9 +284,11 @@ return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links 
     if (!pdfDoc) return;
     const want = new Set<number>();
     const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
-    for (let d = -3; d <= 3; d++) want.add(clamp(idx0 + 1 + d));
-    want.forEach(async (p) => {
-      if (cacheRef.current.has(p)) return;
+    for (let d = -2; d <= 2; d++) want.add(clamp(idx0 + 1 + d));
+purgeCacheExcept(want);
+
+want.forEach(async (p) => {
+  if (cacheRef.current.has(p)) return;
       try { const bmp = await renderPageToImage(p); cacheRef.current.set(p, bmp); setTick((t) => t + 1); } catch {}
     });
   }
