@@ -5,10 +5,8 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /* ---------- Config ---------- */
-const SITE_ORIGIN =
-  (process.env.NEXT_PUBLIC_SITE_URL || "https://unison-online-dev.pages.dev").replace(/\/$/, "");
-const R2_PUBLIC =
-  process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
+const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://unison-online-dev.pages.dev").replace(/\/$/, "");
+const R2_PUBLIC   = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
@@ -24,10 +22,10 @@ const abs = (p: string) => (/^https?:\/\//i.test(p) ? p : `${SITE_ORIGIN}${p.sta
 
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   try {
-    const r = await fetch(
-      `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`,
-      { cache: "no-store", next: { revalidate: 0 } }
-    );
+    const r = await fetch(`${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`, {
+      cache: "no-store",
+      next: { revalidate: 0 },
+    });
     if (!r.ok) return null;
     return (await r.json()) as MetaPayload;
   } catch {
@@ -52,12 +50,25 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return JSON.parse(JSON.stringify(out));
 }
 
-/* ---------- Metadata ---------- */
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string | string[] };
-}): Promise<Metadata> {
+/* ---------- Static fallback metadata (на випадок, якщо generateMetadata не спрацює) ---------- */
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
+  title: "Directory — Unison Alberta",
+  description: "Unison Alberta directory viewer.",
+  openGraph: {
+    type: "website",
+    siteName: "Unison Alberta",
+    url: `${SITE_ORIGIN}/directory`,
+    images: [{ url: `${SITE_ORIGIN}/og.jpg`, width: 1200, height: 630, alt: "Unison Alberta" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [`${SITE_ORIGIN}/og.jpg`],
+  },
+};
+
+/* ---------- Dynamic metadata per slug ---------- */
+export async function generateMetadata({ params }: { params: { slug: string | string[] } }): Promise<Metadata> {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
 
   const data = slug ? await getMeta(slug) : null;
@@ -70,10 +81,8 @@ export async function generateMetadata({
   return {
     metadataBase: new URL(SITE_ORIGIN),
     alternates: { canonical: `/directory/${slug}` },
-
     title,
     description,
-
     openGraph: {
       type: "article",
       url: abs(`/directory/${slug}`),
@@ -82,7 +91,6 @@ export async function generateMetadata({
       description,
       images: [{ url: ogImg, width: 1200, height: 630, alt: title }],
     },
-
     twitter: {
       card: "summary_large_image",
       title,
@@ -101,7 +109,6 @@ export default async function Page({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
-
   const data = slug ? await getMeta(slug) : null;
 
   // Фолбек: прямий перегляд через ?file=
