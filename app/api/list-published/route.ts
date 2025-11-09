@@ -5,17 +5,25 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-/* ---------- ENV ---------- */
+/* ---------- ENV (CDN для зчитування/запису index.json) ---------- */
 const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 const R2_BUCKET = process.env.R2_BUCKET || "unison-catalog";
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!;
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 
+/* ---------- SITE base (для публічних посилань у відповіді API) ---------- */
+const ENV_SITE_BASE = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/g, "");
+
+function siteBaseFromReq(req: NextRequest) {
+  // Якщо в env заданий явний базовий URL — використовуємо його (dev/prod/sw).
+  // Інакше — беремо origin поточного запиту.
+  return ENV_SITE_BASE || req.nextUrl.origin;
+}
+
 const s3 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  // ВАЖЛИВО: ListObjects ми не використовуємо — лише PutObject (Edge-safe)
   credentials: { accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY },
 });
 
@@ -31,7 +39,7 @@ type IndexItem = {
   title: string;
   description: string;
   featuredUrl: string | null;
-  urlPath: string;
+  urlPath: string; // наприклад: "/directory/<slug>"
   file: string;
   publishedAt: string;
   updatedAt: string;
@@ -95,13 +103,18 @@ function bookmarksChanged(
   return norm(a) !== norm(b);
 }
 
-/* ---------- GET: створити index.json якщо відсутній, і віддати дані ---------- */
-export async function GET() {
+function buildLinks(index: IndexJson, base: string) {
+  const b = base.replace(/\/+$/g, "");
+  return index.items
+    .map((it) => `${b}${it.urlPath || `/directory/${encodeURIComponent(it.slug)}`}`)
+    .sort((a, c) => a.localeCompare(c));
+}
+
+/* ---------- GET: повертаємо links на домені сайту (а не CDN) ---------- */
+export async function GET(req: NextRequest) {
   try {
     const index = await ensureIndex();
-    const links = index.items
-      .map((it) => `${R2_PUBLIC}/directory/${encodeURIComponent(it.slug)}`)
-      .sort((a, b) => a.localeCompare(b));
+    const links = buildLinks(index, siteBaseFromReq(req));
     return ok({ links, index });
   } catch (e: any) {
     return err(String(e?.message || e), 500);
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest) {
       file?: string;
       publishedAt?: string;
       bookmarks?: Array<{ id?: string; page?: number; label?: string; color?: string | null }>;
-      prev?: MetaJson | null; // опціонально — для точнішого diff закладок
+      prev?: MetaJson | null;
     };
 
     const slug = (body.slug || "").trim();
@@ -176,10 +189,7 @@ export async function POST(req: NextRequest) {
     index.generatedAt = now;
     await writeIndexToR2(index);
 
-    const links = index.items
-      .map((it) => `${R2_PUBLIC}/directory/${encodeURIComponent(it.slug)}`)
-      .sort((a, b) => a.localeCompare(b));
-
+    const links = buildLinks(index, siteBaseFromReq(req));
     return ok({ ok: true, links, index });
   } catch (e: any) {
     return err(String(e?.message || e), 500);
