@@ -13,23 +13,30 @@ export default function ClientEditor() {
   const [links, setLinks] = useState<string[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setListLoading(true);
-        // ВАЖЛИВО: правильний шлях до API
-        const r = await fetch("/api/directory/list-published", { cache: "no-store" });
-        const j = await r.json();
-        if (alive) setLinks(Array.isArray(j?.links) ? j.links : []);
-      } catch {
-        if (alive) setLinks([]);
-      } finally {
-        if (alive) setListLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  // app/secure/editor/ClientEditor.tsx  — секція useEffect для Published
+useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      setListLoading(true);
+
+      // Канонічний шлях
+      let r = await fetch("/api/list-published", { cache: "no-store" });
+
+      // Fallback на стару адресу (працюватиме через аліас вище)
+      if (!r.ok) r = await fetch("/api/directory/list-published", { cache: "no-store" });
+
+      const j = await r.json().catch(() => ({ links: [] }));
+      if (alive) setLinks(Array.isArray(j?.links) ? j.links : []);
+    } catch {
+      if (alive) setLinks([]);
+    } finally {
+      if (alive) setListLoading(false);
+    }
+  })();
+  return () => { alive = false; };
+}, []);
+
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
