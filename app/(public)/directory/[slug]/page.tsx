@@ -21,17 +21,31 @@ type MetaPayload = {
 const abs = (p: string) => (/^https?:\/\//i.test(p) ? p : `${SITE_ORIGIN}${p.startsWith("/") ? "" : "/"}${p}`);
 
 async function getMeta(slug: string): Promise<MetaPayload | null> {
+  // 1) Пряма спроба з R2 (без кешу)
+  const r2Url = `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`;
   try {
-    const r = await fetch(`${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`, {
-      cache: "no-store",
-      next: { revalidate: 0 },
-    });
-    if (!r.ok) return null;
-    return (await r.json()) as MetaPayload;
+    const r = await fetch(r2Url, { cache: "no-store", next: { revalidate: 0 } });
+    if (r.ok) {
+      return (await r.json()) as MetaPayload;
+    }
   } catch {
-    return null;
+    // падаємо на фолбек
   }
+
+  // 2) Надійний фолбек: власний API (у тому ж домені/рантаймі)
+  const apiUrl = `${SITE_ORIGIN}/api/directory/${encodeURIComponent(slug)}?__nocache=${Date.now()}`;
+  try {
+    const r = await fetch(apiUrl, { cache: "no-store", next: { revalidate: 0 } });
+    if (r.ok) {
+      return (await r.json()) as MetaPayload;
+    }
+  } catch {
+    // ігноруємо — віддамо дефолти
+  }
+
+  return null;
 }
+
 
 function sanitizeBookmarks(input: unknown): Bookmark[] {
   if (!Array.isArray(input)) return [];
