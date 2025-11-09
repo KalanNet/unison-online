@@ -24,14 +24,14 @@ function canEncodeWebP(): boolean {
 type RenderPreset = 'balanced' | 'sharp' | 'ultra';
 const RENDER_PRESET: RenderPreset = 'sharp';
 
-// константна мапа (const-assert тільки на літералі, не на індексації)
 const PRESETS = {
-  balanced: { DPR_CAP: 2, MAX_MP_MAIN: 5.5, MAX_MP_PREFETCH: 3.5, WEBP_Q: 0.82, PREFETCH_RADIUS: 2 },
-  sharp:    { DPR_CAP: 2, MAX_MP_MAIN: 8.0, MAX_MP_PREFETCH: 4.5, WEBP_Q: 0.88, PREFETCH_RADIUS: 2 },
-  ultra:    { DPR_CAP: 3, MAX_MP_MAIN: 10.0, MAX_MP_PREFETCH: 5.5, WEBP_Q: 0.92, PREFETCH_RADIUS: 1 },
+  balanced: { DPR_CAP: 2, MAX_MP_MAIN: 5.5,  MAX_MP_PREFETCH: 3.5, WEBP_Q: 0.82, PREFETCH_RADIUS: 2 },
+  sharp:    { DPR_CAP: 2.5, MAX_MP_MAIN: 10.5, MAX_MP_PREFETCH: 4.5, WEBP_Q: 0.88, PREFETCH_RADIUS: 2 },
+  ultra:    { DPR_CAP: 3,   MAX_MP_MAIN: 12.0, MAX_MP_PREFETCH: 5.5, WEBP_Q: 0.92, PREFETCH_RADIUS: 1 },
 } as const;
 
 const PRESET = PRESETS[RENDER_PRESET];
+
 
 
 
@@ -41,10 +41,14 @@ type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
 
 export type SearchBox = { x: number; y: number; w: number; h: number };
 export type SearchHit = { id: string; page: number; box: SearchBox; snippet: string };
+
+type Tier = 'hi' | 'low';
+
 type PageBmp = {
-  url: string; w: number; h: number;
+  url: string; w: number; h: number; tier: Tier;
   links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>;
 };
+
 
 function genId() {
   try { // @ts-ignore
@@ -89,6 +93,19 @@ export function useViewerController({ file, title }: { file: string; title?: str
   const [pageH, setPageH] = useState<number>(1414);
 
   const cacheRef = useRef<Map<number, PageBmp>>(new Map());
+
+  // майбутня «видимість» та черга рендерів
+const visibleHintRef = useRef<Set<number>>(new Set()); // 1-based pages
+const inflightRef    = useRef<Map<string, Promise<PageBmp>>>(new Map());
+
+function willBeVisible(pages: number[]) {
+  const s = visibleHintRef.current; s.clear(); pages.forEach(p => s.add(p));
+}
+function isVisibleNowOrHint(pageNum: number) {
+  const now = (pageNum - 1 === currentIndex) || (!single && pageNum - 1 === currentIndex + 1);
+  return now || visibleHintRef.current.has(pageNum);
+}
+
 
   function freeBmp(b?: PageBmp) {
   try { if (b?.url && b.url.startsWith("blob:")) URL.revokeObjectURL(b.url); } catch {}
@@ -238,79 +255,111 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   function getPageCssSize(base: { w: number; h: number }, fit: number) {
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
-async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-    const page = await pdfDoc.getPage(pageNum);
+async function renderPageToImage(pageNum: number, tier: Tier): Promise<PageBmp> {
+  if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
+  const page = await pdfDoc.getPage(pageNum);
 
-    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    // ↑ детальніше для ТИХ, що на екрані; скромніше для префетча
-const isVisible = (pageNum - 1 === currentIndex) || (!single && pageNum - 1 === currentIndex + 1);
-const MAX_MP = isVisible ? PRESET.MAX_MP_MAIN : PRESET.MAX_MP_PREFETCH;
+  const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
-const dpr = Math.min(PRESET.DPR_CAP, window.devicePixelRatio || 1);
-const baseScale = Math.max(0.1, (css.w / pageW) * dpr);
+  // що «видимо»: поточний/сусідній або позначений як майбутньо-видимий
+  const visible = isVisibleNowOrHint(pageNum);
+  const MAX_MP  = (visible || tier === 'hi') ? PRESET.MAX_MP_MAIN : PRESET.MAX_MP_PREFETCH;
 
-// ліміт по бюджету пікселів
-const maxScaleByBudget = Math.sqrt((MAX_MP * 1_000_000) / (pageW * pageH));
-const scale = Math.min(baseScale, maxScaleByBudget);
+  const dpr = Math.min(PRESET.DPR_CAP, window.devicePixelRatio || 1);
+  const baseScale = Math.max(0.1, (css.w / pageW) * dpr);
 
+  // невеликий оверсемпл лише для hi
+  const oversample = (visible || tier === 'hi') ? 1.18 : 1.0;
 
-const vp = page.getViewport({ scale });
+  const maxScaleByBudget = Math.sqrt((MAX_MP * 1_000_000) / (pageW * pageH));
+  const scale = Math.min(baseScale * oversample, maxScaleByBudget);
 
+  const vp = page.getViewport({ scale });
 
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(vp.width));
-    canvas.height = Math.max(1, Math.round(vp.height));
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("2D context unavailable");
-      ctx.imageSmoothingEnabled = true;
+  const canvas = document.createElement("canvas");
+  canvas.width  = Math.max(1, Math.round(vp.width));
+  canvas.height = Math.max(1, Math.round(vp.height));
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("2D context unavailable");
+  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
+
+  await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
+
+  const anns = await page.getAnnotations({ intent: "display" });
+  const links: PageBmp["links"] = [];
+  anns.forEach((a: any) => {
+    if (a.subtype !== "Link") return;
+    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+    const left = Math.min(x1, x2), top = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
+  });
+
+  // PNG для hi/visible (без втрат); WebP для low
+  const usePng = (visible || tier === 'hi') || !canEncodeWebP();
+  const mime    = usePng ? "image/png"  : "image/webp";
+  const quality = usePng ? 1.0          : PRESET.WEBP_Q;
+
+  const blob: Blob = await new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), mime, quality)
+  );
+  const url = URL.createObjectURL(blob);
+  return { url, w: vp.width, h: vp.height, links, tier };
+}
 
 
-    const anns = await page.getAnnotations({ intent: "display" });
-    const links: PageBmp["links"] = [];
-    anns.forEach((a: any) => {
-      if (a.subtype !== "Link") return;
-      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-      const left = Math.min(x1, x2), top = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
-    });
-
-    const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? PRESET.WEBP_Q : 1.0;
-
-const blob: Blob = await new Promise((resolve, reject) =>
-  canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), mime, quality)
-);
-const url = URL.createObjectURL(blob);
-return { url, w: vp.width, h: vp.height, links };
-
-
-  }
 
 
 
+function cacheHasHi(p: number) {
+  const b = cacheRef.current.get(p);
+  return !!b && b.tier === 'hi';
+}
+function setCache(p: number, bmp: PageBmp) {
+  const prev = cacheRef.current.get(p);
+  freeBmp(prev);
+  cacheRef.current.set(p, bmp);
+  setTick(t => t + 1);
+}
 
+async function ensurePage(p: number, tier: Tier): Promise<void> {
+  if (tier === 'hi' && cacheHasHi(p)) return;
+  if (tier === 'low' && cacheRef.current.has(p)) return;
+
+  const key = `${p}:${tier}`;
+  const inflight = inflightRef.current.get(key);
+  if (inflight) { await inflight; return; }
+
+  const job = renderPageToImage(p, tier)
+    .then(bmp => { setCache(p, bmp); })
+    .finally(() => inflightRef.current.delete(key));
+  inflightRef.current.set(key, job);
+  await job;
+}
+
+function clampPage(n: number) {
+  return pdfDoc ? Math.max(1, Math.min(pdfDoc.numPages, n)) : n;
+}
 
 
 
   const [, setTick] = useState(0);
-  function warmPagesAround(idx0: number) {
-    if (!pdfDoc) return;
-    const want = new Set<number>();
-    const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
-    const R = PRESET.PREFETCH_RADIUS;
-for (let d = -R; d <= R; d++) want.add(clamp(idx0 + 1 + d));
-purgeCacheExcept(want);
+function warmPagesAround(idx0: number) {
+  if (!pdfDoc) return;
+  const want = new Set<number>();
+  const R = PRESET.PREFETCH_RADIUS;
+  for (let d = -R; d <= R; d++) want.add(clampPage(idx0 + 1 + d));
 
+  // hi — для тих, що зараз або скоро будуть видимі; low — для решти
+  want.forEach(p => {
+    const tier: Tier = isVisibleNowOrHint(p) ? 'hi' : 'low';
+    void ensurePage(p, tier);
+  });
 
-want.forEach(async (p) => {
-  if (cacheRef.current.has(p)) return;
-      try { const bmp = await renderPageToImage(p); cacheRef.current.set(p, bmp); setTick((t) => t + 1); } catch {}
-    });
-  }
+  purgeCacheExcept(want);
+}
+
 
   /* ---------- search ---------- */
   function normBox(x: number, y: number, w: number, h: number, PW: number, PH: number): SearchBox {
@@ -371,21 +420,38 @@ nextMap.get(p)!.push({ ...box, hitIndex });
 
     setHits(nextHits);
     setPageHighlights(nextMap);
-    if (nextHits.length) { setActiveHit(0); goToPage(nextHits[0].page); }
+    if (nextHits.length) { setActiveHit(0); void goToPage(nextHits[0].page); }
+
+
   }
 
   /* ---------- navigation ---------- */
   const canPrev = !!pdfDoc && currentIndex > 0;
   const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
-  function goPrev() { if (!bookRef.current || !canPrev) return; bookRef.current.pageFlip().flipPrev(); }
-  function goNext() { if (!bookRef.current || !canNext) return; bookRef.current.pageFlip().flipNext(); }
-  function goToPage(p: number) {
-    if (!bookRef.current || !pdfDoc) return;
-    const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
-    bookRef.current.pageFlip().flip(idx);
-  }
-  function goFirst() { goToPage(1); }
-  function goLast() { if (pdfDoc) goToPage(pdfDoc.numPages); }
+ async function goToPage(p: number) {
+  if (!bookRef.current || !pdfDoc) return;
+  const target = clampPage(p);
+  // підказуємо, що буде видно, і блокуємо фліп до готовності hi-якості
+  willBeVisible(visibleSpreadFor(target));
+  await Promise.all(visibleSpreadFor(target).map(pg => ensurePage(pg, 'hi')));
+  const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, target - 1));
+  bookRef.current.pageFlip().flip(idx);
+}
+
+async function goNext() {
+  if (!bookRef.current || !pdfDoc || !canNext) return;
+  const target = clampPage(currentIndex + 2); // 0-based -> 1-based
+  await goToPage(target);
+}
+async function goPrev() {
+  if (!bookRef.current || !pdfDoc || !canPrev) return;
+  const target = clampPage(currentIndex); // попередня ліва (1-based)
+  await goToPage(target);
+}
+
+function goFirst() { void goToPage(1); }
+function goLast()  { if (pdfDoc) void goToPage(pdfDoc.numPages); }
+
   useEffect(() => { warmPagesAround(currentIndex); }, [currentIndex, pdfDoc]);
 
   /* ---------- swipe-to-flip (mobile, anywhere) ---------- */
@@ -463,7 +529,8 @@ useEffect(() => {
   function submitJump() {
     if (!pdfDoc) return;
     const num = Math.min(pdfDoc.numPages, Math.max(1, parseInt(pageJump || "1", 10) || 1));
-    goToPage(num);
+    void goToPage(num);
+
   }
 
   /* ---------- loupe (desktop only) ---------- */
@@ -609,7 +676,8 @@ function removeBookmark(id: string) {
 
 function goToBookmark(id: string) {
   const b = bookmarks.find((x) => x.id === id);
-  if (b) goToPage(b.page);
+  if (b) void goToPage(b.page);
+
 }
 
 
