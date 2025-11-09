@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Viewer from "app/components/Viewer";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 /* ---------- helpers ---------- */
 function getSlugFromPublicUrl(href: string): string | null {
@@ -24,7 +25,10 @@ type InitMeta = {
 };
 type InitBookmark = { id: string; page: number; label: string; color?: string | null };
 
-export default function ClientEditor({ slug }: { slug?: string }) {
+export default function ClientEditor() {
+  const sp = useSearchParams();
+  const slug = sp.get("slug") || undefined;
+
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,88 +63,83 @@ export default function ClientEditor({ slug }: { slug?: string }) {
 
   // If opened with ?slug=... → preload meta.json and open Viewer in edit-mode
   useEffect(() => {
-  // NEW MODE: якщо slug немає — скидаємо все, залишаємо fileUrl null (тобто uploader)
-  if (!slug) {
-    setFileUrl(null);
+    // NEW MODE: якщо slug немає — скидаємо все, залишаємо fileUrl null (тобто uploader)
+    if (!slug) {
+      setFileUrl(null);
+      setInitialMeta(null);
+      setInitialBookmarks([]);
+      setError(null);
+      return;
+    }
+
+    // EDIT MODE: підтягуємо meta+file для slug
+    setFileUrl(null); // clear while loading!
     setInitialMeta(null);
     setInitialBookmarks([]);
     setError(null);
-    return;
-  }
 
-  // EDIT MODE: підтягуємо meta+file для slug
-  setFileUrl(null); // clear while loading!
-  setInitialMeta(null);
-  setInitialBookmarks([]);
-  setError(null);
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error || "Failed to load");
+        if (!alive) return; // важливо — захист від гонки
 
-  let alive = true;
-  (async () => {
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const fileFromApi =
+          j?.file ||
+          j?.pdfUrl ||
+          j?.publicUrl ||
+          (j?.urlPath ? origin + j.urlPath : null);
+
+        setFileUrl(fileFromApi);
+        setInitialMeta({
+          title: j?.meta?.title || "",
+          description: j?.meta?.description || "",
+          slug,
+          featuredUrl: j?.meta?.featuredUrl ?? null,
+        });
+        setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
+      } catch {
+        if (!alive) return;
+        setError("Cannot load meta or file.");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+
+    // Скидаємо весь стан EDIT-режиму:
+    setInitialMeta(null);
+    setInitialBookmarks([]);
+    setFileUrl(null);
+
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLoading(true);
+
     try {
-      const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
-      const j = await r.json();
-if (!r.ok) throw new Error(j?.error || "Failed to load");
+      const fd = new FormData();
+      fd.append("pdf", f);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Upload failed");
+      const out = await res.json();
+      if (!out.url) throw new Error("No URL received from API");
 
-const origin = typeof window !== "undefined" ? window.location.origin : "";
-const fileFromApi =
-  j?.file ||
-  j?.pdfUrl ||
-  j?.publicUrl ||
-  (j?.urlPath ? origin + j.urlPath : null);
-
-setFileUrl(fileFromApi);
-setInitialMeta({
-  title: j?.meta?.title || "",
-  description: j?.meta?.description || "",
-  slug,
-  featuredUrl: j?.meta?.featuredUrl ?? null,
-});
-setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
-    } catch {
-      if (!alive) return;
-      setError("Cannot load meta or file.");
+      setFileUrl(out.url);
+      // (опційно) почистити '?slug=' в URL, щоб явно показати режим "нового файлу":
+      // const u = new URL(window.location.href); u.searchParams.delete("slug"); history.replaceState({}, "", u.toString());
+    } catch (ex: any) {
+      setError(typeof ex === "string" ? ex : ex?.message || "Unknown error");
+    } finally {
+      setLoading(false);
     }
-  })();
-  return () => {
-    alive = false;
   };
-}, [slug]);
-
-const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  setError(null);
-
-  // Скидаємо весь стан EDIT-режиму:
-  setInitialMeta(null);
-  setInitialBookmarks([]);
-  setFileUrl(null);
-  // Якщо у тебе є setSlug або подібне — додай теж:
-  // setSlug(null);
-
-  const f = e.target.files?.[0];
-  if (!f) return;
-  setLoading(true);
-
-  try {
-    const fd = new FormData();
-    fd.append("pdf", f);
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    if (!res.ok) throw new Error("Upload failed");
-    const out = await res.json();
-    if (!out.url) throw new Error("No URL received from API");
-
-    setFileUrl(out.url);
-
-    // Тут явно вказуємо, що це новий файл, не редагування:
-    // setInitialMeta(null); // ще раз можна, але вже вище скинули
-    // setInitialBookmarks([]); // вже вище скинули
-
-  } catch (ex: any) {
-    setError(typeof ex === "string" ? ex : ex?.message || "Unknown error");
-  } finally {
-    setLoading(false);
-  }
-};
-
 
   // If no file yet → show uploader + published list
   if (!fileUrl) {
@@ -224,22 +223,20 @@ const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                         Go
                       </a>
                       {s ? (
-  <Link
-  className="ua-btn"
-  href={{ pathname: "/secure/editor", query: { slug: s } }}
-  prefetch={false}
-  replace
-  title="Edit"
->
-  Edit
-</Link>
-
-) : (
-  <button className="ua-btn" disabled title="Edit unavailable">
-    Edit
-  </button>
-)}
-
+                        <Link
+                          className="ua-btn"
+                          href={{ pathname: "/secure/editor", query: { slug: s } }}
+                          prefetch={false}
+                          replace
+                          title="Edit"
+                        >
+                          Edit
+                        </Link>
+                      ) : (
+                        <button className="ua-btn" disabled title="Edit unavailable">
+                          Edit
+                        </button>
+                      )}
                     </li>
                   );
                 })}
@@ -274,6 +271,6 @@ const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     );
   }
 
-  // In edit-mode or after fresh upload → render Viewer with prefilled meta/bookmarks (if any)
+  // In edit-mode or after fresh upload → render Viewer
   return <Viewer file={fileUrl} initialMeta={initialMeta || undefined} initialBookmarks={initialBookmarks} />;
 }

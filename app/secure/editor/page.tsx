@@ -1,5 +1,6 @@
 // app/secure/editor/page.tsx
 import type { Metadata } from "next";
+import ClientEditor from "./ClientEditor";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -9,12 +10,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-import ClientEditor from "./ClientEditor";
-
-export default function Page({
-  searchParams,
-}: {
-  searchParams: { slug?: string };
-}) {
-  return <ClientEditor slug={searchParams?.slug} />;
+export default function Page() {
+  // Ніяких props — редактор сам читає slug з URL на клієнті
+  return <ClientEditor />;
 }
