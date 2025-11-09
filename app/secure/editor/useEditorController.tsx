@@ -228,9 +228,9 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 2;            // жорсткий ліміт DPI
+    const DPR_CAP = 3;            // жорсткий ліміт DPI
 const QUALITY = 1;            // без 4x oversampling
-const MAX_MP = 5.5;           // бюджет ~5.5 мегапікселів на сторінку
+const MAX_MP = 7.5;           // бюджет ~5.5 мегапікселів на сторінку
 
 const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
 const baseScale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
