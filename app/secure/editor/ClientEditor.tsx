@@ -137,7 +137,7 @@ const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
 
   // If no file yet → show uploader + published list
-  if (!fileUrl) {
+  if (!slug) {
     return (
       <div style={{ background: "#21353a", minHeight: "100vh", color: "#fff" }}>
         {/* header */}
@@ -266,5 +266,12 @@ const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   }
 
   // In edit-mode or after fresh upload → render Viewer with prefilled meta/bookmarks (if any)
-  return <Viewer file={fileUrl} initialMeta={initialMeta || undefined} initialBookmarks={initialBookmarks} />;
+  return (
+  <Viewer
+    file={fileUrl ?? ""}
+    initialMeta={initialMeta || undefined}
+    initialBookmarks={initialBookmarks}
+    // error={error}
+  />
+);
 }
