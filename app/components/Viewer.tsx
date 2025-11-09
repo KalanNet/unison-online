@@ -248,47 +248,57 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
     initErr = typeof err === "string" ? err : err?.message || "Viewer component error";
   }
 
-  // --- EDIT MODE: префіл мети та закладок, якщо прийшли з ?slug=... ---
+// --- EDIT MODE: preload meta + bookmarks (після готовності PDF) ---
 useEffect(() => {
-  if (!initialMeta || !ctrl) return;
-  // заповнюємо мету
-  ctrl.setMeta({
-    title: initialMeta.title,
-    description: initialMeta.description,
-    slug: initialMeta.slug,
-    featuredUrl: initialMeta.featuredUrl,
-  });
-  // замінюємо весь список закладок
-  if (typeof (ctrl as any).replaceBookmarks === "function") {
-    (ctrl as any).replaceBookmarks(initialBookmarks || []);
-  } else if (typeof (ctrl as any).setBookmarks === "function") {
-    (ctrl as any).setBookmarks(initialBookmarks || []);
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [initialMeta]);
+  if (!ctrl || !ctrl.pdfDoc) return;  // дочекайся, поки PDF завантажиться
 
-const isEdit = !!initialMeta?.slug;
-  // Валідація джерела PDF — повідомлення таке ж, як у тебе
-  if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
-    return (
-      <div
-        style={{
-          background: "#21353a",
-          minHeight: "100vh",
-          color: "#fff",
-          padding: "80px 12px",
-          textAlign: "center",
-        }}
-      >
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
-          Файл не знайдено або неправильний формат!
-        </h2>
-        <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>
-          Передай коректний PDF через upload або URL.
-        </div>
-      </div>
-    );
+  // 1) META
+  if (initialMeta) {
+    ctrl.setMeta({
+      title:       initialMeta.title,
+      description: initialMeta.description,
+      slug:        initialMeta.slug,
+      featuredUrl: initialMeta.featuredUrl,
+    });
   }
+
+  // 2) BOOKMARKS (з санітизацією номерів сторінок під діапазон PDF)
+  if (Array.isArray(initialBookmarks)) {
+    const max = ctrl.pdfDoc.numPages;
+    const safe = initialBookmarks.map((b) => ({
+      ...b,
+      page: Math.max(1, Math.min(max, Number(b.page) || 1)),
+    }));
+
+    // Використовуємо setBookmarks, якщо експортнутий з контролера; інакше fallback на replaceBookmarks
+    (ctrl as any).setBookmarks?.(safe) ?? (ctrl as any).replaceBookmarks?.(safe);
+  }
+}, [ctrl?.pdfDoc, initialMeta, initialBookmarks]);
+
+// Режим редагування: є initialMeta.slug → slug фіксований (read-only у UI)
+const isEdit = !!initialMeta?.slug;
+
+// Валідація джерела PDF — залишаємо як було
+if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
+  return (
+    <div
+      style={{
+        background: "#21353a",
+        minHeight: "100vh",
+        color: "#fff",
+        padding: "80px 12px",
+        textAlign: "center",
+      }}
+    >
+      <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
+        Файл не знайдено або неправильний формат!
+      </h2>
+      <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>
+        Передай коректний PDF через upload або URL.
+      </div>
+    </div>
+  );
+}
 
   // Помилка ініціалізації/роботи компонента
   if (initErr || error) {

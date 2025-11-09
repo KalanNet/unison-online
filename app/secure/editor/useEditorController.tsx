@@ -659,7 +659,7 @@ return {
   toggleFullscreen, handleShare,
   // css
   globalCss,
-  bookmarks, addBookmark, removeBookmark, goToBookmark,
+  bookmarks, setBookmarks, updateBookmark, addBookmark, removeBookmark, goToBookmark,
   meta, setMeta, setFeatured,
   publishMetaAndBookmarks,
   
