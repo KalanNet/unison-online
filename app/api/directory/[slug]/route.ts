@@ -37,6 +37,23 @@ async function readPrev(slug: string): Promise<MetaJson | null> {
   } catch { return null; }
 }
 
+export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  const { slug } = await ctx.params;
+  if (!slug) return err("Missing slug", 422);
+
+  try {
+    const r = await fetch(`${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`, {
+      cache: "no-store",
+    });
+    if (!r.ok) return err("Not found", 404);
+    const j = await r.json();
+    return ok(j, 200);
+  } catch (e: any) {
+    return err(String(e?.message || e), 500);
+  }
+}
+
+
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
   if (!slug) return err("Missing slug", 422);
@@ -49,6 +66,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     publishedAt?: string; // опційно збережемо оригінал
   };
 
+  
   // 1) підтягуємо попередню версію, щоб нічого не втратити
   const prev = await readPrev(slug);
   if (!prev) return err("Not found", 404);
