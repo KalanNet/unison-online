@@ -18,7 +18,8 @@ export default function ClientEditor() {
     (async () => {
       try {
         setListLoading(true);
-        const r = await fetch("/api/list-published", { cache: "no-store" });
+        // ВАЖЛИВО: правильний шлях до API
+        const r = await fetch("/api/directory/list-published", { cache: "no-store" });
         const j = await r.json();
         if (alive) setLinks(Array.isArray(j?.links) ? j.links : []);
       } catch {
