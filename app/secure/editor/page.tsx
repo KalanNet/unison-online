@@ -1,3 +1,4 @@
+// app/secure/editor/page.tsx
 import type { Metadata } from "next";
 
 export const runtime = "edge";
@@ -10,6 +11,10 @@ export const metadata: Metadata = {
 
 import ClientEditor from "./ClientEditor";
 
-export default function EditorPage() {
-  return <ClientEditor />;
+export default function Page({
+  searchParams,
+}: {
+  searchParams: { slug?: string };
+}) {
+  return <ClientEditor slug={searchParams?.slug} />;
 }

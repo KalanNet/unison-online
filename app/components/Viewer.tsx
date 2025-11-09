@@ -1,11 +1,15 @@
 // app/components/Viewer.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
+
+type InitMeta = { title: string; description: string; slug: string; featuredUrl: string | null };
+type InitBookmark = { id: string; page: number; label: string; color?: string | null };
+
 
 /* --- SEO limits (golden standards) --- */
 const SEO = {
@@ -71,6 +75,8 @@ async function prepareFeaturedUnder200KB(file: File): Promise<File> {
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 /* ---------- slug helpers (Unicode-safe) ---------- */
+
+
 function _normalizeDashesSpaces(s: string) {
   const dashAll = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;           // усі юнікод-дефіси
   const spacesAll = /[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g; // усі типи пробілів
@@ -212,7 +218,17 @@ function SlugInput({
   );
 }
 
-export default function Viewer({ file, title }: { file: string; title?: string }) {
+export default function Viewer({
+  file,
+  title,
+  initialMeta,
+  initialBookmarks = [],
+}: {
+  file: string;
+  title?: string;
+  initialMeta?: InitMeta;
+  initialBookmarks?: InitBookmark[];
+}) {
   const [error, setError] = useState<string | null>(null);
 
 // NEW: pending color для кастомної палітри (лише попередній вибір)
@@ -231,6 +247,26 @@ const [customColor, setCustomColor] = useState<string>("#ffffff");
   } catch (err: any) {
     initErr = typeof err === "string" ? err : err?.message || "Viewer component error";
   }
+
+  // --- EDIT MODE: префіл мети та закладок, якщо прийшли з ?slug=... ---
+useEffect(() => {
+  if (!initialMeta || !ctrl) return;
+  // заповнюємо мету
+  ctrl.setMeta({
+    title: initialMeta.title,
+    description: initialMeta.description,
+    slug: initialMeta.slug,
+    featuredUrl: initialMeta.featuredUrl,
+  });
+  // замінюємо весь список закладок
+  if (typeof (ctrl as any).replaceBookmarks === "function") {
+    (ctrl as any).replaceBookmarks(initialBookmarks || []);
+  } else if (typeof (ctrl as any).setBookmarks === "function") {
+    (ctrl as any).setBookmarks(initialBookmarks || []);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [initialMeta]);
+
 
   // Валідація джерела PDF — повідомлення таке ж, як у тебе
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
@@ -311,50 +347,152 @@ const descOk  = d.length >= 80 && d.length <= SEO.DESC_MAX;
 const slugOk  = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
 const imageOk = !!ctrl.meta.featuredUrl;
 
+// === handlePublish (inline у компоненті) ===
+async function handlePublish(): Promise<void> {
+  if (!ctrl) return;
+
+  const title = (ctrl.meta.title || "").trim();
+  const desc  = (ctrl.meta.description || "").trim();
+  const slug  = (ctrl.meta.slug || "").trim();
+
+  const errs: string[] = [];
+  if (!title) errs.push("Title is required");
+  if (title.length < 10) errs.push("Title must be at least 10 characters");
+  if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
+
+  if (!desc) errs.push("Meta description is required");
+  if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
+  if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
+
+  if (!slug) errs.push("Slug is required");
+  if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
+  if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
+
+  if (!ctrl.meta.featuredUrl) errs.push("Featured image is required");
+
+  if (errs.length) { notify(errs.join("\n")); return; }
+
+  try {
+    // EDIT: оновлення існуючої сторінки
+    if (initialMeta?.slug) {
+      const body: any = {
+        meta: {
+          title: ctrl.meta.title,
+          description: ctrl.meta.description,
+          // не змінюємо шлях через slug у цьому запиті
+          featuredUrl: ctrl.meta.featuredUrl ?? null,
+        },
+        bookmarks: ctrl.bookmarks,
+        file: ((ctrl as any).fileUrl as string) || file,
+      };
+      if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
+
+      const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || "Update failed");
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const full =
+        j?.publicUrl ||
+        (j?.urlPath && origin ? origin + j.urlPath : `${origin}/directory/${initialMeta.slug}`);
+      if (full) setPub({ url: full });
+      return;
+    }
+
+    // NEW: публікація нового запису
+    const r = await ctrl.publishMetaAndBookmarks();
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
+    if (full) setPub({ url: full });
+  } catch (e: any) {
+    console.error(e);
+    notify(e?.message || "Publish failed");
+  }
+}
+// === /handlePublish ===
 
 
   return (
     <div className="viewer-root">
       <EditorHeader
-        title={ctrl.title}
-        onSearch={ctrl.runSearch}
-        isSearching={(ctrl as any).searching ?? false}
-        file={file}
-        isFs={ctrl.isFs}
-        toggleFullscreen={ctrl.toggleFullscreen}
-        handleShare={ctrl.handleShare}
-        // NEW: показуємо модалку після успішної публікації (без зміни типу пропса)
-        onPublish={() => {
-          const title = (ctrl!.meta.title || "").trim();
-          const desc  = (ctrl!.meta.description || "").trim();
-          const slug  = (ctrl!.meta.slug || "").trim();
+  title={ctrl.title}
+  onSearch={ctrl.runSearch}
+  isSearching={(ctrl as any).searching ?? false}
+  file={file}
+  isFs={ctrl.isFs}
+  toggleFullscreen={ctrl.toggleFullscreen}
+  handleShare={ctrl.handleShare}
+  onPublish={async () => {
+    if (!ctrl) return;
 
-          const errs: string[] = [];
-          if (!title) errs.push("Title is required");
-          if (title.length < 10) errs.push("Title must be at least 10 characters");
-          if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
+    const title = (ctrl.meta.title || "").trim();
+    const desc  = (ctrl.meta.description || "").trim();
+    const slug  = (ctrl.meta.slug || "").trim();
 
-          if (!desc) errs.push("Meta description is required");
-          if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
-          if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
+    const errs: string[] = [];
+    if (!title) errs.push("Title is required");
+    if (title.length < 10) errs.push("Title must be at least 10 characters");
+    if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
 
-          if (!slug) errs.push("Slug is required");
-          if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
-          if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
+    if (!desc) errs.push("Meta description is required");
+    if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
+    if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
 
-          if (!ctrl!.meta.featuredUrl) errs.push("Featured image is required");
+    if (!slug) errs.push("Slug is required");
+    if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
+    if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
 
-          if (errs.length) { notify(errs.join("\n")); return; }
+    if (!ctrl.meta.featuredUrl) errs.push("Featured image is required");
 
-          ctrl!.publishMetaAndBookmarks()
-            .then((r) => {
-              const origin = typeof window !== "undefined" ? window.location.origin : "";
-              const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
-              if (full) setPub({ url: full });
-            })
-            .catch((e) => { console.error(e); notify((e as any)?.message || "Publish failed"); });
-        }}
-      />
+    if (errs.length) { notify(errs.join("\n")); return; }
+
+    try {
+      // EDIT: оновлення існуючої сторінки
+      if (initialMeta?.slug) {
+        const body: any = {
+          meta: {
+            title: ctrl.meta.title,
+            description: ctrl.meta.description,
+            // не змінюємо шлях через slug у цьому запиті
+            featuredUrl: ctrl.meta.featuredUrl ?? null,
+          },
+          bookmarks: ctrl.bookmarks,
+          file: ((ctrl as any).fileUrl as string) || file,
+        };
+        if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
+
+        const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j?.error || "Update failed");
+
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const full =
+          j?.publicUrl ||
+          (j?.urlPath && origin ? origin + j.urlPath : `${origin}/directory/${initialMeta.slug}`);
+        if (full) setPub({ url: full });
+        return;
+      }
+
+      // NEW: публікація нового запису
+      const r = await ctrl.publishMetaAndBookmarks();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
+      if (full) setPub({ url: full });
+    } catch (e: any) {
+      console.error(e);
+      notify(e?.message || "Publish failed");
+    }
+  }}
+/>
+
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
       <aside className="fb-sticky-panel" role="complementary" aria-label="Bookmarks & Meta">
