@@ -267,7 +267,7 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [initialMeta]);
 
-
+const isEdit = !!initialMeta?.slug;
   // Валідація джерела PDF — повідомлення таке ж, як у тебе
   if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
     return (
@@ -535,15 +535,29 @@ async function handlePublish(): Promise<void> {
 
 
           {/* --- SLUG --- */}
-          <label className="fb-field">
+<label className="fb-field">
   <div className="fb-lab">Slug <Req /></div>
-  <SlugInput
-    value={ctrl.meta.slug ?? ""}
-    title={ctrl.meta.title || ctrl.title}
-    onChange={(v) => ctrl.setMeta({ slug: v as any })}
-    maxLen={SEO.SLUG_MAX}
-  />
+
+  {isEdit ? (
+    // EDIT MODE: показуємо, але не даємо редагувати
+    <input
+      className="fb-inp"
+      value={(ctrl.meta.slug ?? "")}
+      readOnly
+      disabled
+      title="Slug is fixed after publish"
+    />
+  ) : (
+    // CREATE MODE: можна редагувати/генерувати
+    <SlugInput
+      value={ctrl.meta.slug ?? ""}
+      title={ctrl.meta.title || ctrl.title}
+      onChange={(v) => ctrl.setMeta({ slug: v as any })}
+      maxLen={SEO.SLUG_MAX}
+    />
+  )}
 </label>
+
 
 
           {/* --- FEATURED IMAGE --- */}
@@ -1016,6 +1030,13 @@ async function handlePublish(): Promise<void> {
           justifyContent: center;
           overflow: hidden;
         }
+
+        .fb-inp[disabled] {
+  opacity: .7;
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+
 
         .book-container {
           display: flex;
