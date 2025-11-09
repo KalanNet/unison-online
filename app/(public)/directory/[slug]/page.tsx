@@ -1,12 +1,12 @@
 // app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
+import MetaHead from "app/(public)/directory/[slug]/MetaHead";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /* ---------- Config ---------- */
 const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://unison-online-dev.pages.dev").replace(/\/$/, "");
-const R2_PUBLIC   = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
@@ -22,7 +22,7 @@ const abs = (p: string) => (/^https?:\/\//i.test(p) ? p : `${SITE_ORIGIN}${p.sta
 
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   try {
-    // ✅ йдемо у внутрішній API-роут замість CDN
+    // йдемо у власний API, щоб не впиратись у кеш CDN
     const r = await fetch(abs(`/api/directory/${encodeURIComponent(slug)}`), {
       cache: "no-store",
       next: { revalidate: 0 },
@@ -33,7 +33,6 @@ async function getMeta(slug: string): Promise<MetaPayload | null> {
     return null;
   }
 }
-
 
 function sanitizeBookmarks(input: unknown): Bookmark[] {
   if (!Array.isArray(input)) return [];
@@ -52,27 +51,24 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return JSON.parse(JSON.stringify(out));
 }
 
+function pickOgImage(featuredUrl?: string | null) {
+  const raw = (featuredUrl ?? "").trim();
+  const isAbs = /^https?:\/\//i.test(raw);
+  const isWebp = /\.webp(\?|#|$)/i.test(raw);
+  // Телега/FB часом ігнорять webp → фолбек на /og.jpg
+  return (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
+}
 
 /* ---------- Dynamic metadata per slug ---------- */
 export async function generateMetadata(
   { params }: { params: { slug: string | string[] } }
 ): Promise<Metadata> {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
-
   const data = slug ? await getMeta(slug) : null;
 
   const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
   const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
-
-  // завжди віддаємо PNG через builder-роут (сумісно з Telegram/Twitter/X/Facebook)
-// Використати PNG/JPG із meta.json або фолбек на /og.jpg (без важких builder-роутів)
-const raw = (data?.meta?.featuredUrl ?? "").trim();
-const isAbs  = /^https?:\/\//i.test(raw);
-const isWebp = /\.webp(\?|#|$)/i.test(raw);
-
-// Telegram/FB часто ігнорять .webp → якщо webp/відносний/порожній — фолбек на статику
-const ogImg = (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
-
+  const ogImg = pickOgImage(data?.meta?.featuredUrl);
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -86,13 +82,10 @@ const ogImg = (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
       title,
       description,
       images: [{ url: ogImg, width: 1200, height: 630, alt: title }],
-
     },
-    twitter: { card: "summary_large_image", title, description, images: [ogImg] }
-,
+    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
   };
 }
-
 
 /* ---------- Page ---------- */
 export default async function Page({
@@ -105,22 +98,41 @@ export default async function Page({
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
   const data = slug ? await getMeta(slug) : null;
 
+  // Значення для <head>
+  const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
+  const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
+  const url = abs(`/directory/${slug}`);
+  const ogImg = pickOgImage(data?.meta?.featuredUrl);
+
   // Фолбек: прямий перегляд через ?file=
   if (!data?.file) {
     if (typeof searchParams.file === "string" && searchParams.file) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
       const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
-      const title = data?.meta?.title || slug || "Preview";
-      return <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />;
+      return (
+        <>
+          <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
+          <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />
+        </>
+      );
     }
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
-    return <ClientFallback />;
+    return (
+      <>
+        <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
+        <ClientFallback />
+      </>
+    );
   }
 
   // Основний рендер
   const PublicViewer = (await import("app/public/PublicViewer")).default;
-  const title = data.meta?.title ?? slug;
   const safeBookmarks = sanitizeBookmarks(data.bookmarks);
 
-  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />;
+  return (
+    <>
+      <MetaHead title={title} description={description} url={url} ogImage={ogImg} />
+      <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />
+    </>
+  );
 }
