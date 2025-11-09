@@ -50,33 +50,20 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return JSON.parse(JSON.stringify(out));
 }
 
-/* ---------- Static fallback metadata (на випадок, якщо generateMetadata не спрацює) ---------- */
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_ORIGIN),
-  title: "Directory — Unison Alberta",
-  description: "Unison Alberta directory viewer.",
-  openGraph: {
-    type: "website",
-    siteName: "Unison Alberta",
-    url: `${SITE_ORIGIN}/directory`,
-    images: [{ url: `${SITE_ORIGIN}/og.jpg`, width: 1200, height: 630, alt: "Unison Alberta" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    images: [`${SITE_ORIGIN}/og.jpg`],
-  },
-};
 
 /* ---------- Dynamic metadata per slug ---------- */
-export async function generateMetadata({ params }: { params: { slug: string | string[] } }): Promise<Metadata> {
+export async function generateMetadata(
+  { params }: { params: { slug: string | string[] } }
+): Promise<Metadata> {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
 
   const data = slug ? await getMeta(slug) : null;
 
   const title = (data?.meta?.title ?? `Directory — ${slug}`).trim();
   const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
+
+  // завжди віддаємо PNG через builder-роут (сумісно з Telegram/Twitter/X/Facebook)
   const ogRoute = abs(`/directory/${slug}/opengraph-image`);
-;
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -84,22 +71,22 @@ export async function generateMetadata({ params }: { params: { slug: string | st
     title,
     description,
     openGraph: {
-  type: "article",
-  url: abs(`/directory/${slug}`),
-  siteName: "Unison Alberta",
-  title,
-  description,
-  images: [{ url: ogRoute, width: 1200, height: 630, alt: title }],
-},
-twitter: {
-  card: "summary_large_image",
-  title,
-  description,
-  images: [ogRoute],
-},
-
+      type: "article",
+      url: abs(`/directory/${slug}`),
+      siteName: "Unison Alberta",
+      title,
+      description,
+      images: [{ url: ogRoute, width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogRoute],
+    },
   };
 }
+
 
 /* ---------- Page ---------- */
 export default async function Page({
