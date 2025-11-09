@@ -63,7 +63,14 @@ export async function generateMetadata(
   const description = (data?.meta?.description ?? "Unison Alberta directory viewer.").trim();
 
   // завжди віддаємо PNG через builder-роут (сумісно з Telegram/Twitter/X/Facebook)
-  const ogRoute = abs(`/directory/${slug}/opengraph-image`);
+// Використати PNG/JPG із meta.json або фолбек на /og.jpg (без важких builder-роутів)
+const raw = (data?.meta?.featuredUrl ?? "").trim();
+const isAbs  = /^https?:\/\//i.test(raw);
+const isWebp = /\.webp(\?|#|$)/i.test(raw);
+
+// Telegram/FB часто ігнорять .webp → якщо webp/відносний/порожній — фолбек на статику
+const ogImg = (!isAbs || isWebp || !raw) ? `${SITE_ORIGIN}/og.jpg` : raw;
+
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -76,14 +83,11 @@ export async function generateMetadata(
       siteName: "Unison Alberta",
       title,
       description,
-      images: [{ url: ogRoute, width: 1200, height: 630, alt: title }],
+      images: [{ url: ogImg, width: 1200, height: 630, alt: title }],
+
     },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogRoute],
-    },
+    twitter: { card: "summary_large_image", title, description, images: [ogImg] }
+,
   };
 }
 
