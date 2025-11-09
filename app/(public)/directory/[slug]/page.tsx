@@ -1,8 +1,13 @@
 // app/(public)/directory/[slug]/page.tsx
+import { headers as nextHeaders } from "next/headers";
 import type { Metadata } from "next";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
+
+/* ---------- Config ---------- */
+const R2_PUBLIC =
+  process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
@@ -15,14 +20,18 @@ type MetaPayload = {
 };
 
 /* ---------- Helpers ---------- */
+/** Читаємо meta.json БЕЗПОСЕРЕДНЬО з CDN (а не через /api/...) */
 async function getMeta(slug: string): Promise<MetaPayload | null> {
-  // Відносний виклик внутрішнього API (Edge/Pages friendly)
-  const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
-  if (!r.ok) return null;
-  return (await r.json()) as MetaPayload;
+  try {
+    const r = await fetch(
+      `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`,
+      { cache: "no-store", next: { revalidate: 0 } }
+    );
+    if (!r.ok) return null;
+    return (await r.json()) as MetaPayload;
+  } catch {
+    return null;
+  }
 }
 
 /** Жорстка санітаризація + клон для безпечної серіалізації між SSR/CSR */
@@ -40,7 +49,6 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
     const color = typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
     if (label.length > 0) out.push({ id, page, label, color });
   }
-  // structuredClone fallback: JSON roundtrip (plain-об’єкт)
   return JSON.parse(JSON.stringify(out));
 }
 
@@ -51,17 +59,51 @@ export async function generateMetadata({
   params: { slug: string | string[] };
 }): Promise<Metadata> {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+
+  // Абсолютний origin для canonical/OG (важливо для соцмереж)
+  const h = await nextHeaders(); // <= головне виправлення
+  const envOrigin = process.env.NEXT_PUBLIC_SITE_URL; // якщо маєш – ще надійніше
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto =
+    h.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
+  const origin =
+    envOrigin && /^https?:\/\//i.test(envOrigin)
+      ? envOrigin
+      : host
+      ? `${proto}://${host}`
+      : "https://unison-online-dev.pages.dev";
+
   const data = slug ? await getMeta(slug) : null;
 
   const title = data?.meta?.title ?? `Directory — ${slug ?? ""}`;
   const description = data?.meta?.description ?? "Unison Alberta directory viewer.";
-  const ogImg = data?.meta?.featuredUrl ?? "https://unison-online-dev.pages.dev/og.jpg";
+
+  const candidate = data?.meta?.featuredUrl ?? "";
+  const ogImg = /^https?:\/\//i.test(candidate) ? candidate : `${origin}/og.jpg`;
 
   return {
+    metadataBase: new URL(origin),
+    alternates: { canonical: `/directory/${slug}` },
+
     title,
     description,
-    openGraph: { title, description, images: [ogImg] },
-    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
+
+    openGraph: {
+      type: "article",
+      url: `/directory/${slug}`,
+      siteName: "Unison Alberta",
+      title,
+      description,
+      images: [{ url: ogImg, width: 1200, height: 630, alt: title }],
+    },
+
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImg],
+    },
   };
 }
 
@@ -75,10 +117,10 @@ export default async function Page({
 }) {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
 
-  // SSR-спроба отримати meta.json через внутрішній API
+  // SSR-спроба отримати meta.json (через CDN)
   const data = slug ? await getMeta(slug) : null;
 
-  // Фолбек: якщо meta немає — дозволяємо прямий перегляд через ?file=
+  // Фолбек: якщо meta/file немає — дозволяємо прямий перегляд через ?file=
   if (!data?.file) {
     if (typeof searchParams.file === "string" && searchParams.file) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
@@ -86,7 +128,6 @@ export default async function Page({
       const title = data?.meta?.title || slug || "Preview";
       return <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />;
     }
-    // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
