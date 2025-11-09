@@ -20,6 +20,21 @@ function canEncodeWebP(): boolean {
   return __WEBP_OK;
 }
 
+// ——— Render quality presets ———
+type RenderPreset = 'balanced' | 'sharp' | 'ultra';
+const RENDER_PRESET: RenderPreset = 'sharp';
+
+// константна мапа (const-assert тільки на літералі, не на індексації)
+const PRESETS = {
+  balanced: { DPR_CAP: 2, MAX_MP_MAIN: 5.5, MAX_MP_PREFETCH: 3.5, WEBP_Q: 0.82, PREFETCH_RADIUS: 2 },
+  sharp:    { DPR_CAP: 2, MAX_MP_MAIN: 8.0, MAX_MP_PREFETCH: 4.5, WEBP_Q: 0.88, PREFETCH_RADIUS: 2 },
+  ultra:    { DPR_CAP: 3, MAX_MP_MAIN: 10.0, MAX_MP_PREFETCH: 5.5, WEBP_Q: 0.92, PREFETCH_RADIUS: 1 },
+} as const;
+
+const PRESET = PRESETS[RENDER_PRESET];
+
+
+
 
 type PDFJS = typeof import("pdfjs-dist");
 type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
@@ -228,16 +243,17 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 3;            // жорсткий ліміт DPI
-const QUALITY = 1;            // без 4x oversampling
-const MAX_MP = 7.5;           // бюджет ~5.5 мегапікселів на сторінку
+    // ↑ детальніше для ТИХ, що на екрані; скромніше для префетча
+const isVisible = (pageNum - 1 === currentIndex) || (!single && pageNum - 1 === currentIndex + 1);
+const MAX_MP = isVisible ? PRESET.MAX_MP_MAIN : PRESET.MAX_MP_PREFETCH;
 
-const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-const baseScale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
+const dpr = Math.min(PRESET.DPR_CAP, window.devicePixelRatio || 1);
+const baseScale = Math.max(0.1, (css.w / pageW) * dpr);
 
-// ліміт за мегапікселями
+// ліміт по бюджету пікселів
 const maxScaleByBudget = Math.sqrt((MAX_MP * 1_000_000) / (pageW * pageH));
 const scale = Math.min(baseScale, maxScaleByBudget);
+
 
 const vp = page.getViewport({ scale });
 
@@ -263,7 +279,8 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
     });
 
     const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? 0.82 : 1.0;
+const quality = mime === "image/webp" ? PRESET.WEBP_Q : 1.0;
+
 const blob: Blob = await new Promise((resolve, reject) =>
   canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), mime, quality)
 );
@@ -284,8 +301,10 @@ return { url, w: vp.width, h: vp.height, links };
     if (!pdfDoc) return;
     const want = new Set<number>();
     const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
-    for (let d = -2; d <= 2; d++) want.add(clamp(idx0 + 1 + d));
+    const R = PRESET.PREFETCH_RADIUS;
+for (let d = -R; d <= R; d++) want.add(clamp(idx0 + 1 + d));
 purgeCacheExcept(want);
+
 
 want.forEach(async (p) => {
   if (cacheRef.current.has(p)) return;
