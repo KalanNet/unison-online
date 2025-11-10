@@ -21,9 +21,6 @@ function canEncodeWebP(): boolean {
 }
 
 
-type PDFJS = typeof import("pdfjs-dist");
-type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
-
 export type SearchBox = { x: number; y: number; w: number; h: number };
 export type SearchHit = { id: string; page: number; box: SearchBox; snippet: string };
 type PageBmp = {
@@ -54,6 +51,137 @@ function useIsNarrow(max = 600) {
   }, [max]);
   return narrow;
 }
+
+// ============ ОПТИМІЗАЦІЯ РЕНДЕРИНГУ ============
+const MAX_CONCURRENT_RENDERS = 3;
+const renderQueue = new Map<number, Promise<PageBmp>>();
+
+type PDFJS = typeof import("pdfjs-dist");
+type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
+
+function getOrCreateRenderPromise(
+  pageNum: number,
+  pdfDoc: PDFDocumentProxy | null,
+  pdfjs: PDFJS | null,
+  pageW: number,
+  pageH: number,
+  fitScale: number
+): Promise<PageBmp> | null {
+  if (!pdfDoc || !pdfjs) return null;
+  
+  if (renderQueue.has(pageNum)) {
+    return renderQueue.get(pageNum)!;
+  }
+  
+  const promise = (async () => {
+    try {
+      const bmp = await renderPageToImageOptimized(pageNum, pdfDoc, pdfjs, pageW, pageH, fitScale);
+      return bmp;
+    } finally {
+      renderQueue.delete(pageNum);
+    }
+  })();
+  
+  renderQueue.set(pageNum, promise);
+  return promise;
+}
+
+async function renderPageToImageOptimized(
+  pageNum: number,
+  pdfDoc: PDFDocumentProxy,
+  pdfjs: PDFJS,
+  pageW: number,
+  pageH: number,
+  fitScale: number
+): Promise<PageBmp> {
+  const page = await pdfDoc.getPage(pageNum);
+  
+  const css = { 
+    w: Math.max(1, Math.floor(pageW * fitScale)), 
+    h: Math.max(1, Math.floor(pageH * fitScale)) 
+  };
+  
+  const DPR_CAP = 3;
+  const QUALITY = 2.5;
+  
+  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+  const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
+  const vp = page.getViewport({ scale });
+
+  const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+  
+  let canvas: any;
+  if (useOffscreen) {
+    canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(vp.width)),
+      Math.max(1, Math.round(vp.height))
+    );
+  } else {
+    canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(vp.width));
+    canvas.height = Math.max(1, Math.round(vp.height));
+  }
+  
+  const ctx = canvas.getContext("2d", { 
+    alpha: false,
+    desynchronized: true,
+    willReadFrequently: false
+  });
+  
+  if (!ctx) throw new Error("2D context unavailable");
+  
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // ✅ КРАЩИЙ ВАРІАНТ з type assertion:
+  const renderContext: any = {
+    canvasContext: ctx,
+    viewport: vp
+  };
+  
+  await page.render(renderContext).promise;
+
+
+  
+  let url: string;
+  if (useOffscreen) {
+    const blob = await canvas.convertToBlob({ 
+      type: canEncodeWebP() ? "image/webp" : "image/png",
+      quality: 0.92 
+    });
+    
+    url = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } else {
+    const mime = canEncodeWebP() ? "image/webp" : "image/png";
+    url = canvas.toDataURL(mime, 0.92);
+  }
+
+  const anns = await page.getAnnotations({ intent: "display" });
+  const links: PageBmp["links"] = [];
+  
+  anns.forEach((a: any) => {
+    if (a.subtype !== "Link") return;
+    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+    const left = Math.min(x1, x2), top = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    links.push({ 
+      x: left / vp.width, 
+      y: top / vp.height, 
+      w: w / vp.width, 
+      h: h / vp.height, 
+      href: sanitizeLink(a) || undefined, 
+      dest: a.dest 
+    });
+  });
+
+  return { url, w: vp.width, h: vp.height, links };
+}
+// ============ КІНЕЦЬ ОПТИМІЗАЦІЇ ============
+
 
 export function useViewerController({ file, title }: { file: string; title?: string }) {
   /* ---------- refs та базові стани ---------- */
@@ -204,94 +332,73 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   function getPageCssSize(base: { w: number; h: number }, fit: number) {
     return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
   }
-async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-    const page = await pdfDoc.getPage(pageNum);
-
-    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    
-    // ⚠️ КРИТИЧНО: зменшено з 7 до 2, з 4 до 1.5
-    const DPR_CAP = 5;  // було 7
-    const QUALITY = 4; // було 4
-    
-    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
-    const vp = page.getViewport({ scale });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(vp.width));
-    canvas.height = Math.max(1, Math.round(vp.height));
-    const ctx = canvas.getContext("2d", { 
-      alpha: false,
-      desynchronized: true, // ← додано для кращої продуктивності
-      willReadFrequently: false
-    });
-    if (!ctx) throw new Error("2D context unavailable");
-    
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    
-    await page.render({ 
-      canvasContext: ctx, 
-      viewport: vp,
-      canvas
-    }).promise;
-
-
-    const anns = await page.getAnnotations({ intent: "display" });
-    const links: PageBmp["links"] = [];
-    anns.forEach((a: any) => {
-      if (a.subtype !== "Link") return;
-      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-      const left = Math.min(x1, x2), top = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
-    });
-
-    const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? 0.92 : 1.0; // ← було 0.86, підвищено до 0.92
-return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links };
-  }
-
-
-
-
 
 
 
 const [, setTick] = useState(0);
+const activeRendersRef = useRef<Set<number>>(new Set());
 
-function warmPagesAround(idx0: number) {
-  if (!pdfDoc) return;
-  const want = new Set<number>();
+async function warmPagesAround(idx0: number) {
+  if (!pdfDoc || !pdfjs) return;
+  
+  const currentPage = idx0 + 1;
   const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
   
-  // ⚠️ Пріоритет: наступні 3 сторінки
-  for (let d = 1; d <= 3; d++) want.add(clamp(idx0 + 1 + d));
-  
-  // Потім поточна та попередні
-  want.add(clamp(idx0 + 1));
-  for (let d = -1; d >= -2; d--) want.add(clamp(idx0 + 1 + d));
+  const priority = [
+    { pages: [clamp(currentPage)], immediate: true },
+    { pages: [clamp(currentPage + 1), clamp(currentPage + 2)], immediate: true },
+    { pages: [clamp(currentPage - 1), clamp(currentPage + 3)], immediate: false }
+  ];
 
-  // Рендеримо асинхронно без блокування UI
-  want.forEach(async (p) => {
-    if (cacheRef.current.has(p)) return;
-    try {
-      // Використовуємо requestIdleCallback якщо доступний
-      const render = async () => {
-        const bmp = await renderPageToImage(p);
-        cacheRef.current.set(p, bmp);
-        setTick((t) => t + 1);
-      };
-      
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => render(), { timeout: 1000 });
-      } else {
-        setTimeout(render, 0);
+  const toRender: Array<{ page: number; immediate: boolean }> = [];
+  
+  priority.forEach(({ pages, immediate }) => {
+    pages.forEach(p => {
+      if (!cacheRef.current.has(p) && !activeRendersRef.current.has(p)) {
+        toRender.push({ page: p, immediate });
       }
-    } catch {}
+    });
   });
+
+  const renderBatch = async (batch: Array<{ page: number; immediate: boolean }>) => {
+    const promises = batch.map(async ({ page, immediate }) => {
+      if (activeRendersRef.current.size >= MAX_CONCURRENT_RENDERS && !immediate) {
+        return;
+      }
+
+      activeRendersRef.current.add(page);
+      
+      try {
+        const promise = getOrCreateRenderPromise(page, pdfDoc, pdfjs, pageW, pageH, fitScale);
+        if (!promise) return;
+        
+        const bmp = await promise;
+        cacheRef.current.set(page, bmp);
+        setTick(t => t + 1);
+      } catch (e) {
+        console.warn(`Render failed for page ${page}:`, e);
+      } finally {
+        activeRendersRef.current.delete(page);
+      }
+    });
+
+    await Promise.allSettled(promises);
+  };
+
+  const immediate = toRender.filter(x => x.immediate);
+  const deferred = toRender.filter(x => !x.immediate);
+  
+  if (immediate.length) await renderBatch(immediate);
+  
+  if (deferred.length) {
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => renderBatch(deferred), { timeout: 500 });
+    } else {
+      setTimeout(() => renderBatch(deferred), 100);
+    }
+  }
 }
+
 
 
   /* ---------- search ---------- */
@@ -368,7 +475,9 @@ nextMap.get(p)!.push({ ...box, hitIndex });
   }
   function goFirst() { goToPage(1); }
   function goLast() { if (pdfDoc) goToPage(pdfDoc.numPages); }
-  useEffect(() => { warmPagesAround(currentIndex); }, [currentIndex, pdfDoc]);
+  useEffect(() => { 
+  void warmPagesAround(currentIndex); 
+}, [currentIndex, pdfDoc, pageW, pageH, fitScale]);
 
   /* ---------- swipe-to-flip (mobile, anywhere) ---------- */
 useEffect(() => {
