@@ -235,10 +235,9 @@ const mCtrl = {
   maxShadowOpacity={0.2}
   drawShadow
   mobileScrollSupport
-
-  disableFlipByClick   // ← внутрішній клік вимкнено (клік обробимо самі)
+  disableFlipByClick
   showHint={false}
-  useMouseEvents       // ← drag у ввімкненому стані (працюватиме лише в «дірках»)
+  useMouseEvents={false}   // ← було true/присутній прапор; ставимо false
   clickEventForward
   startPage={(initPageRef.current ?? 0) as number}
   onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
@@ -251,13 +250,11 @@ const mCtrl = {
   }}
 >
 
-
               {Array.from({ length: ctrl.totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
                 const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
                   (bmp?.links as any) ?? [];
-                  
 
                 return (
                   <div
@@ -658,7 +655,7 @@ const mCtrl = {
 
 /* маленькі активні трикутники */
 .flip-handles .fh{
-  position: absolute;
+  position: absolute;іі
   width: var(--corner-size); height: var(--corner-size);
   border: 0; background: transparent;
   pointer-events: auto;       /* тільки сам трикутник ловить події */
