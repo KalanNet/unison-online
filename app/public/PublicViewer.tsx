@@ -181,6 +181,11 @@ const mCtrl = {
   );
 }
 
+// прапорці для обкладинок (десктоп)
+const isFrontCover = !ctrl.single && ctrl.currentIndex === 0;
+const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1);
+
+
   // --- ДЕСКТОП (FlipBook) ---
   return (
     <div className="viewer-root">
@@ -208,9 +213,9 @@ const mCtrl = {
         {/* внутрішній контейнер, який резервує місце симетрично всередині сцени */}
         <div className="stage-rail">
           <div
-            className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+            className={`book-container${isFrontCover ? " is-cover" : ""}${isBackCover ? " is-backcover" : ""}`}
             style={{
-              transition: "transform 500ms ease-in-out",
+              transition: `transform ${isBackCover ? 1000 : 500}ms ease-in-out`,
               margin: "0 auto",
               display: "flex",
               alignItems: "center",
@@ -579,8 +584,13 @@ const mCtrl = {
 
         .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
         .book-container.is-cover { transform: translateX(-24%); }
+        /* нове: задня обкладинка – симетрично вправо */
+.book-container.is-backcover { transform: translateX(24%); }
+        
         .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
         .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
+
+        
 
         .page, .page > div, .page .page-content { overflow: visible !important; }
         .page .page-content { position: relative; }
