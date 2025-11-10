@@ -276,7 +276,7 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
   // Ліміти якості/розміру — ключ до плавності
-  const DPR_CAP = 3.0;
+  const DPR_CAP = 5.0;
   const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
   const MAX_W = 3000;
   const targetW = Math.min(MAX_W, Math.max(720, Math.round(css.w * dpr)));
@@ -314,12 +314,6 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const url = await canvasToSrc(canvas, mime, quality);
   return { url, w: vp.width, h: vp.height, links };
 }
-
-
-
-
-
-
 
 
 
