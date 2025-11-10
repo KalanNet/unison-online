@@ -50,8 +50,8 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
-
-  // відсортований список і швидкий індекс -> для стабільних top-позицій
+  
+// після const isMobile = useIsMobile(980);
 const bmSorted = React.useMemo(
   () => [...bookmarks].sort((a, b) => a.page - b.page),
   [bookmarks]
@@ -60,8 +60,6 @@ const bmIndex = React.useMemo(
   () => new Map(bmSorted.map((b, i) => [b.id, i])),
   [bmSorted]
 );
-
-  
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -272,11 +270,6 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                 const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
                   (bmp?.links as any) ?? [];
 
-                  const curr = ctrl.currentIndex + 1;                 // 1-based
-const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
-
-
                 return (
                   <div
                     key={i}
@@ -328,50 +321,51 @@ const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
   const i = bmIndex.get(bm.id) ?? 0;
 
   const curr = ctrl.currentIndex + 1; // 1-based
-const isOnOpenSpread = pageNum === leftNow || pageNum === rightNow;
-const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+  const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+  const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
 
-const style: React.CSSProperties = {
-  position: "absolute",
-  zIndex: isOnOpenSpread ? 90 : 40,   // ← поверх сусідньої сторінки
-  top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
-  width: "var(--tabThickness,36px)",
-  height: "var(--tabLength,140px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: "#fff",
-  fontSize: 15,
-  fontWeight: 800,
-  lineHeight: 1,
-  border: "1px solid rgba(0,0,0,.18)",
-  boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-  opacity: 0.98,
-  pointerEvents: "auto",
-  background: bm.color || "#f47e20",
-  ...(sideIsLeft
-    ? {
-        left: 0,
-      transformOrigin: "left center",
-      // лівий ярлик трохи ЗАВОДИМО всередину сторінки; без жодних rotate
-      transform: "translateX(calc(-100% + var(--tabInset,10px)))",
-      borderRadius: "0 10px 10px 0",
-    }
-  : {
-      right: 0,
-      transformOrigin: "right center",
-      // ПРАВИЙ shape розвернутий правильно (дзеркало за рахунок радіусів),
-      // тільки симетричний відступ усередину
-      transform: "translateX(calc(100% - var(--tabInset,10px)))",
-      borderRadius: "10px 0 0 10px",
-    }),
-};
+  const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+  const style: React.CSSProperties = {
+    position: "absolute",
+    zIndex: (pageNum === leftNow || pageNum === rightNow) ? 90 : 40,
+    top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
+    width: "var(--tabThickness,36px)",
+    height: "var(--tabLength,140px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 800,
+    lineHeight: 1,
+    border: "1px solid rgba(0,0,0,.18)",
+    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+    opacity: 0.98,
+    pointerEvents: "auto",
+    background: bm.color || "#f47e20",
+    ...(sideIsLeft
+      ? {
+          left: 0,
+          transformOrigin: "left center",
+          // завели всередину сторінки; БЕЗ rotate
+          transform: "translateX(var(--tabInset,10px))",
+          borderRadius: "0 10px 10px 0",
+        }
+      : {
+          right: 0,
+          transformOrigin: "right center",
+          // симетрично для правої сторони; БЕЗ rotate
+          transform: "translateX(calc(-1 * var(--tabInset,10px)))",
+          borderRadius: "10px 0 0 10px",
+        }),
+  };
 
   return (
     <button
       key={bm.id}
       className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-        bm.page === leftNow || bm.page === leftNow + 1 ? " active" : ""
+        (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
       }`}
       title={`${bm.label} (p.${bm.page})`}
       style={style}
@@ -458,7 +452,7 @@ const style: React.CSSProperties = {
 </div>
 
 
-
+            
           </div>
         </div>
       </section>
@@ -559,8 +553,7 @@ const style: React.CSSProperties = {
           --rail: calc(var(--tabThickness) + 12px);
         }
 
-        :root { --tabInset: 10px; } /* скільки заводимо закладку всередину книги */
-:root { --tabOutside: 12px; } /* на скільки винести ярлик ЗА межі сторінки */
+        :root { --tabInset: 0px; } /* наскільки вкладка заходить усередину сторінки */
 
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
