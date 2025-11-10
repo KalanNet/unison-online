@@ -235,14 +235,10 @@ const mCtrl = {
   maxShadowOpacity={0.2}
   drawShadow
   mobileScrollSupport
-
-  /* ↓↓↓ ключові вмикачі стандартного поведінки ↓↓↓ */
-  disableFlipByClick        // фліп НЕ по кліку по сторінці
-  showHint={false}          // прибрати «загин» на ховері
-  useMouseEvents            // лишаємо drag з кута
-  clickEventForward         // лінки всередині працюють
-  /* ↑↑↑ */
-
+  disableFlipByClick
+  showHint={false}
+  useMouseEvents={false}   // ← було true/присутній прапор; ставимо false
+  clickEventForward
   startPage={(initPageRef.current ?? 0) as number}
   onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
   style={{
@@ -351,6 +347,17 @@ const mCtrl = {
                 );
               })}
             </FlipBook>
+
+            {/* Кутові хендли для гортання */}
+<div className="flip-handles" aria-hidden>
+  {/* Ліві кути — попередня сторінка */}
+  <button className="fh tl" onMouseDown={(e) => { e.preventDefault(); (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev(); }} />
+  <button className="fh bl" onMouseDown={(e) => { e.preventDefault(); (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev(); }} />
+  {/* Праві кути — наступна сторінка */}
+  <button className="fh tr" onMouseDown={(e) => { e.preventDefault(); (ctrl.bookRef.current as any)?.pageFlip?.().flipNext(); }} />
+  <button className="fh br" onMouseDown={(e) => { e.preventDefault(); (ctrl.bookRef.current as any)?.pageFlip?.().flipNext(); }} />
+</div>
+
 
             {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
             {(bookmarks?.length ?? 0) > 0 && (
@@ -637,26 +644,39 @@ const mCtrl = {
           box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
         }
 
-        /* --- tighten native StPageFlip corner hit area --- */
-.book-container .stf__corner{
-  width: 44px !important;   /* було ~90-100px, тепер у 2+ рази менше */
-  height: 44px !important;
-  /* бажано фіксовані px, щоб не перекривати контент при масштабі */
+        /* змінюй на 28–40px як зручно */
+:root { --corner-size: 34px; }
+
+.flip-handles{
+  position: absolute; inset: 0;
+  z-index: 210;
+  pointer-events: none; /* важливо: не блокуємо посилання на сторінці */
 }
 
-/* Позиції кутів (про всяк випадок прибираємо будь-які зсуви) */
-.book-container .stf__corner--top-left,
-.book-container .stf__corner--bottom-left{ left: 0 !important; }
+/* маленькі активні трикутники */
+.flip-handles .fh{
+  position: absolute;
+  width: var(--corner-size); height: var(--corner-size);
+  border: 0; background: transparent;
+  pointer-events: auto;       /* тільки сам трикутник ловить події */
+  cursor: grab;
+}
 
-.book-container .stf__corner--top-right,
-.book-container .stf__corner--bottom-right{ right: 0 !important; }
-
-/* Ледь помітний хінт при наведенні — якщо хочеш */
-.book-container .stf__corner:hover{ filter: brightness(1.02); }
-
-/* На дуже великих екранах можна трохи збільшити (щоб влучати курсором) */
-@media (min-width: 1600px){
-  .book-container .stf__corner{ width: 52px !important; height: 52px !important; }
+/* верх-ліво */
+.flip-handles .tl{ left: 0; top: 0;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+/* низ-ліво */
+.flip-handles .bl{ left: 0; bottom: 0;
+  clip-path: polygon(0 100%, 0 0, 100% 100%);
+}
+/* верх-право */
+.flip-handles .tr{ right: 0; top: 0;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+/* низ-право */
+.flip-handles .br{ right: 0; bottom: 0;
+  clip-path: polygon(100% 100%, 0 100%, 100% 0);
 }
 
 
