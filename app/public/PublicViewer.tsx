@@ -51,6 +51,59 @@ export default function PublicViewer({
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
 
+  // --- ДЕСKTOP: дозволяємо react-pageflip реагувати лише в маленьких кутах ---
+const CORNER_PX = 22; // розмір активної зони кута, підкрути за відчуттям
+
+const bookWrapRef = React.useRef<HTMLDivElement>(null);
+
+const isInteractive = (el: EventTarget | null) =>
+  el instanceof HTMLElement &&
+  !!el.closest('a, button, .pdf-link, input, textarea, select, [role="button"]');
+
+// лише ВЕРХНІ кути; якщо потрібні ще й нижні — див. коментар нижче
+const inAllowedCorner = (e: MouseEvent) => {
+  const el = bookWrapRef.current;
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  const inLeftTop  = x <= CORNER_PX && y <= CORNER_PX;
+  const inRightTop = (r.width - x) <= CORNER_PX && y <= CORNER_PX;
+  return inLeftTop || inRightTop;
+};
+
+// capture-хендлери: «з’їдаємо» події поза кутами, щоб pageflip їх не бачив
+const onMouseMoveCap = (ev: React.MouseEvent<HTMLDivElement>) => {
+  const e = ev.nativeEvent as MouseEvent;
+  if (isInteractive(e.target)) return;       // даємо ховер/клік по лінках і кнопках
+  if (!inAllowedCorner(e)) ev.stopPropagation(); // поза кутиками — без hover-загину/drag
+};
+
+const onMouseDownCap = (ev: React.MouseEvent<HTMLDivElement>) => {
+  const e = ev.nativeEvent as MouseEvent;
+  if (isInteractive(e.target)) return;       // кліки по лінках проходять
+  if (!inAllowedCorner(e)) {
+    ev.stopPropagation();
+    ev.preventDefault();                     // блокуємо початок drag/flip поза кутиками
+  }
+};
+
+/*  Якщо хочеш ще й нижні кути — заміни inAllowedCorner на варіант із низом:
+const inAllowedCorner = (e: MouseEvent) => {
+  const el = bookWrapRef.current;
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  const inLeftTop     = x <= CORNER_PX && y <= CORNER_PX;
+  const inRightTop    = (r.width - x) <= CORNER_PX && y <= CORNER_PX;
+  const inLeftBottom  = x <= CORNER_PX && (r.height - y) <= CORNER_PX;
+  const inRightBottom = (r.width - x) <= CORNER_PX && (r.height - y) <= CORNER_PX;
+  return inLeftTop || inRightTop || inLeftBottom || inRightBottom;
+};
+*/
+
+
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
     initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
@@ -207,22 +260,25 @@ const mCtrl = {
         {/* внутрішній контейнер, який резервує місце симетрично всередині сцени */}
         <div className="stage-rail">
           <div
-            className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
-            style={{
-              transition: "transform 500ms ease-in-out",
-              margin: "0 auto",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: ctrl.single
-                ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
-                : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
-              height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
-              maxWidth: "100%",
-              maxHeight: "100%",
-              position: "relative",
-            }}
-          >
+  ref={bookWrapRef}
+  onMouseMoveCapture={onMouseMoveCap}
+  onMouseDownCapture={onMouseDownCap}
+  className={`book-container${ctrl.currentIndex === 0 && !ctrl.single ? " is-cover" : ""}`}
+  style={{
+    transition: "transform 500ms ease-in-out",
+    margin: "0 auto",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: ctrl.single
+      ? Math.round(ctrl.baseSize.w * ctrl.fitScale)
+      : Math.round(ctrl.baseSize.w * ctrl.fitScale * 2),
+    height: Math.round(ctrl.baseSize.h * ctrl.fitScale),
+    maxWidth: "100%",
+    maxHeight: "100%",
+    position: "relative",
+  }}
+>
             <FlipBook
               ref={ctrl.bookRef}
               width={ctrl.baseSize.w}
@@ -626,6 +682,21 @@ const mCtrl = {
           outline-color: rgba(56, 189, 248, .95);
           box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
         }
+
+        /* легкий хінт у верхніх кутах, не заважає клікам (pointer-events:none) */
+.book-container::before,
+.book-container::after{
+  content:"";
+  position:absolute; top:0; width:22px; height:22px;
+  background: linear-gradient(135deg, rgba(0,0,0,.14), rgba(0,0,0,0));
+  opacity:.0; transition: opacity .12s ease;
+  pointer-events:none;
+}
+.book-container::before{ left:0; }
+.book-container::after { right:0; transform: scaleX(-1); }
+.book-container:hover::before,
+.book-container:hover::after{ opacity:.28; }
+
       `}</style>
     </div>
   );
