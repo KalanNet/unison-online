@@ -645,7 +645,7 @@ const mCtrl = {
         }
 
         /* змінюй на 28–40px як зручно */
-:root { --corner-size: 34px; }
+:root { --corner-size: 50px; }
 
 .flip-handles{
   position: absolute; inset: 0;
