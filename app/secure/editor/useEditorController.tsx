@@ -211,8 +211,8 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
     
     // ⚠️ КРИТИЧНО: зменшено з 7 до 2, з 4 до 1.5
-    const DPR_CAP = 2;  // було 7
-    const QUALITY = 1.5; // було 4
+    const DPR_CAP = 5;  // було 7
+    const QUALITY = 4; // було 4
     
     const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
