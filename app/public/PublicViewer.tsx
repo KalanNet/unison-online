@@ -50,6 +50,17 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
+
+  // відсортований список і швидкий індекс -> для стабільних top-позицій
+const bmSorted = React.useMemo(
+  () => [...bookmarks].sort((a, b) => a.page - b.page),
+  [bookmarks]
+);
+const bmIndex = React.useMemo(
+  () => new Map(bmSorted.map((b, i) => [b.id, i])),
+  [bmSorted]
+);
+
   
 
   // 3) Зафіксувати стартову сторінку (один раз)
@@ -307,6 +318,85 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                         </div>
                         {/* === /HIGHLIGHTS LAYER === */}
 
+                        {/* === BOOKMARK TABS (attached to this page) === */}
+{bmSorted.filter(b => b.page === pageNum).map((bm) => {
+  const i = bmIndex.get(bm.id) ?? 0;
+
+  const curr = ctrl.currentIndex + 1; // 1-based
+  const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+  const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+  const style: React.CSSProperties = {
+    position: "absolute",
+    zIndex: 6,                       // над контентом сторінки
+    top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
+    width: "var(--tabThickness,36px)",
+    height: "var(--tabLength,140px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 800,
+    lineHeight: 1,
+    border: "1px solid rgba(0,0,0,.18)",
+    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+    opacity: 0.98,
+    pointerEvents: "auto",
+    background: bm.color || "#f47e20",
+    ...(sideIsLeft
+      ? {
+          left: 0,
+          transformOrigin: "left center",
+          // ВИХОДИМО назовні як і раніше; невеликий "inset" залишаємо для реалізму
+          transform:
+            "translateX(calc(-100% + var(--tabInset,10px))) rotate(180deg) scaleX(var(--bmScale,1))",
+          borderRadius: "0 10px 10px 0",
+        }
+      : {
+          right: 0,
+          transformOrigin: "right center",
+          transform:
+            "translateX(calc(100% - var(--tabInset,10px))) scaleX(var(--bmScale,1))",
+          // дзеркальна форма для правої сторони
+          borderRadius: "10px 0 0 10px",
+        }),
+  };
+
+  return (
+    <button
+      key={bm.id}
+      className={`bm-tab ${sideIsLeft ? "left" : "right"}${
+        bm.page === leftNow || bm.page === leftNow + 1 ? " active" : ""
+      }`}
+      title={`${bm.label} (p.${bm.page})`}
+      style={style}
+      onClick={(e) => {
+        e.preventDefault();
+        const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+        if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+        else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+      }}
+    >
+      <span
+        className="bm-tab__label"
+        style={{
+          maxHeight: "calc(var(--tabLength,140px) - 10px)",
+          padding: "4px 0",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+      >
+        {bm.label}
+      </span>
+    </button>
+  );
+})}
+{/* === /BOOKMARK TABS === */}
+
+
                         {/* PDF LINKS */}
                         {links?.length
                           ? links.map((L, idx) =>
@@ -364,110 +454,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
 </div>
 
 
-            {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
-            {(bookmarks?.length ?? 0) > 0 && (
-              <div
-  className="bm-tabs-overlay"
-  style={{
-    position: "absolute",
-    inset: 0,
-    zIndex: 200,
-    overflow: "visible",
-    pointerEvents: "none",
-    ["--tabThickness" as any]: "36px",
-    ["--tabLength"   as any]: "140px",
-    ["--tabTop"      as any]: "36px",
-    ["--tabGap"      as any]: "0px",
-    ["--tabInset"    as any]: "var(--tabInset)", // ← нове
-  } as React.CSSProperties}
->
-                {(() => {
-                  const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
 
-                  // поточний розворот
-                  const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
-                  const leftNow = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-                  const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
-
-                  return sorted.map((bm, i) => {
-                    const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
-
-                    const baseStyle: React.CSSProperties = {
-                      position: "absolute",
-                      top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-                      width: "var(--tabThickness)",
-                      height: "var(--tabLength)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontSize: 15,
-                      fontWeight: 800,
-                      lineHeight: 1,
-                      border: "1px solid rgba(0,0,0,.18)",
-                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                      opacity: 0.98,
-                      transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-                      pointerEvents: "auto",
-                      background: bm.color || "#f47e20",
-                      borderRadius: "0 10px 10px 0",
-                    };
-
-                    const sideStyle: React.CSSProperties = sideIsLeft
-  ? {
-      /* ЛІВА сторона: заходимо всередину книги на var(--tabInset) */
-      left: 0,
-      transformOrigin: "left center",
-      transform:
-        "translateX(var(--tabInset)) rotate(180deg) scaleX(var(--bmScale,1))",
-    }
-  : {
-      /* ПРАВА сторона: так само, але всередину з правого краю */
-      right: 0,
-      transformOrigin: "right center",
-      transform:
-        "translateX(calc(-1 * var(--tabInset))) scaleX(var(--bmScale,1))",
-    };
-
-
-                    return (
-                      <button
-                        key={bm.id}
-                        className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-                          (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
-                        }`}
-                        title={`${bm.label} (p.${bm.page})`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
-                          if (typeof ctrl!.goToPage === "function") {
-                            ctrl!.goToPage(pageIndex);
-                          } else {
-                            (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
-                          }
-                        }}
-                        style={{ ...baseStyle, ...sideStyle }}
-                      >
-                        <span
-                          className="bm-tab__label"
-                          style={{
-                            maxHeight: "calc(var(--tabLength) - 10px)",
-                            padding: "4px 0",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            writingMode: "vertical-rl",
-                            textOrientation: "mixed",
-                          } as React.CSSProperties}
-                        >
-                          {bm.label}
-                        </span>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-            {/* === /OVERLAY ЗАКЛАДОК === */}
           </div>
         </div>
       </section>
