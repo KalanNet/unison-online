@@ -323,8 +323,8 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   const i = bmIndex.get(bm.id) ?? 0;
 
   const curr = ctrl.currentIndex + 1; // 1-based
-  const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-  const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
 
   const style: React.CSSProperties = {
     position: "absolute",
@@ -350,14 +350,14 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
           transformOrigin: "left center",
           // ВИХОДИМО назовні як і раніше; невеликий "inset" залишаємо для реалізму
           transform:
-            "translateX(calc(-100% + var(--tabInset,10px))) rotate(180deg) scaleX(var(--bmScale,1))",
+             "translateX(calc(-100% - var(--tabOutside))) rotate(180deg) scaleX(var(--bmScale,1))",
           borderRadius: "0 10px 10px 0",
         }
       : {
           right: 0,
           transformOrigin: "right center",
           transform:
-            "translateX(calc(100% - var(--tabInset,10px))) scaleX(var(--bmScale,1))",
+            "translateX(calc(100% + var(--tabOutside))) scaleX(var(--bmScale,1))",
           // дзеркальна форма для правої сторони
           borderRadius: "10px 0 0 10px",
         }),
@@ -556,6 +556,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
         }
 
         :root { --tabInset: 10px; } /* скільки заводимо закладку всередину книги */
+:root { --tabOutside: 12px; } /* на скільки винести ярлик ЗА межі сторінки */
 
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
