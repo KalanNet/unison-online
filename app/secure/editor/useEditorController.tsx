@@ -371,25 +371,13 @@ nextMap.get(p)!.push({ ...box, hitIndex });
   /* ---------- navigation ---------- */
   const canPrev = !!pdfDoc && currentIndex > 0;
   const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
-  function goPrev() {
-  if (!bookRef.current || !canPrev) return;
-  warmPagesAround(currentIndex - 1);
-  bookRef.current.pageFlip().flipPrev();
-}
-
-  function goNext() {
-  if (!bookRef.current || !canNext) return;
-  warmPagesAround(currentIndex + 1);
-  bookRef.current.pageFlip().flipNext();
-}
-
-function goToPage(p: number) {
-  if (!bookRef.current || !pdfDoc) return;
-  const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
-  warmPagesAround(idx);
-  bookRef.current.pageFlip().flip(idx);
-}
-
+  function goPrev() { if (!bookRef.current || !canPrev) return; bookRef.current.pageFlip().flipPrev(); }
+  function goNext() { if (!bookRef.current || !canNext) return; bookRef.current.pageFlip().flipNext(); }
+  function goToPage(p: number) {
+    if (!bookRef.current || !pdfDoc) return;
+    const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
+    bookRef.current.pageFlip().flip(idx);
+  }
   function goFirst() { goToPage(1); }
   function goLast() { if (pdfDoc) goToPage(pdfDoc.numPages); }
   useEffect(() => { warmPagesAround(currentIndex); }, [currentIndex, pdfDoc]);
