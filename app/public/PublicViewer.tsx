@@ -317,6 +317,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                         {/* === /HIGHLIGHTS LAYER === */}
 
                         {/* === BOOKMARK TABS (attached to this page) === */}
+{/* === BOOKMARK TABS (ONLY for current spread pages) === */}
 {bmSorted.filter(b => b.page === pageNum).map((bm) => {
   const i = bmIndex.get(bm.id) ?? 0;
 
@@ -324,11 +325,22 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
   const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
 
+  const isCurrentLeft  = pageNum === leftNow;
+  const isCurrentRight = pageNum === rightNow;
+
+  // яка сторона для цієї закладки
   const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+  // показуємо вкладку на сторінці лише якщо вона «зовнішня» для цього аркуша
+  const shouldAttach =
+    (isCurrentLeft  && sideIsLeft) ||
+    (isCurrentRight && !sideIsLeft);
+
+  if (!shouldAttach) return null;
 
   const style: React.CSSProperties = {
     position: "absolute",
-    zIndex: (pageNum === leftNow || pageNum === rightNow) ? 90 : 40,
+    zIndex: 90,
     top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
     width: "var(--tabThickness,36px)",
     height: "var(--tabLength,140px)",
@@ -344,19 +356,17 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
     opacity: 0.98,
     pointerEvents: "auto",
     background: bm.color || "#f47e20",
-    ...(sideIsLeft
+    ...(isCurrentLeft
       ? {
           left: 0,
           transformOrigin: "left center",
-          // завели всередину сторінки; БЕЗ rotate
-          transform: "translateX(var(--tabInset,10px))",
+          transform: "translateX(var(--tabInset,-35px))",
           borderRadius: "10px 0 0 10px",
         }
       : {
           right: 0,
           transformOrigin: "right center",
-          // симетрично для правої сторони; БЕЗ rotate
-          transform: "translateX(calc(-1 * var(--tabInset,10px)))",
+          transform: "translateX(calc(-1 * var(--tabInset,-35px)))",
           borderRadius: "0 10px 10px 0",
         }),
   };
@@ -364,9 +374,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   return (
     <button
       key={bm.id}
-      className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-        (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
-      }`}
+      className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
       title={`${bm.label} (p.${bm.page})`}
       style={style}
       onClick={(e) => {
@@ -746,6 +754,52 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
 .flip-handles .br{ right: 0; bottom: 0;
   clip-path: polygon(100% 100%, 0 100%, 100% 0);
 }
+
+/* Рейки: займають падінги stage-rail, не блокують посилання */
+.bm-rails{
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+/* Ліва/права колонки у виділених полях по боках книги */
+.bm-rail{
+  position: absolute;
+  top: var(--tabTop,36px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tabGap, 0px);
+  width: var(--tabThickness,36px);
+}
+.bm-rail.left  { left: 0;  align-items: flex-start; }
+.bm-rail.right { right: 0; align-items: flex-end;  }
+
+/* Загальний вигляд вкладок на рейках */
+.bm-rail .bm-tab{
+  position: relative;
+  width: var(--tabThickness,36px);
+  height: var(--tabLength,140px);
+  border: 1px solid rgba(0,0,0,.18);
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  color: #fff; font-weight: 800; font-size: 15px; line-height: 1;
+  pointer-events: auto; cursor: pointer;
+  transition: transform .18s ease, filter .18s ease;
+}
+.bm-rail .bm-tab.left  { border-radius: 10px 0 0 10px; }
+.bm-rail .bm-tab.right { border-radius: 0 10px 10px 0; }
+
+.bm-tab__label{
+  writing-mode: vertical-rl; text-orientation: mixed;
+  max-height: calc(var(--tabLength,140px) - 10px);
+  padding: 4px 0; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Ховер-ефекти однакові всюди */
+.bm-tab:hover { transform: scale(1.06); filter: brightness(1.03); }
+.bm-tab:active { transform: scale(1.03); }
+
+/* Рендер сторінкових вкладок (current spread) вже з твоїм --tabInset:-35px */
 
 
         
