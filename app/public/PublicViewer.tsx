@@ -225,26 +225,35 @@ const mCtrl = {
             }}
           >
             <FlipBook
-              ref={ctrl.bookRef}
-              width={ctrl.baseSize.w}
-              height={ctrl.baseSize.h}
-              size="stretch"
-              usePortrait={ctrl.single}
-              showCover={!ctrl.single}
-              flippingTime={900}
-              maxShadowOpacity={0.2}
-              drawShadow
-              mobileScrollSupport
-              startPage={(initPageRef.current ?? 0) as number}
-              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-              style={{
-                width: "100%",
-                height: "100%",
-                minWidth: 0,
-                minHeight: 0,
-                aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-              }}
-            >
+  ref={ctrl.bookRef}
+  width={ctrl.baseSize.w}
+  height={ctrl.baseSize.h}
+  size="stretch"
+  usePortrait={ctrl.single}
+  showCover={!ctrl.single}
+  flippingTime={900}
+  maxShadowOpacity={0.2}
+  drawShadow
+  mobileScrollSupport
+
+  /* ↓↓↓ ключові вмикачі стандартного поведінки ↓↓↓ */
+  disableFlipByClick        // фліп НЕ по кліку по сторінці
+  showHint={false}          // прибрати «загин» на ховері
+  useMouseEvents            // лишаємо drag з кута
+  clickEventForward         // лінки всередині працюють
+  /* ↑↑↑ */
+
+  startPage={(initPageRef.current ?? 0) as number}
+  onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+  style={{
+    width: "100%",
+    height: "100%",
+    minWidth: 0,
+    minHeight: 0,
+    aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+  }}
+>
+
               {Array.from({ length: ctrl.totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
