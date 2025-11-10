@@ -645,7 +645,7 @@ const mCtrl = {
         }
 
         /* змінюй на 28–40px як зручно */
-:root { --corner-size: 70px; }
+:root { --corner-size: 34px; }
 
 .flip-handles{
   position: absolute; inset: 0;
@@ -655,7 +655,7 @@ const mCtrl = {
 
 /* маленькі активні трикутники */
 .flip-handles .fh{
-  position: absolute;іі
+  position: absolute;
   width: var(--corner-size); height: var(--corner-size);
   border: 0; background: transparent;
   pointer-events: auto;       /* тільки сам трикутник ловить події */
