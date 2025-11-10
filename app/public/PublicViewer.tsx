@@ -257,26 +257,7 @@ const mCtrl = {
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
                 const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
                   (bmp?.links as any) ?? [];
-
-                  const onPageSurfaceClick = (e: React.MouseEvent<HTMLDivElement>) => {
-  const api = (ctrl.bookRef.current as any)?.pageFlip?.();
-  if (!api) return;
-
-  const rail = (e.currentTarget.parentElement as HTMLElement); // контейнер сторінки
-  const r = rail.getBoundingClientRect();
-  const x = e.clientX - r.left;
-  const half = r.width / 2;
-
-  // Визначаємо сторону кліку навіть у розвороті
-  if (x < half) {
-    if (api.flipPrev) api.flipPrev();
-    else api.turnToPrevPage?.();
-  } else {
-    if (api.flipNext) api.flipNext();
-    else api.turnToNextPage?.();
-  }
-};
-
+                  
 
                 return (
                   <div
@@ -302,20 +283,6 @@ const mCtrl = {
                             display: "block",
                           }}
                         />
-
-                        {/* Клік-ловець з «дірками» у 4-х кутах */}
-<div className="click-catcher" onClick={onPageSurfaceClick} aria-hidden>
-  <div className="cell tl hole" />
-  <div className="cell t" />
-  <div className="cell tr hole" />
-  <div className="cell l" />
-  <div className="cell c" />
-  <div className="cell r" />
-  <div className="cell bl hole" />
-  <div className="cell b" />
-  <div className="cell br hole" />
-</div>
-
 
                         {/* === HIGHLIGHTS LAYER === */}
                         <div className="hl-layer" aria-hidden>
