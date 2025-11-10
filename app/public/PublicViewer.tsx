@@ -367,19 +367,20 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
             {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
             {(bookmarks?.length ?? 0) > 0 && (
               <div
-                className="bm-tabs-overlay"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 200,
-                  overflow: "visible",
-                  pointerEvents: "none",
-                  ["--tabThickness" as any]: "36px",
-                  ["--tabLength" as any]: "140px",
-                  ["--tabTop" as any]: "36px",
-                  ["--tabGap" as any]: "0px",
-                } as React.CSSProperties}
-              >
+  className="bm-tabs-overlay"
+  style={{
+    position: "absolute",
+    inset: 0,
+    zIndex: 200,
+    overflow: "visible",
+    pointerEvents: "none",
+    ["--tabThickness" as any]: "36px",
+    ["--tabLength"   as any]: "140px",
+    ["--tabTop"      as any]: "36px",
+    ["--tabGap"      as any]: "0px",
+    ["--tabInset"    as any]: "var(--tabInset)", // ← нове
+  } as React.CSSProperties}
+>
                 {(() => {
                   const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
 
@@ -413,18 +414,21 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                     };
 
                     const sideStyle: React.CSSProperties = sideIsLeft
-                      ? {
-                          left: 0,
-                          transformOrigin: "center center",
-                          transform:
-                            "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
-                        }
-                      : {
-                          right: 0,
-                          transformOrigin: "center center",
-                          transform:
-                            "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
-                        };
+  ? {
+      /* ЛІВА сторона: заходимо всередину книги на var(--tabInset) */
+      left: 0,
+      transformOrigin: "left center",
+      transform:
+        "translateX(var(--tabInset)) rotate(180deg) scaleX(var(--bmScale,1))",
+    }
+  : {
+      /* ПРАВА сторона: так само, але всередину з правого краю */
+      right: 0,
+      transformOrigin: "right center",
+      transform:
+        "translateX(calc(-1 * var(--tabInset))) scaleX(var(--bmScale,1))",
+    };
+
 
                     return (
                       <button
@@ -563,6 +567,9 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
           --tabThickness: 36px;
           --rail: calc(var(--tabThickness) + 12px);
         }
+
+        :root { --tabInset: 10px; } /* скільки заводимо закладку всередину книги */
+
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
         .viewer-root { min-height: 100dvh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
