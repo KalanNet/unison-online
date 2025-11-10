@@ -352,17 +352,19 @@ const style: React.CSSProperties = {
   ...(sideIsLeft
     ? {
         left: 0,
-        transformOrigin: "left center",
-        // тільки трохи винести ЯРЛИК за край сторінки
-        transform: "translateX(calc(-1 * var(--tabOutside,12px)))",
-        borderRadius: "0 10px 10px 0",
-      }
-    : {
-        right: 0,
-        transformOrigin: "right center",
-        transform: "translateX(var(--tabOutside,12px))",
-        borderRadius: "10px 0 0 10px",
-      }),
+      transformOrigin: "left center",
+      // лівий ярлик трохи ЗАВОДИМО всередину сторінки; без жодних rotate
+      transform: "translateX(calc(-100% + var(--tabInset,10px)))",
+      borderRadius: "0 10px 10px 0",
+    }
+  : {
+      right: 0,
+      transformOrigin: "right center",
+      // ПРАВИЙ shape розвернутий правильно (дзеркало за рахунок радіусів),
+      // тільки симетричний відступ усередину
+      transform: "translateX(calc(100% - var(--tabInset,10px)))",
+      borderRadius: "10px 0 0 10px",
+    }),
 };
 
   return (
