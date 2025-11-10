@@ -209,7 +209,11 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const page = await pdfDoc.getPage(pageNum);
 
     const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 4;
+    
+    // ⚠️ КРИТИЧНО: зменшено з 7 до 2, з 4 до 1.5
+    const DPR_CAP = 2;  // було 7
+    const QUALITY = 1.5; // було 4
+    
     const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
     const vp = page.getViewport({ scale });
@@ -217,11 +221,21 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(vp.width));
     canvas.height = Math.max(1, Math.round(vp.height));
-    const ctx = canvas.getContext("2d", { alpha: false });
+    const ctx = canvas.getContext("2d", { 
+      alpha: false,
+      desynchronized: true, // ← додано для кращої продуктивності
+      willReadFrequently: false
+    });
     if (!ctx) throw new Error("2D context unavailable");
-      ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
+    
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    
+    await page.render({ 
+      canvasContext: ctx, 
+      viewport: vp,
+      canvas
+    }).promise;
 
 
     const anns = await page.getAnnotations({ intent: "display" });
@@ -235,9 +249,8 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
     });
 
     const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? 0.86 : 1.0; // PNG ігнорує параметр якості
+const quality = mime === "image/webp" ? 0.92 : 1.0; // ← було 0.86, підвищено до 0.92
 return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links };
-
   }
 
 
@@ -246,17 +259,40 @@ return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links 
 
 
 
-  const [, setTick] = useState(0);
-  function warmPagesAround(idx0: number) {
-    if (!pdfDoc) return;
-    const want = new Set<number>();
-    const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
-    for (let d = -3; d <= 3; d++) want.add(clamp(idx0 + 1 + d));
-    want.forEach(async (p) => {
-      if (cacheRef.current.has(p)) return;
-      try { const bmp = await renderPageToImage(p); cacheRef.current.set(p, bmp); setTick((t) => t + 1); } catch {}
-    });
-  }
+const [, setTick] = useState(0);
+
+function warmPagesAround(idx0: number) {
+  if (!pdfDoc) return;
+  const want = new Set<number>();
+  const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
+  
+  // ⚠️ Пріоритет: наступні 3 сторінки
+  for (let d = 1; d <= 3; d++) want.add(clamp(idx0 + 1 + d));
+  
+  // Потім поточна та попередні
+  want.add(clamp(idx0 + 1));
+  for (let d = -1; d >= -2; d--) want.add(clamp(idx0 + 1 + d));
+
+  // Рендеримо асинхронно без блокування UI
+  want.forEach(async (p) => {
+    if (cacheRef.current.has(p)) return;
+    try {
+      // Використовуємо requestIdleCallback якщо доступний
+      const render = async () => {
+        const bmp = await renderPageToImage(p);
+        cacheRef.current.set(p, bmp);
+        setTick((t) => t + 1);
+      };
+      
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => render(), { timeout: 1000 });
+      } else {
+        setTimeout(render, 0);
+      }
+    } catch {}
+  });
+}
+
 
   /* ---------- search ---------- */
   function normBox(x: number, y: number, w: number, h: number, PW: number, PH: number): SearchBox {
@@ -648,6 +684,18 @@ async function publishMetaAndBookmarks(): Promise<{
 
     .panel-title{ color:#e9f0e4; font-weight:800; margin-bottom:.5rem; }
     .viewer-panel{ background:#fff; box-shadow: inset 0 1px 0 #eef1e8; }
+
+    .flipbook-instance,
+    .flipbook-instance > * {
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+    
+    /* Оптимізація для анімацій */
+    .stf__wrapper {
+      contain: layout style paint;
+    }
 
 
     .portal-loupe{ position: fixed; z-index: 60; border-radius: 999px; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.24), inset 0 0 0 2px rgba(255,255,255,.9); pointer-events: none; background:#fff; contain: layout paint; will-change: transform; transform: translateZ(0); }
