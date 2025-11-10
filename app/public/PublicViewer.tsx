@@ -636,6 +636,32 @@ const mCtrl = {
           outline-color: rgba(56, 189, 248, .95);
           box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
         }
+
+        /* --- tighten native StPageFlip corner hit area --- */
+.book-container .stf__corner{
+  width: 44px !important;   /* було ~90-100px, тепер у 2+ рази менше */
+  height: 44px !important;
+  /* бажано фіксовані px, щоб не перекривати контент при масштабі */
+}
+
+/* Позиції кутів (про всяк випадок прибираємо будь-які зсуви) */
+.book-container .stf__corner--top-left,
+.book-container .stf__corner--bottom-left{ left: 0 !important; }
+
+.book-container .stf__corner--top-right,
+.book-container .stf__corner--bottom-right{ right: 0 !important; }
+
+/* Ледь помітний хінт при наведенні — якщо хочеш */
+.book-container .stf__corner:hover{ filter: brightness(1.02); }
+
+/* На дуже великих екранах можна трохи збільшити (щоб влучати курсором) */
+@media (min-width: 1600px){
+  .book-container .stf__corner{ width: 52px !important; height: 52px !important; }
+}
+
+
+        
+
       `}</style>
     </div>
   );
