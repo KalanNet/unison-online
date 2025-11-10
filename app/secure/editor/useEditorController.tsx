@@ -86,6 +86,18 @@ export function useViewerController({ file, title }: { file: string; title?: str
 
   const cacheRef = useRef<Map<number, PageBmp>>(new Map());
 
+// app/secure/editor/useEditorController.tsx — objectURL utils
+const urlsRef = useRef<Set<string>>(new Set());
+function registerUrl(u: string) {
+  try { urlsRef.current.add(u); } catch {}
+}
+function revokeAllUrls() {
+  try {
+    urlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} });
+    urlsRef.current.clear();
+  } catch {}
+}
+
 
   // пошук
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,28 +135,34 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   }, []);
 
 
-  /* ---------- load file ---------- */
-  useEffect(() => {
-    if (!pdfjs || !file) return;
-    (async () => {
-      const res = await fetch(file); if (!res.ok) return;
-      const buf = await res.arrayBuffer();
-      const task = pdfjs.getDocument({ data: buf });
-      const doc = await task.promise;
+/* ---------- load file ---------- */
+useEffect(() => {
+  if (!pdfjs || !file) return;
+  (async () => {
+    // новий файл → зачистити попередні objectURL та кеш
+    revokeAllUrls();
+    cacheRef.current.clear();
 
+    const res = await fetch(file);
+    if (!res.ok) return;
+    const buf = await res.arrayBuffer();
+    const task = pdfjs.getDocument({ data: buf });
+    const doc = await task.promise;
 
-      cacheRef.current.clear();
-      setPdfDoc(doc); setCurrentIndex(0);
+    setPdfDoc(doc);
+    setCurrentIndex(0);
 
+    const p1 = await doc.getPage(1);
+    const vp1 = p1.getViewport({ scale: 1 });
+    setPageW(vp1.width);
+    setPageH(vp1.height);
 
-      const p1 = await doc.getPage(1);
-      const vp1 = p1.getViewport({ scale: 1 });
-      setPageW(vp1.width); setPageH(vp1.height);
-
-
-      setTimeout(() => { void calcFitScale(); warmPagesAround(0); }, 0);
-    })().catch(console.error);
-  }, [pdfjs, file]);
+    requestAnimationFrame(() => {
+      void calcFitScale();
+      warmPagesAround(0);
+    });
+  })().catch(console.error);
+}, [pdfjs, file]);
 
 
   /* ---------- глобальна висота + fullscreen ---------- */
@@ -233,50 +251,71 @@ const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>
   }, [pdfDoc, single, isNarrow]);
 
 
-  /* ---------- render page → image ---------- */
-  function getPageCssSize(base: { w: number; h: number }, fit: number) {
-    return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
-  }
+/* ---------- render page → image ---------- */
+function getPageCssSize(base: { w: number; h: number }, fit: number) {
+  return { w: Math.max(1, Math.floor(base.w * fit)), h: Math.max(1, Math.floor(base.h * fit)) };
+}
+
+async function canvasToSrc(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<string> {
+  if ('toBlob' in canvas) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, quality));
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      registerUrl(url);
+      return url;
+    }
+  }
+  // фолбек
+  return canvas.toDataURL(mime, quality);
+}
+
 async function renderPageToImage(pageNum: number): Promise<PageBmp> {
-    if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
-    const page = await pdfDoc.getPage(pageNum);
+  if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
+
+  const page = await pdfDoc.getPage(pageNum);
+  const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
+
+  // Ліміти якості/розміру — ключ до плавності
+  const DPR_CAP = 2.5;
+  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+  const MAX_W = 2200;
+  const targetW = Math.min(MAX_W, Math.max(720, Math.round(css.w * dpr)));
+  const scale = Math.max(0.5, targetW / pageW);
+
+  const vp = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  canvas.width  = Math.max(1, Math.round(vp.width));
+  canvas.height = Math.max(1, Math.round(vp.height));
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("2D context unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
+
+  // лінки
+  const anns = await page.getAnnotations({ intent: "display" });
+  const links: PageBmp["links"] = [];
+  anns.forEach((a: any) => {
+    if (a.subtype !== "Link") return;
+    const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
+    const left = Math.min(x1, x2), top = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    links.push({
+      x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height,
+      href: sanitizeLink(a) || undefined, dest: a.dest
+    });
+  });
+
+  const mime = canEncodeWebP() ? "image/webp" : "image/png";
+  const quality = mime === "image/webp" ? 0.82 : 1.0;
+
+  const url = await canvasToSrc(canvas, mime, quality);
+  return { url, w: vp.width, h: vp.height, links };
+}
 
 
-    const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
-    const DPR_CAP = 7, QUALITY = 4;
-    const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const scale = Math.max(0.1, (css.w / pageW) * dpr * QUALITY);
-    const vp = page.getViewport({ scale });
-
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(vp.width));
-    canvas.height = Math.max(1, Math.round(vp.height));
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("2D context unavailable");
-      ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
-
-
-
-    const anns = await page.getAnnotations({ intent: "display" });
-    const links: PageBmp["links"] = [];
-    anns.forEach((a: any) => {
-      if (a.subtype !== "Link") return;
-      const [x1, y1, x2, y2] = vp.convertToViewportRectangle(a.rect);
-      const left = Math.min(x1, x2), top = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-      links.push({ x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height, href: sanitizeLink(a) || undefined, dest: a.dest });
-    });
-
-
-    const mime = canEncodeWebP() ? "image/webp" : "image/png";
-const quality = mime === "image/webp" ? 0.86 : 1.0; // PNG ігнорує параметр якості
-return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links };
-
-
-  }
 
 
 
@@ -284,18 +323,56 @@ return { url: canvas.toDataURL(mime, quality), w: vp.width, h: vp.height, links 
 
 
 
+/* ---------- прогрів та черга рендерів ---------- */
+const [, setTick] = useState(0);
 
-  const [, setTick] = useState(0);
-  function warmPagesAround(idx0: number) {
-    if (!pdfDoc) return;
-    const want = new Set<number>();
-    const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
-    for (let d = -3; d <= 3; d++) want.add(clamp(idx0 + 1 + d));
-    want.forEach(async (p) => {
-      if (cacheRef.current.has(p)) return;
-      try { const bmp = await renderPageToImage(p); cacheRef.current.set(p, bmp); setTick((t) => t + 1); } catch {}
-    });
-  }
+/* render queue with limited concurrency */
+const MAX_CONCURRENCY = 2;
+const inflightRef = useRef<Set<number>>(new Set());
+const queueRef = useRef<number[]>([]);
+
+function enqueueRender(p: number) {
+  if (!pdfDoc) return;
+  if (cacheRef.current.has(p)) return;
+  if (queueRef.current.includes(p)) return;
+  queueRef.current.push(p);
+  void pumpQueue();
+}
+
+async function pumpQueue() {
+  if (!pdfDoc) return;
+  while (inflightRef.current.size < MAX_CONCURRENCY && queueRef.current.length > 0) {
+    const p = queueRef.current.shift()!;
+    if (cacheRef.current.has(p)) continue;
+    inflightRef.current.add(p);
+    try {
+      const bmp = await renderPageToImage(p);
+      cacheRef.current.set(p, bmp);
+      setTick((t) => t + 1); // тригерим перерендер, щоби підхопити нові сторінки
+    } catch {
+      // ignore single-page errors
+    } finally {
+      inflightRef.current.delete(p);
+    }
+  }
+}
+
+function warmPagesAround(idx0: number) {
+  if (!pdfDoc) return;
+  const clamp = (n: number) => Math.max(1, Math.min(pdfDoc.numPages, n));
+  const center = idx0 + 1;
+
+  // Пріоритет: більше вперед (до 5), трохи назад (до 3)
+  const order: number[] = [];
+  for (let d = 0; d <= 5; d++) {
+    if (d !== 0) order.push(clamp(center + d)); // вперед
+    if (d <= 3)   order.push(clamp(center - d)); // назад
+  }
+
+  order.forEach((p) => enqueueRender(p));
+  void pumpQueue();
+}
+
 
 
   /* ---------- search ---------- */
@@ -368,19 +445,36 @@ nextMap.get(p)!.push({ ...box, hitIndex });
   }
 
 
-  /* ---------- navigation ---------- */
-  const canPrev = !!pdfDoc && currentIndex > 0;
-  const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
-  function goPrev() { if (!bookRef.current || !canPrev) return; bookRef.current.pageFlip().flipPrev(); }
-  function goNext() { if (!bookRef.current || !canNext) return; bookRef.current.pageFlip().flipNext(); }
-  function goToPage(p: number) {
-    if (!bookRef.current || !pdfDoc) return;
-    const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
-    bookRef.current.pageFlip().flip(idx);
-  }
-  function goFirst() { goToPage(1); }
-  function goLast() { if (pdfDoc) goToPage(pdfDoc.numPages); }
-  useEffect(() => { warmPagesAround(currentIndex); }, [currentIndex, pdfDoc]);
+/* ---------- navigation ---------- */
+const canPrev = !!pdfDoc && currentIndex > 0;
+const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
+
+function goPrev() {
+  if (!bookRef.current || !canPrev) return;
+  warmPagesAround(currentIndex - 1);         // підогріваємо наперед
+  bookRef.current.pageFlip().flipPrev();
+}
+
+function goNext() {
+  if (!bookRef.current || !canNext) return;
+  warmPagesAround(currentIndex + 1);         // підогріваємо наперед
+  bookRef.current.pageFlip().flipNext();
+}
+
+function goToPage(p: number) {
+  if (!bookRef.current || !pdfDoc) return;
+  const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
+  warmPagesAround(idx);                       // прогрів цільового індексу
+  bookRef.current.pageFlip().flip(idx);
+}
+
+function goFirst() { goToPage(1); }
+function goLast()  { if (pdfDoc) goToPage(pdfDoc.numPages); }
+
+useEffect(() => {
+  warmPagesAround(currentIndex);
+}, [currentIndex, pdfDoc]);
+
 
 
   /* ---------- swipe-to-flip (mobile, anywhere) ---------- */
