@@ -350,14 +350,14 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
           transformOrigin: "left center",
           // завели всередину сторінки; БЕЗ rotate
           transform: "translateX(var(--tabInset,10px))",
-          borderRadius: "0 10px 10px 0",
+          borderRadius: "10px 0 0 10px",
         }
       : {
           right: 0,
           transformOrigin: "right center",
           // симетрично для правої сторони; БЕЗ rotate
           transform: "translateX(calc(-1 * var(--tabInset,10px)))",
-          borderRadius: "10px 0 0 10px",
+          borderRadius: "0 10px 10px 0",
         }),
   };
 
@@ -553,7 +553,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
           --rail: calc(var(--tabThickness) + 12px);
         }
 
-        :root { --tabInset: 0px; } /* наскільки вкладка заходить усередину сторінки */
+        :root { --tabInset: -35px; } /* наскільки вкладка заходить усередину сторінки */
 
 
         @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
