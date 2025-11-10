@@ -224,26 +224,26 @@ const mCtrl = {
             }}
           >
             <FlipBook
-  ref={ctrl.bookRef}
-  width={ctrl.baseSize.w}
-  height={ctrl.baseSize.h}
-  size="stretch"
-  usePortrait={ctrl.single}
-  showCover={!ctrl.single}
-  flippingTime={900}
-  maxShadowOpacity={0.2}
-  drawShadow
-  mobileScrollSupport
-  /** ↓↓↓ ключове ↓↓↓ */
-  useMouseEvents={false}  // відключає «загин» та фліп від ховера/драгу мишею
-  showHint={false}        // прибирає візуальну підказку на ховері
-  clickEventForward       // кліки по лінках усередині сторінки проходять далі
-  /** ↑↑↑ */
-  startPage={(initPageRef.current ?? 0) as number}
-  onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
-  style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0, aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h }}
->
-
+              ref={ctrl.bookRef}
+              width={ctrl.baseSize.w}
+              height={ctrl.baseSize.h}
+              size="stretch"
+              usePortrait={ctrl.single}
+              showCover={!ctrl.single}
+              flippingTime={900}
+              maxShadowOpacity={0.2}
+              drawShadow
+              mobileScrollSupport
+              startPage={(initPageRef.current ?? 0) as number}
+              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+              style={{
+                width: "100%",
+                height: "100%",
+                minWidth: 0,
+                minHeight: 0,
+                aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+              }}
+            >
               {Array.from({ length: ctrl.totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
@@ -341,15 +341,6 @@ const mCtrl = {
                 );
               })}
             </FlipBook>
-
-            {/* --- крихітні гарячі кути для фліпу (десктоп) --- */}
-{!ctrl.isNarrow && (
-  <div className="pageflip-hotspots" aria-hidden>
-    <button className="pf-corner pf-left"  aria-label="Previous page" onClick={ctrl.goPrev} />
-    <button className="pf-corner pf-right" aria-label="Next page"     onClick={ctrl.goNext} />
-  </div>
-)}
-
 
             {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
             {(bookmarks?.length ?? 0) > 0 && (
@@ -621,39 +612,6 @@ const mCtrl = {
         .sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
         .sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
         .sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
-
-        /* --- flip only from tiny corners --- */
-.pageflip-hotspots{
-  position: absolute;
-  inset: 0;
-  pointer-events: none;   /* щоб нічому не заважати */
-  z-index: 220;           /* вище сторінок, нижче твоїх вкладок якщо треба — підніми */
-}
-.pf-corner{
-  position: absolute;
-  top: 0;                 /* верхні кути; за бажанням можна дублювати й bottom */
-  width: 22px; height: 22px;   /* зменш/збільш за смаком (18–24px ок) */
-  background: transparent;
-  border: 0; padding: 0;
-  pointer-events: auto;   /* клікабельні лише самі кнопки */
-}
-.pf-left  { left: 0;  cursor: nw-resize; }
-.pf-right { right: 0; cursor: ne-resize; }
-
-/* необов’язковий легкий хінт при наведенні */
-.pf-corner::after{
-  content:"";
-  position:absolute; inset:0;
-  background: linear-gradient(135deg, rgba(0,0,0,.12), rgba(0,0,0,0));
-  opacity: 0; transition: opacity .12s ease;
-}
-.pf-right::after{ transform: scaleX(-1); }
-.pf-corner:hover::after{ opacity:.35; }
-
-@media (hover:none){
-  .pageflip-hotspots{ display:none; } /* на тач-пристроях — не потрібні */
-}
-
 
         .hl-layer{ position: absolute; inset: 0; pointer-events: none; z-index: 5; }
         .hl{
