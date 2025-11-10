@@ -441,6 +441,72 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
               })}
             </FlipBook>
 
+            {/* === ALWAYS-VISIBLE RAILS === */}
+{bmSorted.length > 0 && (
+  <div className="bm-rails" aria-hidden={false}>
+    {/* ліва рейка: всі сторінки ДО поточної лівої */}
+    <div className="bm-rail left">
+      {(() => {
+        const curr = ctrl.currentIndex + 1;
+        const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+        return bmSorted.filter(bm => bm.page < leftNow).map((bm, idx) => (
+          <button
+            key={bm.id}
+            className="bm-tab left"
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => {
+              e.preventDefault();
+              const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+              if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+              else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+            }}
+            style={
+              {
+                "--bm-i": String(idx),
+                background: bm.color || "#f47e20",
+              } as React.CSSProperties
+            }
+          >
+            <span className="bm-tab__label">{bm.label}</span>
+          </button>
+        ));
+      })()}
+    </div>
+
+    {/* права рейка: всі сторінки ПІСЛЯ поточної правої */}
+    <div className="bm-rail right">
+      {(() => {
+        const curr = ctrl.currentIndex + 1;
+        const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+        const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+        return bmSorted.filter(bm => bm.page > rightNow).map((bm, idx) => (
+          <button
+            key={bm.id}
+            className="bm-tab right"
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => {
+              e.preventDefault();
+              const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+              if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+              else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+            }}
+            style={
+              {
+                "--bm-i": String(idx),
+                background: bm.color || "#f47e20",
+              } as React.CSSProperties
+            }
+          >
+            <span className="bm-tab__label">{bm.label}</span>
+          </button>
+        ));
+      })()}
+    </div>
+  </div>
+)}
+{/* === /ALWAYS-VISIBLE RAILS === */}
+
+
             {/* Кутові хендли для гортання */}
 <div className="flip-handles" aria-hidden>
   {/* Ліві кути — попередня сторінка */}
