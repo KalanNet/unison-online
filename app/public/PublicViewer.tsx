@@ -272,6 +272,11 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                 const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
                   (bmp?.links as any) ?? [];
 
+                  const curr = ctrl.currentIndex + 1;                 // 1-based
+const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+
+
                 return (
                   <div
                     key={i}
@@ -323,45 +328,42 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   const i = bmIndex.get(bm.id) ?? 0;
 
   const curr = ctrl.currentIndex + 1; // 1-based
-const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+const isOnOpenSpread = pageNum === leftNow || pageNum === rightNow;
 const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
 
-  const style: React.CSSProperties = {
-    position: "absolute",
-    zIndex: 6,                       // над контентом сторінки
-    top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
-    width: "var(--tabThickness,36px)",
-    height: "var(--tabLength,140px)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: 800,
-    lineHeight: 1,
-    border: "1px solid rgba(0,0,0,.18)",
-    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-    opacity: 0.98,
-    pointerEvents: "auto",
-    background: bm.color || "#f47e20",
-    ...(sideIsLeft
-      ? {
-          left: 0,
-          transformOrigin: "left center",
-          // ВИХОДИМО назовні як і раніше; невеликий "inset" залишаємо для реалізму
-          transform:
-             "translateX(calc(-100% - var(--tabOutside))) rotate(180deg) scaleX(var(--bmScale,1))",
-          borderRadius: "0 10px 10px 0",
-        }
-      : {
-          right: 0,
-          transformOrigin: "right center",
-          transform:
-            "translateX(calc(100% + var(--tabOutside))) scaleX(var(--bmScale,1))",
-          // дзеркальна форма для правої сторони
-          borderRadius: "10px 0 0 10px",
-        }),
-  };
+const style: React.CSSProperties = {
+  position: "absolute",
+  zIndex: isOnOpenSpread ? 90 : 40,   // ← поверх сусідньої сторінки
+  top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
+  width: "var(--tabThickness,36px)",
+  height: "var(--tabLength,140px)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#fff",
+  fontSize: 15,
+  fontWeight: 800,
+  lineHeight: 1,
+  border: "1px solid rgba(0,0,0,.18)",
+  boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+  opacity: 0.98,
+  pointerEvents: "auto",
+  background: bm.color || "#f47e20",
+  ...(sideIsLeft
+    ? {
+        left: 0,
+        transformOrigin: "left center",
+        // тільки трохи винести ЯРЛИК за край сторінки
+        transform: "translateX(calc(-1 * var(--tabOutside,12px)))",
+        borderRadius: "0 10px 10px 0",
+      }
+    : {
+        right: 0,
+        transformOrigin: "right center",
+        transform: "translateX(var(--tabOutside,12px))",
+        borderRadius: "10px 0 0 10px",
+      }),
+};
 
   return (
     <button
