@@ -235,9 +235,10 @@ const mCtrl = {
   maxShadowOpacity={0.2}
   drawShadow
   mobileScrollSupport
-  disableFlipByClick
+
+  disableFlipByClick   // ← внутрішній клік вимкнено (клік обробимо самі)
   showHint={false}
-  useMouseEvents={false}   // ← було true/присутній прапор; ставимо false
+  useMouseEvents       // ← drag у ввімкненому стані (працюватиме лише в «дірках»)
   clickEventForward
   startPage={(initPageRef.current ?? 0) as number}
   onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
@@ -250,11 +251,32 @@ const mCtrl = {
   }}
 >
 
+
               {Array.from({ length: ctrl.totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
                 const links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }> =
                   (bmp?.links as any) ?? [];
+
+                  const onPageSurfaceClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+  if (!api) return;
+
+  const rail = (e.currentTarget.parentElement as HTMLElement); // контейнер сторінки
+  const r = rail.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const half = r.width / 2;
+
+  // Визначаємо сторону кліку навіть у розвороті
+  if (x < half) {
+    if (api.flipPrev) api.flipPrev();
+    else api.turnToPrevPage?.();
+  } else {
+    if (api.flipNext) api.flipNext();
+    else api.turnToNextPage?.();
+  }
+};
+
 
                 return (
                   <div
@@ -280,6 +302,20 @@ const mCtrl = {
                             display: "block",
                           }}
                         />
+
+                        {/* Клік-ловець з «дірками» у 4-х кутах */}
+<div className="click-catcher" onClick={onPageSurfaceClick} aria-hidden>
+  <div className="cell tl hole" />
+  <div className="cell t" />
+  <div className="cell tr hole" />
+  <div className="cell l" />
+  <div className="cell c" />
+  <div className="cell r" />
+  <div className="cell bl hole" />
+  <div className="cell b" />
+  <div className="cell br hole" />
+</div>
+
 
                         {/* === HIGHLIGHTS LAYER === */}
                         <div className="hl-layer" aria-hidden>
@@ -645,7 +681,7 @@ const mCtrl = {
         }
 
         /* змінюй на 28–40px як зручно */
-:root { --corner-size: 50px; }
+:root { --corner-size: 70px; }
 
 .flip-handles{
   position: absolute; inset: 0;
@@ -661,66 +697,6 @@ const mCtrl = {
   pointer-events: auto;       /* тільки сам трикутник ловить події */
   cursor: grab;
 }
-
-/* кращий UX курсори + відключення виділення */
-.flip-handles .fh{
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.flip-handles .tl, .flip-handles .br { cursor: nwse-resize; }
-.flip-handles .tr, .flip-handles .bl { cursor: nesw-resize; }
-
-/* базовий шар "загину" — невидимий, показуємо лише на hover */
-.flip-handles .fh::after{
-  content: "";
-  position: absolute;
-  width: calc(var(--corner-size) + 10px);
-  height: calc(var(--corner-size) + 10px);
-  opacity: 0;
-  transition: opacity .12s ease;
-  pointer-events: none; /* щоб клік проходив у кнопку */
-}
-
-/* TOP-LEFT */
-.flip-handles .tl::after{
-  left: 0; top: 0;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-  background:
-    radial-gradient(farthest-side at 0 0, rgba(0,0,0,.25), rgba(0,0,0,0) 70%),
-    linear-gradient(135deg, #fff 0 70%, rgba(255,255,255,.8) 80%, transparent 81%);
-}
-.flip-handles .tl:hover::after{ opacity: 1; }
-
-/* TOP-RIGHT */
-.flip-handles .tr::after{
-  right: 0; top: 0;
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
-  background:
-    radial-gradient(farthest-side at 100% 0, rgba(0,0,0,.25), rgba(0,0,0,0) 70%),
-    linear-gradient(225deg, #fff 0 70%, rgba(255,255,255,.8) 80%, transparent 81%);
-}
-.flip-handles .tr:hover::after{ opacity: 1; }
-
-/* BOTTOM-LEFT */
-.flip-handles .bl::after{
-  left: 0; bottom: 0;
-  clip-path: polygon(0 100%, 0 0, 100% 100%);
-  background:
-    radial-gradient(farthest-side at 0 100%, rgba(0,0,0,.25), rgba(0,0,0,0) 70%),
-    linear-gradient(45deg, #fff 0 70%, rgba(255,255,255,.8) 80%, transparent 81%);
-}
-.flip-handles .bl:hover::after{ opacity: 1; }
-
-/* BOTTOM-RIGHT */
-.flip-handles .br::after{
-  right: 0; bottom: 0;
-  clip-path: polygon(100% 100%, 0 100%, 100% 0);
-  background:
-    radial-gradient(farthest-side at 100% 100%, rgba(0,0,0,.25), rgba(0,0,0,0) 70%),
-    linear-gradient(315deg, #fff 0 70%, rgba(255,255,255,.8) 80%, transparent 81%);
-}
-.flip-handles .br:hover::after{ opacity: 1; }
-
 
 /* верх-ліво */
 .flip-handles .tl{ left: 0; top: 0;
