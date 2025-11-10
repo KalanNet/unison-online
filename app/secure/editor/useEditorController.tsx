@@ -269,43 +269,32 @@ async function canvasToSrc(canvas: HTMLCanvasElement, mime: string, quality: num
   return canvas.toDataURL(mime, quality);
 }
 
-
-  // Ліміти якості/розміру — ключ до плавності
 async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   if (!pdfDoc || !pdfjs) throw new Error("No pdf loaded");
 
   const page = await pdfDoc.getPage(pageNum);
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
-  // Підвищена якість для видимих сторінок
-  const isVisible =
-    pageNum === (currentIndex + 1) || (!single && pageNum === (currentIndex + 2));
-
-  const DPR_CAP = isVisible ? 3.2 : 2.6;
-  const MAX_W   = isVisible ? 3000 : 2200;
-  const MIN_W   = 900;
-
-  const dpr     = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const targetW = Math.min(MAX_W, Math.max(MIN_W, Math.round(css.w * dpr)));
-  const scale   = Math.max(0.5, targetW / pageW);
+  // Ліміти якості/розміру — ключ до плавності
+  const DPR_CAP = 3.0;
+  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+  const MAX_W = 3000;
+  const targetW = Math.min(MAX_W, Math.max(720, Math.round(css.w * dpr)));
+  const scale = Math.max(0.5, targetW / pageW);
 
   const vp = page.getViewport({ scale });
 
-  // Canvas → контекст
   const canvas = document.createElement("canvas");
   canvas.width  = Math.max(1, Math.round(vp.width));
   canvas.height = Math.max(1, Math.round(vp.height));
-
-  const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true } as any) as CanvasRenderingContext2D;
+  const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("2D context unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
-  try { ctx.imageSmoothingEnabled = true; } catch {}
-  try { ctx.imageSmoothingQuality = "high"; } catch {}
-
-  // ВАЖЛИВО: передаємо і canvas, і canvasContext — так вимагають твої типи
   await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
-  // Лінки
+  // лінки
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
   anns.forEach((a: any) => {
@@ -319,13 +308,12 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
     });
   });
 
-  const mime: "image/webp" | "image/png" = canEncodeWebP() ? "image/webp" : "image/png";
-  const quality = mime === "image/webp" ? (isVisible ? 0.93 : 0.88) : 1.0;
+  const mime = canEncodeWebP() ? "image/webp" : "image/png";
+  const quality = mime === "image/webp" ? 0.82 : 1.0;
 
   const url = await canvasToSrc(canvas, mime, quality);
   return { url, w: vp.width, h: vp.height, links };
 }
-
 
 
 
@@ -484,25 +472,8 @@ function goFirst() { goToPage(1); }
 function goLast()  { if (pdfDoc) goToPage(pdfDoc.numPages); }
 
 useEffect(() => {
-  if (!pdfDoc) return;
-
-  // звичайний прогрів околиць
   warmPagesAround(currentIndex);
-
-  // разовий апґрейд видимих сторінок, якщо кеш малуватий
-  const needHiW = 2400; // threshold ширини у кеші
-  const p1 = currentIndex + 1;
-  const p2 = !single && p1 < pdfDoc.numPages ? p1 + 1 : null;
-
-  [p1, p2].filter(Boolean).forEach((p) => {
-    const bmp = cacheRef.current.get(p!);
-    if (!bmp || bmp.w < needHiW) {
-      cacheRef.current.delete(p!);
-      enqueueRender(p!);   // повторний рендер, уже з новими параметрами якості
-    }
-  });
-}, [currentIndex, single, pdfDoc]);
-
+}, [currentIndex, pdfDoc]);
 
 
 
