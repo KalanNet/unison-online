@@ -223,7 +223,7 @@ const isBackCover  = ctrl.currentIndex === (ctrl.totalPages - 1);
         {/* внутрішній контейнер, який резервує місце симетрично всередині сцени */}
         <div className="stage-rail">
           <div
-            className={`book-container${isFrontCover ? " is-cover" : ""}${isBackCover ? " is-backcover" : ""}`}
+            className={`book-container${isFrontCover ? " is-cover" : ""}${isBackCover ? " is-backcover" : ""}${ctrl.single ? " single" : ""}`}
             style={{
               transition: `transform ${isBackCover ? 1000 : 500}ms ease-in-out`,
               margin: "0 auto",
@@ -850,6 +850,9 @@ const isBackCover  = ctrl.currentIndex === (ctrl.totalPages - 1);
   /* =========================================
  * 10) LARGE PAGE ARROWS
  * =======================================*/
+/* =========================================
+ * 10) LARGE PAGE ARROWS
+ * =======================================*/
 .page-arrow {
   position: absolute;
   top: 50%;
@@ -872,50 +875,46 @@ const isBackCover  = ctrl.currentIndex === (ctrl.totalPages - 1);
   user-select: none;
 }
 
+/* --- Двосторінковий режим --- */
 .page-arrow.left  { left: -85px; }
 .page-arrow.right { right: -85px; }
 
-/* При hover — підсвічується */
+/* --- Односторінкова титулка (ліва сторінка) --- */
+.book-container.is-cover.single .page-arrow.left {
+  left: -45px; /* ближче до реального лівого краю */
+}
+.book-container.is-cover.single .page-arrow.right {
+  right: calc(50% - 45px); /* середина книги + 45px */
+}
+
+/* --- Односторінкова задня сторінка (права сторінка) --- */
+.book-container.is-backcover.single .page-arrow.left {
+  left: calc(50% - 45px);  /* середина книги - 45px */
+}
+.book-container.is-backcover.single .page-arrow.right {
+  right: -45px; /* ближче до правого краю */
+}
+
+/* Плавність */
 .page-arrow:hover {
   opacity: 1;
   color: #fff;
   transform: translateY(-50%) scale(1.05);
 }
 
-/* Відключені */
 .page-arrow.disabled {
   opacity: 0.15;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* Односторінковий режим — стрілки рівномірно по краях книги */
-.book-container.is-cover .page-arrow.left,
-.book-container.is-cover .page-arrow.right,
-.book-container.is-backcover .page-arrow.left,
-.book-container.is-backcover .page-arrow.right {
-  left: auto;
-  right: auto;
-}
-
-.book-container.is-cover .page-arrow.left {
-  left: -45px;   /* ближче до лівого краю сцени */
-}
-.book-container.is-cover .page-arrow.right {
-  right: -45px;  /* ближче до правого краю */
-}
-.book-container.is-backcover .page-arrow.left {
-  left: -45px;
-}
-.book-container.is-backcover .page-arrow.right {
-  right: -45px;
-}
-
-
 /* Не показуємо на мобільному */
 @media (max-width: 980px) {
   .page-arrow { display: none !important; }
 }
+
+
+
 
 `}</style>
 
