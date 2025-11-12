@@ -191,8 +191,9 @@ const mCtrl = {
 }
 
 // прапорці для обкладинок (десктоп)
-const isFrontCover = !ctrl.single && ctrl.currentIndex === 0;
-const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1);
+const isFrontCover = ctrl.currentIndex === 0;
+const isBackCover  = ctrl.currentIndex === (ctrl.totalPages - 1);
+
 
 
   // --- ДЕСКТОП (FlipBook) ---
@@ -856,7 +857,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   z-index: 230;
   width: auto;
   height: auto;
-  font-size: 100px;
+  font-size: 150px;
   font-weight: 300;
   line-height: 1;
   color: rgba(255,255,255,0.85);
@@ -871,8 +872,8 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   user-select: none;
 }
 
-.page-arrow.left  { left: -100px; }
-.page-arrow.right { right: -100px; }
+.page-arrow.left  { left: -85px; }
+.page-arrow.right { right: -85px; }
 
 /* При hover — підсвічується */
 .page-arrow:hover {
@@ -888,19 +889,28 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   pointer-events: none;
 }
 
-/* Односторінковий (обкладинка / титулка) режим — центруємо з обох сторін */
+/* Односторінковий режим — стрілки рівномірно по краях книги */
+.book-container.is-cover .page-arrow.left,
+.book-container.is-cover .page-arrow.right,
+.book-container.is-backcover .page-arrow.left,
+.book-container.is-backcover .page-arrow.right {
+  left: auto;
+  right: auto;
+}
+
 .book-container.is-cover .page-arrow.left {
-  left: calc(0px - 25px);
+  left: -45px;   /* ближче до лівого краю сцени */
 }
 .book-container.is-cover .page-arrow.right {
-  right: calc(0px - 25px);
+  right: -45px;  /* ближче до правого краю */
 }
 .book-container.is-backcover .page-arrow.left {
-  left: calc(0px - 25px);
+  left: -45px;
 }
 .book-container.is-backcover .page-arrow.right {
-  right: calc(0px - 25px);
+  right: -45px;
 }
+
 
 /* Не показуємо на мобільному */
 @media (max-width: 980px) {
