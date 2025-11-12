@@ -251,8 +251,8 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   mobileScrollSupport
   disableFlipByClick
   showHint={false}
-   useMouseEvents={true}       // ✅ ← обов’язково true
-  clickEventForward={true}    // ✅ ← залишити, щоб посилання працювали
+  useMouseEvents={false}   // ← було true/присутній прапор; ставимо false
+  clickEventForward
   startPage={(initPageRef.current ?? 0) as number}
   onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
   style={{
