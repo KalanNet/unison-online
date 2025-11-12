@@ -450,23 +450,23 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
               })}
             </FlipBook>
             
-{/* === PAGE ARROWS (зовнішні стрілки для перегортання) === */}
+{/* === PAGE ARROWS (оновлена версія) === */}
 {ctrl.totalPages > 1 && (
   <>
     <button
-      className="nav-arrow left"
+      className={`page-arrow left ${!ctrl.canPrev ? "disabled" : ""}`}
       onClick={(e) => { e.preventDefault(); ctrl.goPrev(); }}
-      disabled={!ctrl.canPrev}
       aria-label="Previous page"
+      disabled={!ctrl.canPrev}
     >
       ‹
     </button>
 
     <button
-      className="nav-arrow right"
+      className={`page-arrow right ${!ctrl.canNext ? "disabled" : ""}`}
       onClick={(e) => { e.preventDefault(); ctrl.goNext(); }}
-      disabled={!ctrl.canNext}
       aria-label="Next page"
+      disabled={!ctrl.canNext}
     >
       ›
     </button>
@@ -474,7 +474,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
 )}
 
 
-
+            
             {/* === ALWAYS-VISIBLE RAILS === */}
 {bmSorted.length > 0 && (
   <div className="bm-rails" aria-hidden={false}>
@@ -846,44 +846,65 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   }
   .bm-rail .bm-tab.left  { left: 0;  border-radius: 10px 0 0 10px; }
   .bm-rail .bm-tab.right { right: 0; border-radius: 0 10px 10px 0; }
-
   /* =========================================
- * 10) PAGE ARROWS
+ * 10) LARGE PAGE ARROWS
  * =======================================*/
-.nav-arrow {
+.page-arrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 220;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.85);
-  color: #21353a;
-  font-size: 38px;
-  font-weight: 700;
+  z-index: 230;
+  width: auto;
+  height: auto;
+  font-size: 78px;
+  font-weight: 500;
   line-height: 1;
-  box-shadow: 0 3px 12px rgba(0,0,0,.3);
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 3px 12px rgba(0,0,0,0.4);
+  border: none;
+  background: none;
+  padding: 0 12px;
   cursor: pointer;
   transition: all 0.25s ease;
-  opacity: 0.0;
+  opacity: 0.4;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.page-arrow.left  { left: -45px; }
+.page-arrow.right { right: -45px; }
+
+/* При hover — підсвічується */
+.page-arrow:hover {
+  opacity: 1;
+  color: #fff;
+  transform: translateY(-50%) scale(1.05);
+}
+
+/* Відключені */
+.page-arrow.disabled {
+  opacity: 0.15;
+  cursor: not-allowed;
   pointer-events: none;
 }
-.nav-arrow.left  { left: 24px; }
-.nav-arrow.right { right: 24px; }
 
-.book-container:hover .nav-arrow {
-  opacity: 1;
-  pointer-events: auto;
+/* Односторінковий (обкладинка / титулка) режим — центруємо з обох сторін */
+.book-container.is-cover .page-arrow.left {
+  left: calc(0px - 25px);
 }
-.nav-arrow:hover {
-  transform: translateY(-50%) scale(1.12);
-  background: #fff;
+.book-container.is-cover .page-arrow.right {
+  right: calc(0px - 25px);
 }
-.nav-arrow:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+.book-container.is-backcover .page-arrow.left {
+  left: calc(0px - 25px);
+}
+.book-container.is-backcover .page-arrow.right {
+  right: calc(0px - 25px);
+}
+
+/* Не показуємо на мобільному */
+@media (max-width: 980px) {
+  .page-arrow { display: none !important; }
 }
 
 `}</style>
