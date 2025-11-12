@@ -276,8 +276,8 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
   // Ліміти якості/розміру — ключ до плавності
-const QUALITY = 2.5;
-const DPR_CAP = 8.0;
+const QUALITY = 2.0;
+const DPR_CAP = 5.0;
 const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
 const targetW = Math.min(6000, Math.round(css.w * dpr * QUALITY));
 const scale = Math.max(1.0, targetW / pageW);
