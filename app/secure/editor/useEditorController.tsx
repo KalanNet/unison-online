@@ -275,26 +275,26 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const page = await pdfDoc.getPage(pageNum);
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
-  // ✅ коректне масштабування: fitScale * DPR
-  const DPR_CAP = 6.0;
+  // Ліміти якості/розміру — ключ до плавності
+  const DPR_CAP = 5.0;
   const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const scale = fitScale * dpr;
+  const MAX_W = 3200;
+  const targetW = Math.min(MAX_W, Math.max(1000, Math.round(css.w * dpr)));
+  const scale = Math.max(0.5, targetW / pageW);
 
   const vp = page.getViewport({ scale });
 
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(vp.width);
-  canvas.height = Math.round(vp.height);
+  canvas.width  = Math.max(1, Math.round(vp.width));
+  canvas.height = Math.max(1, Math.round(vp.height));
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("2D context unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
-  // 🔍 різкість тексту
-  ctx.imageSmoothingEnabled = false;
+  await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
-await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
-
-
-  // 🔗 посилання
+  // лінки
   const anns = await page.getAnnotations({ intent: "display" });
   const links: PageBmp["links"] = [];
   anns.forEach((a: any) => {
@@ -303,29 +303,18 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
     const left = Math.min(x1, x2), top = Math.min(y1, y2);
     const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
     links.push({
-      x: left / vp.width,
-      y: top / vp.height,
-      w: w / vp.width,
-      h: h / vp.height,
-      href: sanitizeLink(a) || undefined,
-      dest: a.dest,
+      x: left / vp.width, y: top / vp.height, w: w / vp.width, h: h / vp.height,
+      href: sanitizeLink(a) || undefined, dest: a.dest
     });
   });
 
-  // ✅ WebP без втрат (lossless) якщо підтримується
   const mime = canEncodeWebP() ? "image/webp" : "image/png";
-  let url: string;
-  if (mime === "image/webp") {
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, mime, 1.0) // quality 1.0 = lossless
-    );
-    url = blob ? URL.createObjectURL(blob) : canvas.toDataURL(mime, 1.0);
-  } else {
-    url = canvas.toDataURL("image/png");
-  }
+  const quality = mime === "image/webp" ? 0.82 : 1.0;
 
+  const url = await canvasToSrc(canvas, mime, quality);
   return { url, w: vp.width, h: vp.height, links };
 }
+
 
 
 
