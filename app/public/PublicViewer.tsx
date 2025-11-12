@@ -856,8 +856,8 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   z-index: 230;
   width: auto;
   height: auto;
-  font-size: 78px;
-  font-weight: 500;
+  font-size: 100px;
+  font-weight: 300;
   line-height: 1;
   color: rgba(255,255,255,0.85);
   text-shadow: 0 3px 12px rgba(0,0,0,0.4);
@@ -871,8 +871,8 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   user-select: none;
 }
 
-.page-arrow.left  { left: -45px; }
-.page-arrow.right { right: -45px; }
+.page-arrow.left  { left: -100px; }
+.page-arrow.right { right: -100px; }
 
 /* При hover — підсвічується */
 .page-arrow:hover {
