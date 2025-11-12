@@ -209,15 +209,10 @@ useEffect(() => {
     const vp = page.getViewport({ scale: 1, rotation });
 
 
-const rect = stageRef.current.getBoundingClientRect();
-const pad = 16;
-
-// якщо сторінка тимчасово схлопнулась — не оновлюємо scale
-if (rect.width < 100 || rect.height < 100) return;
-
-const availW = Math.max(200, rect.width - pad * 2);
-const availH = Math.max(200, rect.height - pad * 2);
-
+    const rect = stageRef.current.getBoundingClientRect();
+    const pad = 16;
+    const availW = Math.max(0, rect.width - pad * 2);
+    const availH = Math.max(0, rect.height - pad * 2);
 
 
     const gap = single ? 0 : 12;
@@ -233,49 +228,27 @@ const availH = Math.max(200, rect.height - pad * 2);
   }
 
 
-useEffect(() => {
-  if (!pdfDoc || !stageRef.current) return;
-  let raf = 0;
-  let resizeTimer: NodeJS.Timeout | null = null;
+  useEffect(() => {
+    if (!pdfDoc || !stageRef.current) return;
+    let raf = 0;
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { void calcFitScale(); setTimeout(() => void calcFitScale(), 120); });
+    };
+    const roStage = new ResizeObserver(schedule); roStage.observe(stageRef.current);
+    const roHeader = localHeaderRef.current ? new ResizeObserver(schedule) : null; roHeader?.observe(localHeaderRef.current!);
+    const roToolbar = toolbarRef.current ? new ResizeObserver(schedule) : null; roToolbar?.observe(toolbarRef.current!);
+    const roBody = new ResizeObserver(schedule); roBody.observe(document.body);
+    window.addEventListener("orientationchange", schedule, { passive: true });
 
-  const safeUpdate = () => {
-    try {
-      const api = bookRef.current?.pageFlip?.();
-      if (api && typeof api.update === "function") api.update();
-    } catch {}
-  };
 
-  const schedule = () => {
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => {
-      void calcFitScale();
-      // 🔒 debounce update
-      if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        safeUpdate();
-        void calcFitScale();
-      }, 180);
-    });
-  };
-
-  const roStage = new ResizeObserver(schedule);
-  roStage.observe(stageRef.current);
-  const roBody = new ResizeObserver(schedule);
-  roBody.observe(document.body);
-
-  window.addEventListener("orientationchange", schedule, { passive: true });
-
-  schedule();
-
-  return () => {
-    cancelAnimationFrame(raf);
-    if (resizeTimer) clearTimeout(resizeTimer);
-    roStage.disconnect();
-    roBody.disconnect();
-    window.removeEventListener("orientationchange", schedule);
-  };
-}, [pdfDoc, single]);
-
+    schedule();
+    return () => {
+      cancelAnimationFrame(raf);
+      roStage.disconnect(); roHeader?.disconnect(); roToolbar?.disconnect(); roBody.disconnect();
+      window.removeEventListener("orientationchange", schedule);
+    };
+  }, [pdfDoc, single, isNarrow]);
 
 
 /* ---------- render page → image ---------- */
