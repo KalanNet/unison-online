@@ -228,27 +228,49 @@ useEffect(() => {
   }
 
 
-  useEffect(() => {
-    if (!pdfDoc || !stageRef.current) return;
-    let raf = 0;
-    const schedule = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => { void calcFitScale(); setTimeout(() => void calcFitScale(), 120); });
-    };
-    const roStage = new ResizeObserver(schedule); roStage.observe(stageRef.current);
-    const roHeader = localHeaderRef.current ? new ResizeObserver(schedule) : null; roHeader?.observe(localHeaderRef.current!);
-    const roToolbar = toolbarRef.current ? new ResizeObserver(schedule) : null; roToolbar?.observe(toolbarRef.current!);
-    const roBody = new ResizeObserver(schedule); roBody.observe(document.body);
-    window.addEventListener("orientationchange", schedule, { passive: true });
+useEffect(() => {
+  if (!pdfDoc || !stageRef.current) return;
+  let raf = 0;
+  let resizeTimer: NodeJS.Timeout | null = null;
 
+  const safeUpdate = () => {
+    try {
+      const api = bookRef.current?.pageFlip?.();
+      if (api && typeof api.update === "function") api.update();
+    } catch {}
+  };
 
-    schedule();
-    return () => {
-      cancelAnimationFrame(raf);
-      roStage.disconnect(); roHeader?.disconnect(); roToolbar?.disconnect(); roBody.disconnect();
-      window.removeEventListener("orientationchange", schedule);
-    };
-  }, [pdfDoc, single, isNarrow]);
+  const schedule = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      void calcFitScale();
+      // 🔒 debounce update
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        safeUpdate();
+        void calcFitScale();
+      }, 180);
+    });
+  };
+
+  const roStage = new ResizeObserver(schedule);
+  roStage.observe(stageRef.current);
+  const roBody = new ResizeObserver(schedule);
+  roBody.observe(document.body);
+
+  window.addEventListener("orientationchange", schedule, { passive: true });
+
+  schedule();
+
+  return () => {
+    cancelAnimationFrame(raf);
+    if (resizeTimer) clearTimeout(resizeTimer);
+    roStage.disconnect();
+    roBody.disconnect();
+    window.removeEventListener("orientationchange", schedule);
+  };
+}, [pdfDoc, single]);
+
 
 
 /* ---------- render page → image ---------- */
