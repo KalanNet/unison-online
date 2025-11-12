@@ -449,6 +449,31 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                 );
               })}
             </FlipBook>
+            
+{/* === PAGE ARROWS (зовнішні стрілки для перегортання) === */}
+{ctrl.totalPages > 1 && (
+  <>
+    <button
+      className="nav-arrow left"
+      onClick={(e) => { e.preventDefault(); ctrl.goPrev(); }}
+      disabled={!ctrl.canPrev}
+      aria-label="Previous page"
+    >
+      ‹
+    </button>
+
+    <button
+      className="nav-arrow right"
+      onClick={(e) => { e.preventDefault(); ctrl.goNext(); }}
+      disabled={!ctrl.canNext}
+      aria-label="Next page"
+    >
+      ›
+    </button>
+  </>
+)}
+
+
 
             {/* === ALWAYS-VISIBLE RAILS === */}
 {bmSorted.length > 0 && (
@@ -821,6 +846,46 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
   }
   .bm-rail .bm-tab.left  { left: 0;  border-radius: 10px 0 0 10px; }
   .bm-rail .bm-tab.right { right: 0; border-radius: 0 10px 10px 0; }
+
+  /* =========================================
+ * 10) PAGE ARROWS
+ * =======================================*/
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 220;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.85);
+  color: #21353a;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 3px 12px rgba(0,0,0,.3);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  opacity: 0.0;
+  pointer-events: none;
+}
+.nav-arrow.left  { left: 24px; }
+.nav-arrow.right { right: 24px; }
+
+.book-container:hover .nav-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+.nav-arrow:hover {
+  transform: translateY(-50%) scale(1.12);
+  background: #fff;
+}
+.nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 `}</style>
 
     </div>
