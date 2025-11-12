@@ -245,7 +245,7 @@ const isBackCover  = ctrl.currentIndex === (ctrl.totalPages - 1);
   height={ctrl.baseSize.h}
   size="stretch"
   usePortrait={ctrl.single}
-  showCover={!ctrl.single}
+  showCover={true}
   flippingTime={900}
   maxShadowOpacity={0.2}
   drawShadow
