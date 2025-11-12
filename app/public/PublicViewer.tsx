@@ -51,6 +51,15 @@ export default function PublicViewer({
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
   
+// після const isMobile = useIsMobile(980);
+const bmSorted = React.useMemo(
+  () => [...bookmarks].sort((a, b) => a.page - b.page),
+  [bookmarks]
+);
+const bmIndex = React.useMemo(
+  () => new Map(bmSorted.map((b, i) => [b.id, i])),
+  [bmSorted]
+);
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -307,6 +316,94 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
                         </div>
                         {/* === /HIGHLIGHTS LAYER === */}
 
+                        {/* === BOOKMARK TABS (attached to this page) === */}
+{/* === BOOKMARK TABS (ONLY for current spread pages) === */}
+{bmSorted.filter(b => b.page === pageNum).map((bm) => {
+  const i = bmIndex.get(bm.id) ?? 0;
+
+  const curr = ctrl.currentIndex + 1; // 1-based
+  const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+  const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+
+  const isCurrentLeft  = pageNum === leftNow;
+  const isCurrentRight = pageNum === rightNow;
+
+  // яка сторона для цієї закладки
+  const sideIsLeft = ctrl.single ? (bm.page < curr) : (bm.page <= leftNow);
+
+  // показуємо вкладку на сторінці лише якщо вона «зовнішня» для цього аркуша
+  const shouldAttach =
+    (isCurrentLeft  && sideIsLeft) ||
+    (isCurrentRight && !sideIsLeft);
+
+  if (!shouldAttach) return null;
+
+  const style: React.CSSProperties = {
+    position: "absolute",
+    zIndex: 90,
+    top: `calc(var(--tabTop,36px) + ${i} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
+    width: "var(--tabThickness,36px)",
+    height: "var(--tabLength,140px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 800,
+    lineHeight: 1,
+    border: "1px solid rgba(0,0,0,.18)",
+    boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+    opacity: 0.98,
+    pointerEvents: "auto",
+    background: bm.color || "#f47e20",
+    ...(isCurrentLeft
+      ? {
+          left: 0,
+          transformOrigin: "left center",
+          transform: "translateZ(0.01px) translateX(var(--tabInset,-35px))",
+          borderRadius: "10px 0 0 10px",
+        }
+      : {
+          right: 0,
+          transformOrigin: "right center",
+          transform: "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px)))",
+
+          borderRadius: "0 10px 10px 0",
+        }),
+  };
+
+  return (
+    <button
+      key={bm.id}
+      className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+      title={`${bm.label} (p.${bm.page})`}
+      style={style}
+      onClick={(e) => {
+        e.preventDefault();
+        const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+        if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+        else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+      }}
+    >
+      <span
+        className="bm-tab__label"
+        style={{
+          maxHeight: "calc(var(--tabLength,140px) - 10px)",
+          padding: "4px 0",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+      >
+        {bm.label}
+      </span>
+    </button>
+  );
+})}
+{/* === /BOOKMARK TABS === */}
+
+
                         {/* PDF LINKS */}
                         {links?.length
                           ? links.map((L, idx) =>
@@ -353,6 +450,72 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
               })}
             </FlipBook>
 
+            {/* === ALWAYS-VISIBLE RAILS === */}
+{bmSorted.length > 0 && (
+  <div className="bm-rails" aria-hidden={false}>
+    {/* ліва рейка: всі сторінки ДО поточної лівої */}
+    <div className="bm-rail left">
+      {(() => {
+        const curr = ctrl.currentIndex + 1;
+        const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+        return bmSorted.filter(bm => bm.page < leftNow).map((bm, idx) => (
+          <button
+            key={bm.id}
+            className="bm-tab left"
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => {
+              e.preventDefault();
+              const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+              if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+              else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+            }}
+            style={
+              {
+                "--bm-i": String(idx),
+                background: bm.color || "#f47e20",
+              } as React.CSSProperties
+            }
+          >
+            <span className="bm-tab__label">{bm.label}</span>
+          </button>
+        ));
+      })()}
+    </div>
+
+    {/* права рейка: всі сторінки ПІСЛЯ поточної правої */}
+    <div className="bm-rail right">
+      {(() => {
+        const curr = ctrl.currentIndex + 1;
+        const leftNow  = ctrl.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
+        const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+        return bmSorted.filter(bm => bm.page > rightNow).map((bm, idx) => (
+          <button
+            key={bm.id}
+            className="bm-tab right"
+            title={`${bm.label} (p.${bm.page})`}
+            onClick={(e) => {
+              e.preventDefault();
+              const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+              if (typeof ctrl.goToPage === "function") ctrl.goToPage(pageIndex);
+              else (ctrl.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
+            }}
+            style={
+              {
+                "--bm-i": String(idx),
+                background: bm.color || "#f47e20",
+              } as React.CSSProperties
+            }
+          >
+            <span className="bm-tab__label">{bm.label}</span>
+          </button>
+        ));
+      })()}
+    </div>
+  </div>
+)}
+{/* === /ALWAYS-VISIBLE RAILS === */}
+
+
             {/* Кутові хендли для гортання */}
 <div className="flip-handles" aria-hidden>
   {/* Ліві кути — попередня сторінка */}
@@ -364,106 +527,7 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
 </div>
 
 
-            {/* === OVERLAY ЗАКЛАДОК (завжди видимі) === */}
-            {(bookmarks?.length ?? 0) > 0 && (
-              <div
-                className="bm-tabs-overlay"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 200,
-                  overflow: "visible",
-                  pointerEvents: "none",
-                  ["--tabThickness" as any]: "36px",
-                  ["--tabLength" as any]: "140px",
-                  ["--tabTop" as any]: "36px",
-                  ["--tabGap" as any]: "0px",
-                } as React.CSSProperties}
-              >
-                {(() => {
-                  const sorted = [...bookmarks].sort((a, b) => a.page - b.page);
-
-                  // поточний розворот
-                  const curr = ctrl!.currentIndex + 1; // 1-based поточна сторінка
-                  const leftNow = ctrl!.single ? curr : (curr % 2 === 0 ? curr : curr - 1);
-                  const rightNow = Math.min(leftNow + 1, ctrl!.totalPages);
-
-                  return sorted.map((bm, i) => {
-                    const sideIsLeft = ctrl!.single ? (bm.page < curr) : (bm.page <= leftNow);
-
-                    const baseStyle: React.CSSProperties = {
-                      position: "absolute",
-                      top: `calc(var(--tabTop) + ${i} * (var(--tabLength) + var(--tabGap)))`,
-                      width: "var(--tabThickness)",
-                      height: "var(--tabLength)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontSize: 15,
-                      fontWeight: 800,
-                      lineHeight: 1,
-                      border: "1px solid rgba(0,0,0,.18)",
-                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                      opacity: 0.98,
-                      transition: "transform .18s ease, box-shadow .18s ease, filter .18s ease",
-                      pointerEvents: "auto",
-                      background: bm.color || "#f47e20",
-                      borderRadius: "0 10px 10px 0",
-                    };
-
-                    const sideStyle: React.CSSProperties = sideIsLeft
-                      ? {
-                          left: 0,
-                          transformOrigin: "center center",
-                          transform:
-                            "translateX(calc(-100% - (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) rotate(180deg) scaleX(var(--bmScale,1))",
-                        }
-                      : {
-                          right: 0,
-                          transformOrigin: "center center",
-                          transform:
-                            "translateX(calc(100% + (var(--tabThickness) * (var(--bmScale,1) - 1) / 2))) scaleX(var(--bmScale,1))",
-                        };
-
-                    return (
-                      <button
-                        key={bm.id}
-                        className={`bm-tab ${sideIsLeft ? "left" : "right"}${
-                          (bm.page === leftNow || bm.page === rightNow) ? " active" : ""
-                        }`}
-                        title={`${bm.label} (p.${bm.page})`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const pageIndex = Math.max(0, (bm.page ?? 1) - 1); // 0-based
-                          if (typeof ctrl!.goToPage === "function") {
-                            ctrl!.goToPage(pageIndex);
-                          } else {
-                            (ctrl!.bookRef.current as any)?.pageFlip()?.flip(pageIndex);
-                          }
-                        }}
-                        style={{ ...baseStyle, ...sideStyle }}
-                      >
-                        <span
-                          className="bm-tab__label"
-                          style={{
-                            maxHeight: "calc(var(--tabLength) - 10px)",
-                            padding: "4px 0",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            writingMode: "vertical-rl",
-                            textOrientation: "mixed",
-                          } as React.CSSProperties}
-                        >
-                          {bm.label}
-                        </span>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-            {/* === /OVERLAY ЗАКЛАДОК === */}
+            
           </div>
         </div>
       </section>
@@ -556,143 +620,209 @@ const isBackCover  = !ctrl.single && ctrl.currentIndex === (ctrl.totalPages - 1)
       />
 
       <style jsx global>{`
-        html, body { margin: 0; height: 100%; background: #21353a; }
-        * { box-sizing: border-box; }
-        :root { --hdr: 56px; --ftr: 64px; }
-        :root{
-          --tabThickness: 36px;
-          --rail: calc(var(--tabThickness) + 12px);
-        }
+  /* =========================================
+   * 1) BASE & CSS VARIABLES
+   * =======================================*/
+  html, body { margin: 0; height: 100%; background: #21353a; }
+  * { box-sizing: border-box; }
 
-        @media (max-width: 680px) { :root { --hdr: 56px; --ftr: 72px; } }
-        .viewer-root { min-height: 100dvh; width: 100%; display: flex; flex-direction: column; color: #fff; background: #21353a; overflow: hidden; }
-        .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
-        button[aria-label="Publish"] { display: none !important; }
-        .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
-        .viewer-stage {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  min-width: 0;
-  /* явна висота, щоб після F11 не «з’їдалося» кілька px знизу */
-  height: calc(100dvh - var(--hdr) - var(--ftr));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
+  :root{
+    /* Header/Footer */
+    --hdr: 56px;
+    --ftr: 64px;
 
-        .book-container { display:flex; align-items:center; justify-content:center; margin:0 auto; min-width:0; min-height:0; transition: transform 500ms cubic-bezier(.7,0,.2,1); }
-        .book-container.is-cover { transform: translateX(-24%); }
-        /* нове: задня обкладинка – симетрично вправо */
-.book-container.is-backcover { transform: translateX(24%); }
-        
-        .pdf-link { border:0; background:transparent; cursor:pointer; display:block; }
-        .pdf-link:focus-visible { outline:2px dashed rgba(28,121,228,.6); outline-offset:1px; }
+    /* Bookmark tabs */
+    --tabThickness: 36px;           /* ширина вкладки */
+    --tabLength: 140px;             /* висота вкладки */
+    --tabGap: 8px;                  /* вертикальний крок між вкладками */
+    --tabTop: 36px;                 /* верхній відступ від краю сторінки/рейки */
+    --tabInset: -35px;              /* наскільки вкладка заходить всередину сторінки (негативне = назовні) */
 
-        
+    /* Сервісні */
+    --rail: calc(var(--tabThickness) + 12px);  /* бокові поля сцени під рейки */
+    --corner-size: 70px;                       /* розмір «трикутника» для фліпу */
+  }
 
-        .page, .page > div, .page .page-content { overflow: visible !important; }
-        .page .page-content { position: relative; }
+  @media (max-width: 680px){
+    :root{
+      --hdr: 56px;
+      --ftr: 72px;
+      /* можна звузити вкладки на мобайлі, якщо треба */
+      /* --tabThickness: 28px; --tabLength: 120px; --tabGap: 6px; */
+      --rail: calc(var(--tabThickness) + 10px);
+    }
+  }
 
-        .stage-rail{
-          position: relative;
-          width: 100%;
-          height: 100%;
-          padding-inline: var(--rail);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          max-width: 100%;
-          box-sizing: border-box;
-        }
+  /* =========================================
+   * 2) APP LAYOUT
+   * =======================================*/
+  .viewer-root {
+    min-height: 100dvh; width: 100%;
+    display: flex; flex-direction: column;
+    color: #fff; background: #21353a; overflow: hidden;
+  }
+  .local-header { height: var(--hdr); min-height: var(--hdr); z-index: 120; }
+  .local-footer { height: var(--ftr); min-height: var(--ftr); z-index: 101; }
+  button[aria-label="Publish"] { display: none !important; }
 
-        .bm-tab { border: 0; cursor: pointer; --bmScale: 1; will-change: transform; }
-        .bm-tab:hover { --bmScale: 1.12; filter: drop-shadow(0 2px 8px rgba(0,0,0,.18)) brightness(1.03); }
-        .bm-tab:active { --bmScale: 1.06; }
+  .viewer-stage{
+    flex: 1 1 auto; width: 100%;
+    min-height: 0; min-width: 0;
+    /* явна висота, щоб після F11 не «з’їдалося» кілька px знизу */
+    height: calc(100dvh - var(--hdr) - var(--ftr));
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
 
-        @media (max-width: 680px){
-          .bm-rail{ width:110px; }
-          .bm-tab{ right:8px; min-width:64px; max-width:110px; font-size:11px; padding:5px 8px; }
-        }
+  /* Контейнер сцени з боковими полями під рейки */
+  .stage-rail{
+    position: relative; width: 100%; height: 100%;
+    padding-inline: var(--rail);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; max-width: 100%;
+  }
 
-        .search-flyout{
-          position: fixed; top: var(--hdr); right: 12px; bottom: var(--ftr);
-          width: min(360px, 92vw);
-          background: #fff; color: #1b2430;
-          border: 1px solid #e7ebdf; border-radius: 14px;
-          box-shadow: 0 18px 40px rgba(0,0,0,.22);
-          z-index: 320; display: flex; flex-direction: column; overflow: hidden;
-        }
-        .sf-hd{ display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fafbf8; border-bottom: 1px solid #eef2e6; font-weight: 800; }
-        .sf-hd .sf-meta{ margin-left: auto; color:#5b6a50; font-weight:600; }
-        .sf-close{
-          background: #fff; border: 1px solid #e7ebdf; border-radius: .6rem;
-          padding: .2rem .55rem; line-height: 1; font-weight: 900; color:#2d3018;
-          box-shadow: 0 4px 12px rgba(0,0,0,.06);
-        }
-        .sf-list{ overflow: auto; padding: 6px 0; flex: 1 1 auto; background: #fff; }
-        .sf-empty{ padding: 16px 14px; color:#6b7280; font-style: italic; }
-        .sf-item{ width: 100%; text-align: left; background: #fff; border: 0; border-bottom: 1px solid #f1f4ec; padding: 10px 12px; cursor: pointer; }
-        .sf-item:hover{ background: #f8faf5; }
-        .sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
-        .sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
-        .sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
+  /* =========================================
+   * 3) FLIPBOOK CONTAINER
+   * =======================================*/
+  .book-container{
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto; min-width: 0; min-height: 0;
+    transition: transform 500ms cubic-bezier(.7,0,.2,1);
+    position: relative;
+  }
+  .book-container.is-cover     { transform: translateX(-24%); }  /* передня обкладинка вліво */
+  .book-container.is-backcover { transform: translateX( 24%); }   /* задня обкладинка вправо */
 
-        .hl-layer{ position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-        .hl{
-          position: absolute;
-          background: rgba(255, 226, 61, .28);
-          outline: 2px solid rgba(255, 200, 0, .9);
-          border-radius: 2px;
-          mix-blend-mode: multiply;
-        }
-        .hl.is-active{
-          background: rgba(56, 189, 248, .25);
-          outline-color: rgba(56, 189, 248, .95);
-          box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
-        }
+  /* =========================================
+   * 4) PAGE PLANE & OVERLAYS
+   * =======================================*/
+  .page, .page > div, .page .page-content { overflow: visible !important; }
+  .page .page-content { position: relative; transform-style: preserve-3d; } /* вкладки «їдуть» разом із сторінкою */
 
-        /* змінюй на 28–40px як зручно */
-:root { --corner-size: 70px; }
+  /* Клікабельні PDF-зони */
+  .pdf-link { border: 0; background: transparent; cursor: pointer; display: block; }
+  .pdf-link:focus-visible { outline: 2px dashed rgba(28,121,228,.6); outline-offset: 1px; }
 
-.flip-handles{
-  position: absolute; inset: 0;
-  z-index: 210;
-  pointer-events: none; /* важливо: не блокуємо посилання на сторінці */
-}
+  /* =========================================
+   * 5) SEARCH FLYOUT
+   * =======================================*/
+  .search-flyout{
+    position: fixed; top: var(--hdr); right: 12px; bottom: var(--ftr);
+    width: min(360px, 92vw);
+    background: #fff; color: #1b2430;
+    border: 1px solid #e7ebdf; border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.22);
+    z-index: 320; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sf-hd{
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: #fafbf8; border-bottom: 1px solid #eef2e6;
+    font-weight: 800;
+  }
+  .sf-hd .sf-meta{ margin-left: auto; color:#5b6a50; font-weight:600; }
+  .sf-close{
+    background: #fff; border: 1px solid #e7ebdf; border-radius: .6rem;
+    padding: .2rem .55rem; line-height: 1; font-weight: 900; color:#2d3018;
+    box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  }
+  .sf-list{ overflow: auto; padding: 6px 0; flex: 1 1 auto; background: #fff; }
+  .sf-empty{ padding: 16px 14px; color:#6b7280; font-style: italic; }
+  .sf-item{
+    width: 100%; text-align: left; background: #fff; border: 0;
+    border-bottom: 1px solid #f1f4ec; padding: 10px 12px; cursor: pointer;
+  }
+  .sf-item:hover{ background: #f8faf5; }
+  .sf-item.is-active{ outline: 2px solid #8ea05a33; background: #f6f9f1; }
+  .sf-snippet{ font-size: 14px; color:#111827; line-height: 1.35; }
+  .sf-meta{ font-size: 12px; color:#6b7280; margin-top: 4px; }
 
-/* маленькі активні трикутники */
-.flip-handles .fh{
-  position: absolute;
-  width: var(--corner-size); height: var(--corner-size);
-  border: 0; background: transparent;
-  pointer-events: auto;       /* тільки сам трикутник ловить події */
-  cursor: grab;
-}
+  /* =========================================
+   * 6) TEXT HIGHLIGHTS
+   * =======================================*/
+  .hl-layer{ position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .hl{
+    position: absolute;
+    background: rgba(255, 226, 61, .28);
+    outline: 2px solid rgba(255, 200, 0, .9);
+    border-radius: 2px;
+    mix-blend-mode: multiply;
+  }
+  .hl.is-active{
+    background: rgba(56, 189, 248, .25);
+    outline-color: rgba(56, 189, 248, .95);
+    box-shadow: 0 0 0 1px rgba(56,189,248,.25) inset;
+  }
 
-/* верх-ліво */
-.flip-handles .tl{ left: 0; top: 0;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-}
-/* низ-ліво */
-.flip-handles .bl{ left: 0; bottom: 0;
-  clip-path: polygon(0 100%, 0 0, 100% 100%);
-}
-/* верх-право */
-.flip-handles .tr{ right: 0; top: 0;
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
-}
-/* низ-право */
-.flip-handles .br{ right: 0; bottom: 0;
-  clip-path: polygon(100% 100%, 0 100%, 100% 0);
-}
+  /* =========================================
+   * 7) PAGE-CORNER FLIP HANDLES
+   * =======================================*/
+  .flip-handles{
+    position: absolute; inset: 0;
+    z-index: 210;
+    pointer-events: none; /* не блокуємо посилання на сторінці */
+  }
+  .flip-handles .fh{
+    position: absolute;
+    width: var(--corner-size); height: var(--corner-size);
+    border: 0; background: transparent;
+    pointer-events: auto; cursor: grab;
+  }
+  .flip-handles .tl{ left: 0;  top: 0;    clip-path: polygon(0 0, 100% 0, 0 100%); }
+  .flip-handles .bl{ left: 0;  bottom: 0; clip-path: polygon(0 100%, 0 0, 100% 100%); }
+  .flip-handles .tr{ right: 0; top: 0;    clip-path: polygon(100% 0, 0 0, 100% 100%); }
+  .flip-handles .br{ right: 0; bottom: 0; clip-path: polygon(100% 100%, 0 100%, 100% 0); }
 
+  /* =========================================
+   * 8) BOOKMARK TABS — COMMON LOOK
+   *    (і для on-page, і для рейок)
+   * =======================================*/
+  .bm-tab{
+    border: 0; cursor: pointer;
+    --bmScale: 1; will-change: transform;
+    color: #fff; font-weight: 800; font-size: 15px; line-height: 1;
+    border: 1px solid rgba(0,0,0,.18);
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+    transition: transform .18s ease, filter .18s ease;
+  }
+  .bm-tab:hover  { transform: scale(1.06); filter: brightness(1.03); }
+  .bm-tab:active { transform: scale(1.03); }
+  .bm-tab__label{
+    writing-mode: vertical-rl; text-orientation: mixed;
+    max-height: calc(var(--tabLength) - 10px);
+    padding: 4px 0; overflow: hidden; text-overflow: ellipsis;
+  }
 
-        
+  /* =========================================
+   * 9) BOOKMARK RAILS (ALWAYS VISIBLE)
+   *    розміщуються у бокових полях сцени
+   * =======================================*/
+  .bm-rails{
+    position: absolute; inset: 0;
+    z-index: 200; pointer-events: none;
+  }
 
-      `}</style>
+  /* Колонки рейок по обидва боки книги */
+  .bm-rail{
+    position: absolute;
+    top: 0; bottom: 0;
+    width: var(--tabThickness);
+    pointer-events: none; /* події ловлять лише .bm-tab усередині */
+  }
+  .bm-rail.left  { left: 0;  transform: translateX(var(--tabInset)); }
+  .bm-rail.right { right: 0; transform: translateX(calc(-1 * var(--tabInset))); }
+
+  /* Кожна вкладка має свій Y через змінну --bm-i (передається інлайном) */
+  .bm-rail .bm-tab{
+    position: absolute; pointer-events: auto;
+    top: calc(var(--tabTop) + var(--bm-i) * (var(--tabLength) + var(--tabGap)));
+    width: var(--tabThickness); height: var(--tabLength);
+    background: #f47e20; /* колір може бути перезаписаний інлайном */
+  }
+  .bm-rail .bm-tab.left  { left: 0;  border-radius: 10px 0 0 10px; }
+  .bm-rail .bm-tab.right { right: 0; border-radius: 0 10px 10px 0; }
+`}</style>
+
     </div>
   );
 }
