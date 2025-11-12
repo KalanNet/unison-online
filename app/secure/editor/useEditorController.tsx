@@ -276,11 +276,11 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
   // Ліміти якості/розміру — ключ до плавності
-  const DPR_CAP = 5.0;
-  const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const MAX_W = 3200;
-  const targetW = Math.min(MAX_W, Math.max(750, Math.round(css.w * dpr)));
-  const scale = Math.max(0.5, targetW / pageW);
+const QUALITY = 2.5;
+const DPR_CAP = 8.0;
+const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
+const targetW = Math.min(6000, Math.round(css.w * dpr * QUALITY));
+const scale = Math.max(1.0, targetW / pageW);
 
   const vp = page.getViewport({ scale });
 
@@ -289,8 +289,8 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   canvas.height = Math.max(1, Math.round(vp.height));
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("2D context unavailable");
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+ctx.imageSmoothingEnabled = false;
+ctx.imageSmoothingQuality = "low"; // або взагалі не задавати
 
   await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
@@ -309,7 +309,7 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   });
 
   const mime = canEncodeWebP() ? "image/webp" : "image/png";
-  const quality = mime === "image/webp" ? 0.98 : 1.0;
+  const quality = mime === "image/webp" ? 1.0 : 1.0;
 
   const url = await canvasToSrc(canvas, mime, quality);
   return { url, w: vp.width, h: vp.height, links };
