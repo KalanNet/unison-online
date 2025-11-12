@@ -276,11 +276,9 @@ async function renderPageToImage(pageNum: number): Promise<PageBmp> {
   const css = getPageCssSize({ w: pageW, h: pageH }, fitScale);
 
   // ✅ коректне масштабування: fitScale * DPR
-  const DPR_CAP = 8.0;
+  const DPR_CAP = 6.0;
   const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-  const QUALITY = 3.0; // або 3.0 якщо текст дуже дрібний
-const scale = fitScale * dpr * QUALITY;
-
+  const scale = fitScale * dpr;
 
   const vp = page.getViewport({ scale });
 
@@ -316,22 +314,15 @@ await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
 
   // ✅ WebP без втрат (lossless) якщо підтримується
   const mime = canEncodeWebP() ? "image/webp" : "image/png";
-let url: string;
-
-if (mime === "image/webp") {
-  const blob = await new Promise<Blob | null>((resolve) => {
-    try {
-      // @ts-ignore — деякі браузери підтримують опцію lossless
-      canvas.toBlob(resolve, mime, { quality: 1.0, lossless: true });
-    } catch {
-      canvas.toBlob(resolve, mime, 1.0);
-    }
-  });
-  url = blob ? URL.createObjectURL(blob) : canvas.toDataURL(mime, 1.0);
-} else {
-  url = canvas.toDataURL("image/png");
-}
-
+  let url: string;
+  if (mime === "image/webp") {
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, mime, 1.0) // quality 1.0 = lossless
+    );
+    url = blob ? URL.createObjectURL(blob) : canvas.toDataURL(mime, 1.0);
+  } else {
+    url = canvas.toDataURL("image/png");
+  }
 
   return { url, w: vp.width, h: vp.height, links };
 }
