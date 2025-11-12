@@ -209,10 +209,15 @@ useEffect(() => {
     const vp = page.getViewport({ scale: 1, rotation });
 
 
-    const rect = stageRef.current.getBoundingClientRect();
-    const pad = 16;
-    const availW = Math.max(0, rect.width - pad * 2);
-    const availH = Math.max(0, rect.height - pad * 2);
+const rect = stageRef.current.getBoundingClientRect();
+const pad = 16;
+
+// якщо сторінка тимчасово схлопнулась — не оновлюємо scale
+if (rect.width < 100 || rect.height < 100) return;
+
+const availW = Math.max(200, rect.width - pad * 2);
+const availH = Math.max(200, rect.height - pad * 2);
+
 
 
     const gap = single ? 0 : 12;
