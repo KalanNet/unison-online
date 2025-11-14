@@ -64,25 +64,28 @@ export default function PublicViewer({
   );
 
   // Коефіцієнт кроку між закладками (1 = повний рознос, 0.5 = ~50% перекриття)
-  const bmStep = React.useMemo(() => {
+    const bmStep = React.useMemo(() => {
     const total = bmSorted.length;
-    if (!total) return 1;
+    if (total <= 1) return 1;
 
     const bookHeight = Math.round((ctrl.baseSize?.h ?? 0) * (ctrl.fitScale ?? 1));
     if (!bookHeight || !Number.isFinite(bookHeight)) return 1;
 
-    const TAB_LEN = 140; // має відповідати --tabLength
-    const PADDING = 72;  // запас зверху/знизу
+    const TAB_LEN = 140;   // відповідає --tabLength
+    const TOP = 36;        // відповідає --tabTop
+    const BOTTOM = 24;     // невеликий відступ знизу
 
-    const avail = Math.max(0, bookHeight - PADDING);
-    const full = total * TAB_LEN;
-    if (!full || avail >= full) return 1;
+    // висота, яка лишається на стиснення МІЖ першою і останньою вкладкою
+    const usable = bookHeight - TOP - BOTTOM - TAB_LEN;
+    if (usable <= 0) return 1;
 
-    const factor = avail / full;
-    // не даємо менше 0.5, щоб нижні були видимі хоча б наполовину
-    const clamped = Math.max(0.5, Math.min(1, factor));
-    return clamped;
+    const denom = (total - 1) * TAB_LEN; // сумарна висота проміжків
+    if (usable >= denom) return 1;       // місця достатньо, вкладки не перекриваються
+
+    const step = usable / denom;         // наскільки стискаємо
+    return Math.max(0.25, step);         // можна сховати майже все, але не менше 25%
   }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
+
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -574,12 +577,13 @@ export default function PublicViewer({
                                   ?.flip(pageIndex);
                             }}
                             style={
-                              {
-                                "--bm-i": String(pos),
-                                background: bm.color || "#f47e20",
-                              } as React.CSSProperties
-                            }
-                          >
+  {
+    "--bm-i": String(pos),
+    background: bm.color || "#f47e20",
+    zIndex: bmSorted.length - pos,     // перша завжди поверх
+  } as React.CSSProperties
+}
+>
                             <span className="bm-tab__label">{bm.label}</span>
                           </button>
                         );
@@ -625,12 +629,14 @@ export default function PublicViewer({
                                   ?.flip(pageIndex);
                             }}
                             style={
-                              {
-                                "--bm-i": String(pos),
-                                background: bm.color || "#f47e20",
-                              } as React.CSSProperties
-                            }
-                          >
+  {
+    "--bm-i": String(pos),
+    background: bm.color || "#f47e20",
+    zIndex: bmSorted.length - pos,
+  } as React.CSSProperties
+}
+>
+
                             <span className="bm-tab__label">{bm.label}</span>
                           </button>
                         );
