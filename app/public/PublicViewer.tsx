@@ -86,6 +86,33 @@ export default function PublicViewer({
     return Math.max(0.25, step);         // можна сховати майже все, але не менше 25%
   }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
 
+    const jumpToPdfPage = React.useCallback(
+    (page1: number) => {
+      if (!ctrl) return;
+
+      // page1 — 1-based (як у PDF), а FlipBook працює з 0-based
+      const target = Math.max(0, (page1 || 1) - 1);
+
+      if (ctrl.currentIndex === target) return;
+
+      // спочатку оновлюємо state контролера
+      ctrl.setCurrentIndex(target);
+
+      // у наступний кадр даємо команду самому FlipBook
+      setTimeout(() => {
+        const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+        if (api?.turnToPage) {
+          api.turnToPage(target);
+        } else if (typeof (ctrl as any).goToPage === "function") {
+          (ctrl as any).goToPage(target);
+        } else if (api?.flip) {
+          api.flip(target);
+        }
+      }, 0);
+    },
+    [ctrl]
+  );
+
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -464,18 +491,11 @@ export default function PublicViewer({
                                 title={`${bm.label} (p.${bm.page})`}
                                 style={style}
                                 onClick={(e) => {
-                                  e.preventDefault();
-                                  const pageIndex = Math.max(
-                                    0,
-                                    (bm.page ?? 1) - 1
-                                  );
-                                  if (typeof ctrl.goToPage === "function")
-                                    ctrl.goToPage(pageIndex);
-                                  else
-                                    (ctrl.bookRef.current as any)
-                                      ?.pageFlip()
-                                      ?.flip(pageIndex);
-                                }}
+  e.preventDefault();
+  e.stopPropagation();
+  jumpToPdfPage(bm.page ?? 1);
+}}
+
                               >
                                 <span className="bm-tab__label">
                                   {bm.label}
@@ -564,18 +584,11 @@ export default function PublicViewer({
                             className="bm-tab left"
                             title={`${bm.label} (p.${bm.page})`}
                             onClick={(e) => {
-                              e.preventDefault();
-                              const pageIndex = Math.max(
-                                0,
-                                (bm.page ?? 1) - 1
-                              );
-                              if (typeof ctrl.goToPage === "function")
-                                ctrl.goToPage(pageIndex);
-                              else
-                                (ctrl.bookRef.current as any)
-                                  ?.pageFlip()
-                                  ?.flip(pageIndex);
-                            }}
+  e.preventDefault();
+  e.stopPropagation();
+  jumpToPdfPage(bm.page ?? 1);
+}}
+
                             style={
   {
     "--bm-i": String(pos),
@@ -616,18 +629,11 @@ export default function PublicViewer({
                             className="bm-tab right"
                             title={`${bm.label} (p.${bm.page})`}
                             onClick={(e) => {
-                              e.preventDefault();
-                              const pageIndex = Math.max(
-                                0,
-                                (bm.page ?? 1) - 1
-                              );
-                              if (typeof ctrl.goToPage === "function")
-                                ctrl.goToPage(pageIndex);
-                              else
-                                (ctrl.bookRef.current as any)
-                                  ?.pageFlip()
-                                  ?.flip(pageIndex);
-                            }}
+  e.preventDefault();
+  e.stopPropagation();
+  jumpToPdfPage(bm.page ?? 1);
+}}
+
                             style={
   {
     "--bm-i": String(pos),
@@ -1061,8 +1067,8 @@ export default function PublicViewer({
           --bmScale: 1;
           will-change: transform;
           color: #fff;
-          font-weight: 400; /* тонкий шрифт */
-          font-size: 13px;
+          font-weight: 500; /* тонкий шрифт */
+          font-size: 15px;
           line-height: 1;
           border: 1px solid rgba(0, 0, 0, 0.18);
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
