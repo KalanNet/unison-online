@@ -18,48 +18,42 @@ type Props = {
   hits: { id: string; page: number; snippet: string }[];
   onGoto: (p: number) => void;
 
-  // щоб не було TS-помилки в PublicViewer.tsx
+  // опціонально з PublicViewer
   onShare?: () => void;
 };
 
 export default function MobilePager(p: Props) {
   const { ctrl } = p;
 
-  // ---- Рендеримо лише поточну та підігріваємо сусідів ----
   const pageNum = ctrl.currentIndex + 1;
 
   useEffect(() => {
     try {
-      ctrl.ensureRendered?.(ctrl.currentIndex);
-    } catch {}
-    try {
+      // прогрів близьких сторінок
       ctrl.warmPagesAround?.(ctrl.currentIndex);
     } catch {}
   }, [ctrl.currentIndex, ctrl]);
 
   const bmp = ctrl.cacheRef.current.get(pageNum);
 
-  // ===== ЗУМ/ПАНОРАМУВАННЯ (локальний стейт) =====
+  // ===== ЗУМ/ПАН (локально) =====
   const pageRef = React.useRef<HTMLDivElement | null>(null);
   const [panEl, setPanEl] = React.useState<HTMLElement | null>(null);
   const [zoom, setZoom] = React.useState(1);
   const [tx, setTx] = React.useState(0);
   const [ty, setTy] = React.useState(0);
 
-  // щоб MobileSwipe знав про реальний DOM-елемент, а не лише ref
   const pageRefCb = React.useCallback((el: HTMLDivElement | null) => {
     pageRef.current = el;
     setPanEl(el ?? null);
   }, []);
 
-  // Скидання зума при зміні сторінки / пошуку
   useEffect(() => {
     setZoom(1);
     setTx(0);
     setTy(0);
   }, [pageNum, p.searchQuery]);
 
-  // Пінч/пан логіка
   const pts = React.useRef<Map<number, { x: number; y: number }>>(new Map());
   const baseDist = React.useRef<number | null>(null);
   const baseZoom = React.useRef(1);
@@ -99,37 +93,37 @@ export default function MobilePager(p: Props) {
     if (pts.current.size < 2) baseDist.current = null;
   };
 
-  // м’які межі пану — щоб картинка не «тікала» за межі
   const maxPan = 180;
   const tX = Math.max(-maxPan, Math.min(maxPan, tx));
   const tY = Math.max(-maxPan, Math.min(maxPan, ty));
 
-  // ===== ЛЕЙАУТ: сцена між хедером і локальним футером =====
-  const HEADER_PX = 56; // висота MobileHeader
-  const FOOTER_PX = 56; // висота локального футера (панель сторінок)
+  // ===== ЛЕЙАУТ: 1fr (канва) + 56px (футер) =====
+  const HEADER_PX = 56;
+  const FOOTER_PX = 56;
 
   const rootStyle: React.CSSProperties = {
-    // використовуємо var(--app-h), яку виставляє useEditorController через visualViewport
+    // var(--app-h) виставляє useEditorController (visualViewport.height)
     height: `calc(var(--app-h, 100dvh) - ${HEADER_PX}px)`,
     display: "grid",
-    gridTemplateRows: `1fr ${FOOTER_PX}px`, // канва + футер
+    gridTemplateRows: `1fr ${FOOTER_PX}px`,
     background: "#21353a",
-    minHeight: 0, // щоб внутрішній контент не випирав
+    minHeight: 0, // критично для гріду
+    overflow: "hidden",
   };
 
   return (
     <div className="mpg-root" style={rootStyle}>
-      {/* Канва з однією сторінкою */}
+      {/* Канва (займає увесь перший рядок 1fr) */}
       <div
         ref={ctrl.stageRef}
         className="mpg-canvas"
         style={{
+          height: "100%",      // ← ключ: канва рівно дорівнює своєму грід-рядку
+          minHeight: 0,        // ← дозволяє внутрішньому флексу не роздуватись
           display: "grid",
           placeItems: "center",
           padding: "10px 10px 12px",
-          overflow: "hidden",
-          minHeight: 0,
-          height: "100%", // ключове: канва рівно дорівнює своєму рядку 1fr
+          overflow: "hidden",  // ← нічого не виходить за межі канви
         }}
       >
         <MobileSwipe
@@ -143,13 +137,21 @@ export default function MobilePager(p: Props) {
           <div
             ref={pageRefCb}
             className="mpg-page"
+            onMouseMove={(e) => ctrl.handlePageMouseMove(e, pageNum)}
+            onMouseLeave={ctrl.handlePageMouseLeave}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
             style={{
-              // !!! головне виправлення: фіксуємося по ВИСОТІ, а не по ширині
-              width: "auto",
-              maxWidth: "100%",
+              // ФІКС: сторінка займає ВСЮ висоту канви і тримає пропорції PDF
               height: "100%",
               maxHeight: "100%",
+              width: "auto",
+              maxWidth: "100%",
               aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+              display: "grid",
+              placeItems: "center",
               background: "#fff",
               borderRadius: 4,
               position: "relative",
@@ -157,12 +159,6 @@ export default function MobilePager(p: Props) {
               touchAction: zoom > 1 ? "none" : "pan-y",
               minHeight: 0,
             }}
-            onMouseMove={(e) => ctrl.handlePageMouseMove(e, pageNum)}
-            onMouseLeave={ctrl.handlePageMouseLeave}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
           >
             {bmp ? (
               <>
@@ -220,7 +216,7 @@ export default function MobilePager(p: Props) {
                   )
                 )}
 
-                {/* search highlights */}
+                {/* Search highlights */}
                 <div className="mpg-hl-layer">
                   {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map(
                     (hl: any, i: number) => {
@@ -245,22 +241,20 @@ export default function MobilePager(p: Props) {
                 </div>
               </>
             ) : (
-              <div style={{ color: "#e9f0e4", textAlign: "center" }}>
-                Loading…
-              </div>
+              <div style={{ color: "#e9f0e4", textAlign: "center" }}>Loading…</div>
             )}
           </div>
         </MobileSwipe>
       </div>
 
-      {/* Локальний мобільний футер з навігацією */}
-      <footer className="mpg-bar">
+      {/* Локальний МОБІЛЬНИЙ ФУТЕР (завжди в другому грід-рядку) */}
+      <footer className="mpg-bar" aria-label="Mobile pager controls">
         <div className="mpg-bar__grid">
           <button
             className="mpg-btn"
             onClick={ctrl.goPrev}
             disabled={!ctrl.canPrev}
-            aria-label="Previous"
+            aria-label="Previous page"
             title="Previous"
           >
             ◀
@@ -278,8 +272,8 @@ export default function MobilePager(p: Props) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") ctrl.submitJump();
               }}
-              aria-label="Page"
-              title="Enter page"
+              aria-label="Page number"
+              title="Enter page number"
             />
             <span className="mpg-sep">/</span>
             <span className="mpg-total">{ctrl.totalPages || "…"}</span>
@@ -289,7 +283,7 @@ export default function MobilePager(p: Props) {
             className="mpg-btn"
             onClick={ctrl.goNext}
             disabled={!ctrl.canNext}
-            aria-label="Next"
+            aria-label="Next page"
             title="Next"
           >
             ▶
@@ -297,13 +291,11 @@ export default function MobilePager(p: Props) {
         </div>
       </footer>
 
+      {/* Мінімальні глобальні стилі для стабільного макета */}
       <style jsx global>{`
-        .mpg-root {
-          color: #2d3018;
-        }
-        .mpg-canvas {
-          height: 100%;
-        }
+        .mpg-root { color: #2d3018; }
+        .mpg-canvas { height: 100%; }
+
         .mpg-bar {
           height: 56px;
           background: #ffffffef;
@@ -324,9 +316,7 @@ export default function MobilePager(p: Props) {
           border-radius: 0.6rem;
           background: #fff;
         }
-        .mpg-btn[disabled] {
-          opacity: 0.45;
-        }
+        .mpg-btn[disabled] { opacity: 0.45; }
         .mpg-mid {
           display: flex;
           justify-content: center;
@@ -340,32 +330,13 @@ export default function MobilePager(p: Props) {
           border: 1px solid #e7ebdf;
           border-radius: 0.5rem;
         }
-        .mpg-sep {
-          color: #5c6750;
-        }
-        .mpg-total {
-          color: #2d3018;
-        }
+        .mpg-sep { color: #5c6750; }
+        .mpg-total { color: #2d3018; }
 
-        .pdf-link {
-          border: 0;
-          background: transparent;
-          display: block;
-        }
-        .mpg-hl-layer {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
-        .hl {
-          background: #f4ce6944;
-          outline: 1px solid #f4ce69;
-          border-radius: 3px;
-        }
-        .hl.is-active {
-          background: #f47e2050;
-          outline-color: #f47e20;
-        }
+        .pdf-link { border: 0; background: transparent; display: block; }
+        .mpg-hl-layer { position: absolute; inset: 0; pointer-events: none; }
+        .hl { background: #f4ce6944; outline: 1px solid #f4ce69; border-radius: 3px; }
+        .hl.is-active { background: #f47e2050; outline-color: #f47e20; }
       `}</style>
     </div>
   );
