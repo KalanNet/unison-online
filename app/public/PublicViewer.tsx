@@ -417,83 +417,90 @@ export default function PublicViewer({
                         {/* === /HIGHLIGHTS LAYER === */}
                         {/* === BOOKMARK TABS (ONLY for current spread pages) === */}
                         {bmSorted
-  .filter((b) => b.page === pageNum)
-  .map((bm) => {
-    const i = bmIndex.get(bm.id) ?? 0;
+                          .filter((b) => b.page === pageNum)
+                          .map((bm) => {
+                            const i = bmIndex.get(bm.id) ?? 0;
 
-    const curr = ctrl.currentIndex + 1; // 1-based
-    const leftNow = ctrl.single ? curr : curr % 2 === 0 ? curr : curr - 1;
-    const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                            const curr = ctrl.currentIndex + 1; // 1-based
+                            const leftNow = ctrl.single
+                              ? curr
+                              : curr % 2 === 0
+                              ? curr
+                              : curr - 1;
+                            const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
 
-    const isCurrentLeft = pageNum === leftNow;
-    const isCurrentRight = pageNum === rightNow;
+                            const isCurrentLeft = pageNum === leftNow;
+                            const isCurrentRight = pageNum === rightNow;
 
-    const sideIsLeft = ctrl.single ? bm.page < curr : bm.page <= leftNow;
+                            const sideIsLeft = ctrl.single ? bm.page < curr : bm.page <= leftNow;
 
-    const shouldAttach =
-      (isCurrentLeft && sideIsLeft) || (isCurrentRight && !sideIsLeft);
+                            const shouldAttach =
+                              (isCurrentLeft && sideIsLeft) ||
+                              (isCurrentRight && !sideIsLeft);
 
-    if (!shouldAttach) return null;
+                            if (!shouldAttach) return null;
 
-    // наскільки активна вкладка «товстіша» назовні
-    const ACTIVE_GROW = 6;
-    const tabWidth = `calc(var(--tabThickness,36px) + ${ACTIVE_GROW}px)`;
+                            const ACTIVE_SCALE = 1.14; // наскільки «товстішає» активна вкладка
 
-    const style: React.CSSProperties = {
-      position: "absolute",
-      zIndex: 90,
-      top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
-      width: tabWidth,
-      height: "var(--tabLength,140px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: "#fff",
-      fontSize: 16, // активна — 16px
-      fontWeight: 500,
-      lineHeight: 1,
-      border: "1px solid rgba(0,0,0,.18)",
-      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-      opacity: 0.98,
-      pointerEvents: "auto",
-      background: bm.color || "#f47e20",
-      ...(isCurrentLeft
-        ? {
-            left: 0,
-            transformOrigin: "left center",
-            // tabInset негативний, +ACTIVE_GROW зменшує модуль і зберігає внутрішній край,
-            // а «товщина» росте тільки вліво (назовні)
-            transform:
-              `translateZ(0.01px) translateX(calc(var(--tabInset,-35px) + ${ACTIVE_GROW}px))`,
-            borderRadius: "10px 0 0 10px",
-          }
-        : {
-            right: 0,
-            transformOrigin: "right center",
-            // для правої вкладки додаємо ACTIVE_GROW до виносу,
-            // внутрішній край лишається на тій самій позиції
-            transform:
-              `translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px) + ${ACTIVE_GROW}px))`,
-            borderRadius: "0 10px 10px 0",
-          }),
-    };
+                            const style: React.CSSProperties = {
+                              position: "absolute",
+                              zIndex: 90,
+                              top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
+                              width: "var(--tabThickness,36px)",
+                              height: "var(--tabLength,140px)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#fff",
+                              fontSize: 16, // активна — 16px
+                              fontWeight: 500,
+                              lineHeight: 1,
+                              border: "1px solid rgba(0,0,0,.18)",
+                              boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                              opacity: 0.98,
+                              pointerEvents: "auto",
+                              background: bm.color || "#f47e20",
+                              ...(isCurrentLeft
+                                ? {
+                                    left: 0,
+                                    transformOrigin: "right center",
+                                    // внутрішній (правий) край «приліплений» до сторінки,
+                                    // масштаб росте лише назовні (вліво)
+                                    transform:
+                                      "translateZ(0.01px) translateX(var(--tabInset,-35px)) scaleX(" +
+                                      ACTIVE_SCALE +
+                                      ")",
+                                    borderRadius: "10px 0 0 10px",
+                                  }
+                                : {
+                                    right: 0,
+                                    transformOrigin: "left center",
+                                    // внутрішній (лівий) край «приліплений» до сторінки,
+                                    // масштаб росте лише назовні (вправо)
+                                    transform:
+                                      "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px))) scaleX(" +
+                                      ACTIVE_SCALE +
+                                      ")",
+                                    borderRadius: "0 10px 10px 0",
+                                  }),
+                            };
 
-    return (
-      <button
-        key={bm.id}
-        className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
-        title={`${bm.label} (p.${bm.page})`}
-        style={style}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          jumpToPdfPage(bm.page ?? 1);
-        }}
-      >
-        <span className="bm-tab__label">{bm.label}</span>
-      </button>
-    );
-  })}
+                            return (
+                              <button
+                                key={bm.id}
+                                className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+                                title={`${bm.label} (p.${bm.page})`}
+                                style={style}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  jumpToPdfPage(bm.page ?? 1);
+                                }}
+                              >
+                                <span className="bm-tab__label">{bm.label}</span>
+                              </button>
+                            );
+                          })}
 
 
                         {/* === /BOOKMARK TABS === */}
@@ -1060,7 +1067,7 @@ export default function PublicViewer({
           --bmScale: 1;
           will-change: transform;
           color: #fff;
-          font-weight: 500; /* тонкий шрифт */
+          font-weight: 500;
           font-size: 15px;
           line-height: 1;
           border: 1px solid rgba(0, 0, 0, 0.18);
@@ -1074,15 +1081,16 @@ export default function PublicViewer({
         .bm-tab:active {
           transform: scale(1.03);
         }
-                .bm-tab__label {
-          writing-mode: vertical-rl;   /* базово зверху вниз */
+
+        .bm-tab__label {
+          writing-mode: vertical-rl; /* базово зверху вниз */
           text-orientation: mixed;
           max-height: calc(var(--tabLength) - 10px);
           padding: 4px 0;
           overflow: hidden;
           text-overflow: ellipsis;
           letter-spacing: 0.08em;
-          display: inline-block;       /* щоб можна було крутити текст */
+          display: inline-block;
         }
 
         /* Права сторона — як є, згори вниз */
@@ -1094,7 +1102,6 @@ export default function PublicViewer({
         .bm-tab.left .bm-tab__label {
           transform: rotate(180deg);
         }
-
 
         /* =========================================
          * 9) BOOKMARK RAILS (ALWAYS VISIBLE)
