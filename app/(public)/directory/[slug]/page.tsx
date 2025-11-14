@@ -19,7 +19,7 @@ type MetaPayload = {
 // Та сама featured-картинка, що й на головній (лежить у public/og-featured-home.jpg)
 const DEFAULT_OG_IMAGE = "/og-featured-home.jpg";
 
-// Meta для соцмереж саме для 2025 каталогу
+// Meta для соцмереж (дефолт для всіх директорій поки що)
 const SOCIAL_TITLE_2025 = "Services and Housing Directory 2025";
 const SOCIAL_DESC_2025 =
   "A helpful resource for seniors in Calgary to find Services and Housing all gathered in Directory Catalogue.";
@@ -64,22 +64,11 @@ export async function generateMetadata({
   const slug = slugRaw ?? "";
   const data = slug ? await getMeta(slug) : null;
 
-  // 1) Базові значення з meta.json або дефолт
-  let title =
-    data?.meta?.title ??
-    (slug ? `Directory — ${slug}` : "Directory");
+  // 1) Базові значення: або те, що прийшло з meta.json, або ТВОЇ нові дефолти
+  const title = data?.meta?.title ?? SOCIAL_TITLE_2025;
+  const description = data?.meta?.description ?? SOCIAL_DESC_2025;
 
-  let description =
-    data?.meta?.description ??
-    "Unison Alberta directory viewer.";
-
-  // 2) Для 2025 каталогу жорстко перезаписуємо title/description
-  if (slug === "services-and-housing-directory-2025") {
-    title = SOCIAL_TITLE_2025;
-    description = SOCIAL_DESC_2025;
-  }
-
-  // 3) Якщо у meta.json є featuredUrl – беремо його, інакше – дефолтний OG
+  // 2) Якщо у meta.json є featuredUrl – беремо його, інакше – дефолтний OG
   const ogImg = data?.meta?.featuredUrl || DEFAULT_OG_IMAGE;
 
   return {
