@@ -417,92 +417,81 @@ export default function PublicViewer({
                         {/* === /HIGHLIGHTS LAYER === */}
                         {/* === BOOKMARK TABS (ONLY for current spread pages) === */}
                         {bmSorted
-                          .filter((b) => b.page === pageNum)
-                          .map((bm) => {
-                            const i = bmIndex.get(bm.id) ?? 0;
+  .filter((b) => b.page === pageNum)
+  .map((bm) => {
+    const i = bmIndex.get(bm.id) ?? 0;
 
-                            const curr = ctrl.currentIndex + 1; // 1-based
-                            const leftNow = ctrl.single
-                              ? curr
-                              : curr % 2 === 0
-                              ? curr
-                              : curr - 1;
-                            const rightNow = Math.min(
-                              leftNow + 1,
-                              ctrl.totalPages
-                            );
+    const curr = ctrl.currentIndex + 1; // 1-based
+    const leftNow = ctrl.single ? curr : curr % 2 === 0 ? curr : curr - 1;
+    const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
 
-                            const isCurrentLeft = pageNum === leftNow;
-                            const isCurrentRight = pageNum === rightNow;
+    const isCurrentLeft = pageNum === leftNow;
+    const isCurrentRight = pageNum === rightNow;
 
-                            // з якого боку сторінки має стирчати закладка
-                            const sideIsLeft = ctrl.single
-                              ? bm.page < curr
-                              : bm.page <= leftNow;
+    const sideIsLeft = ctrl.single ? bm.page < curr : bm.page <= leftNow;
 
-                            // показуємо кнопку лише на зовнішній стороні аркуша
-                            const shouldAttach =
-                              (isCurrentLeft && sideIsLeft) ||
-                              (isCurrentRight && !sideIsLeft);
+    const shouldAttach =
+      (isCurrentLeft && sideIsLeft) || (isCurrentRight && !sideIsLeft);
 
-                            if (!shouldAttach) return null;
+    if (!shouldAttach) return null;
 
-                            const style: React.CSSProperties = {
-                              position: "absolute",
-                              zIndex: 90,
-                              top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
-                              width: "var(--tabThickness,36px)",
-                              height: "var(--tabLength,140px)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              fontSize: 13,
-                              fontWeight: 600, // тонший шрифт
-                              lineHeight: 1,
-                              border: "1px solid rgba(0,0,0,.18)",
-                              boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                              opacity: 0.98,
-                              pointerEvents: "auto",
-                              background: bm.color || "#f47e20",
-                              ...(isCurrentLeft
-                                ? {
-                                    left: 0,
-                                    transformOrigin: "left center",
-                                    transform:
-                                      "translateZ(0.01px) translateX(var(--tabInset,-35px))",
-                                    borderRadius: "10px 0 0 10px",
-                                  }
-                                : {
-                                    right: 0,
-                                    transformOrigin: "right center",
-                                    transform:
-                                      "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px)))",
-                                    borderRadius: "0 10px 10px 0",
-                                  }),
-                            };
+    // Активна вкладка (єдина, яка прикріплена до поточного розвороту)
+    const ACTIVE_GROW = 6;  // на стільки px "виглядаємо" назовні
+    const ACTIVE_SHIFT = 3; // невеликий зсув, щоб залишитись "причепленою"
+    const tabWidth = `calc(var(--tabThickness,36px) + ${ACTIVE_GROW}px)`;
 
-                            return (
-                              <button
-                                key={bm.id}
-                                className={`bm-tab ${
-                                  sideIsLeft ? "left" : "right"
-                                } active`}
-                                title={`${bm.label} (p.${bm.page})`}
-                                style={style}
-                                onClick={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  jumpToPdfPage(bm.page ?? 1);
-}}
+    const style: React.CSSProperties = {
+      position: "absolute",
+      zIndex: 90,
+      top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
+      width: tabWidth,
+      height: "var(--tabLength,140px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#fff",
+      fontSize: 16,       // активна - 16px
+      fontWeight: 500,
+      lineHeight: 1,
+      border: "1px solid rgba(0,0,0,.18)",
+      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+      opacity: 0.98,
+      pointerEvents: "auto",
+      background: bm.color || "#f47e20",
+      ...(isCurrentLeft
+        ? {
+            left: 0,
+            transformOrigin: "left center",
+            transform:
+              `translateZ(0.01px) translateX(calc(var(--tabInset,-35px) - ${ACTIVE_SHIFT}px))`,
+            borderRadius: "10px 0 0 10px",
+          }
+        : {
+            right: 0,
+            transformOrigin: "right center",
+            transform:
+              `translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px) + ${ACTIVE_SHIFT}px))`,
+            borderRadius: "0 10px 10px 0",
+          }),
+    };
 
-                              >
-                                <span className="bm-tab__label">
-                                  {bm.label}
-                                </span>
-                              </button>
-                            );
-                          })}
+    return (
+      <button
+        key={bm.id}
+        className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+        title={`${bm.label} (p.${bm.page})`}
+        style={style}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          jumpToPdfPage(bm.page ?? 1);
+        }}
+      >
+        <span className="bm-tab__label">{bm.label}</span>
+      </button>
+    );
+  })}
+
                         {/* === /BOOKMARK TABS === */}
 
 
@@ -1082,13 +1071,22 @@ export default function PublicViewer({
           transform: scale(1.03);
         }
         .bm-tab__label {
-          writing-mode: vertical-rl;
           text-orientation: mixed;
           max-height: calc(var(--tabLength) - 10px);
           padding: 4px 0;
           overflow: hidden;
           text-overflow: ellipsis;
-          letter-spacing: 0.08em; /* трохи більший крок між літерами */
+          letter-spacing: 0.08em;
+        }
+
+        /* ПРАВА сторона — як і було: згори вниз */
+        .bm-tab.right .bm-tab__label {
+          writing-mode: vertical-rl;
+        }
+
+        /* ЛІВА сторона — навпаки: знизу вгору */
+        .bm-tab.left .bm-tab__label {
+          writing-mode: vertical-lr;
         }
 
         /* =========================================
