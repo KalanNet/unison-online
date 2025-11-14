@@ -51,15 +51,38 @@ export default function PublicViewer({
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
 
-  // сортування закладок
+  // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
   const bmSorted = React.useMemo(
     () => [...bookmarks].sort((a, b) => a.page - b.page),
     [bookmarks]
   );
+
+  // Глобальний порядковий індекс кожної закладки
   const bmIndex = React.useMemo(
     () => new Map(bmSorted.map((b, i) => [b.id, i])),
     [bmSorted]
   );
+
+  // Коефіцієнт кроку між закладками (1 = повний рознос, 0.5 = ~50% перекриття)
+  const bmStep = React.useMemo(() => {
+    const total = bmSorted.length;
+    if (!total) return 1;
+
+    const bookHeight = Math.round((ctrl.baseSize?.h ?? 0) * (ctrl.fitScale ?? 1));
+    if (!bookHeight || !Number.isFinite(bookHeight)) return 1;
+
+    const TAB_LEN = 140; // має відповідати --tabLength
+    const PADDING = 72;  // запас зверху/знизу
+
+    const avail = Math.max(0, bookHeight - PADDING);
+    const full = total * TAB_LEN;
+    if (!full || avail >= full) return 1;
+
+    const factor = avail / full;
+    // не даємо менше 0.5, щоб нижні були видимі хоча б наполовину
+    const clamped = Math.max(0.5, Math.min(1, factor));
+    return clamped;
+  }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -247,37 +270,11 @@ export default function PublicViewer({
       />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
-        {/* внутрішній контейнер, який резервує місце симетрично всередині сцени */}
-        <div className="stage-rail">
-          {/* ТОНКІ СТРІЛКИ НА КРАЯХ ЕКРАНА (відв'язані від сторінок) */}
-          {ctrl.totalPages > 1 && (
-            <>
-              <button
-                className={`page-arrow left ${!ctrl.canPrev ? "disabled" : ""}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  ctrl.goPrev();
-                }}
-                aria-label="Previous page"
-                disabled={!ctrl.canPrev}
-              >
-                ‹
-              </button>
-
-              <button
-                className={`page-arrow right ${!ctrl.canNext ? "disabled" : ""}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  ctrl.goNext();
-                }}
-                aria-label="Next page"
-                disabled={!ctrl.canNext}
-              >
-                ›
-              </button>
-            </>
-          )}
-
+        {/* резервуємо місце і пробрасываем --bm-step у CSS */}
+        <div
+          className="stage-rail"
+          style={{ "--bm-step": bmStep } as React.CSSProperties}
+        >
           <div
             className={`book-container${isFrontCover ? " is-cover" : ""}${
               isBackCover ? " is-backcover" : ""
@@ -310,7 +307,7 @@ export default function PublicViewer({
               mobileScrollSupport
               disableFlipByClick
               showHint={false}
-              useMouseEvents={false} // ← було true/присутній прапор; ставимо false
+              useMouseEvents={false}
               clickEventForward
               startPage={(initPageRef.current ?? 0) as number}
               onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
@@ -388,30 +385,32 @@ export default function PublicViewer({
                           )}
                         </div>
                         {/* === /HIGHLIGHTS LAYER === */}
-
                         {/* === BOOKMARK TABS (ONLY for current spread pages) === */}
                         {bmSorted
                           .filter((b) => b.page === pageNum)
                           .map((bm) => {
-                            const iIdx = bmIndex.get(bm.id) ?? 0;
+                            const i = bmIndex.get(bm.id) ?? 0;
 
                             const curr = ctrl.currentIndex + 1; // 1-based
                             const leftNow = ctrl.single
                               ? curr
-                              : curr === 1
-                              ? 1
                               : curr % 2 === 0
                               ? curr
                               : curr - 1;
-                            const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                            const rightNow = Math.min(
+                              leftNow + 1,
+                              ctrl.totalPages
+                            );
 
                             const isCurrentLeft = pageNum === leftNow;
                             const isCurrentRight = pageNum === rightNow;
 
-                            // яка сторона для цієї закладки
-                            const sideIsLeft = ctrl.single ? bm.page < curr : bm.page <= leftNow;
+                            // з якого боку сторінки має стирчати закладка
+                            const sideIsLeft = ctrl.single
+                              ? bm.page < curr
+                              : bm.page <= leftNow;
 
-                            // показуємо вкладку на сторінці лише якщо вона «зовнішня» для цього аркуша
+                            // показуємо кнопку лише на зовнішній стороні аркуша
                             const shouldAttach =
                               (isCurrentLeft && sideIsLeft) ||
                               (isCurrentRight && !sideIsLeft);
@@ -421,15 +420,15 @@ export default function PublicViewer({
                             const style: React.CSSProperties = {
                               position: "absolute",
                               zIndex: 90,
-                              top: `calc(var(--tabTop,36px) + ${iIdx} * (var(--tabLength,140px) + var(--tabGap,0px)))`,
+                              top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
                               width: "var(--tabThickness,36px)",
                               height: "var(--tabLength,140px)",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
                               color: "#fff",
-                              fontSize: 15,
-                              fontWeight: 800,
+                              fontSize: 13,
+                              fontWeight: 600, // тонший шрифт
                               lineHeight: 1,
                               border: "1px solid rgba(0,0,0,.18)",
                               boxShadow: "0 2px 6px rgba(0,0,0,.12)",
@@ -456,12 +455,17 @@ export default function PublicViewer({
                             return (
                               <button
                                 key={bm.id}
-                                className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+                                className={`bm-tab ${
+                                  sideIsLeft ? "left" : "right"
+                                } active`}
                                 title={`${bm.label} (p.${bm.page})`}
                                 style={style}
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
+                                  const pageIndex = Math.max(
+                                    0,
+                                    (bm.page ?? 1) - 1
+                                  );
                                   if (typeof ctrl.goToPage === "function")
                                     ctrl.goToPage(pageIndex);
                                   else
@@ -470,23 +474,14 @@ export default function PublicViewer({
                                       ?.flip(pageIndex);
                                 }}
                               >
-                                <span
-                                  className="bm-tab__label"
-                                  style={{
-                                    maxHeight: "calc(var(--tabLength,140px) - 10px)",
-                                    padding: "4px 0",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    writingMode: "vertical-rl",
-                                    textOrientation: "mixed",
-                                  }}
-                                >
+                                <span className="bm-tab__label">
                                   {bm.label}
                                 </span>
                               </button>
                             );
                           })}
                         {/* === /BOOKMARK TABS === */}
+
 
                         {/* PDF LINKS */}
                         {links?.length
@@ -542,89 +537,104 @@ export default function PublicViewer({
               })}
             </FlipBook>
 
-            {/* === ALWAYS-VISIBLE RAILS === */}
+                       {/* === ALWAYS-VISIBLE RAILS === */}
             {bmSorted.length > 0 && (
               <div className="bm-rails" aria-hidden={false}>
-                {/* ліва рейка: всі сторінки ДО поточної лівої */}
+                {/* ліва рейка: усі сторінки ДО поточної лівої */}
                 <div className="bm-rail left">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
                       ? curr
-                      : curr === 1
-                      ? 1
                       : curr % 2 === 0
                       ? curr
                       : curr - 1;
+
                     return bmSorted
                       .filter((bm) => bm.page < leftNow)
-                      .map((bm, idx) => (
-                        <button
-                          key={bm.id}
-                          className="bm-tab left"
-                          title={`${bm.label} (p.${bm.page})`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
-                            if (typeof ctrl.goToPage === "function")
-                              ctrl.goToPage(pageIndex);
-                            else
-                              (ctrl.bookRef.current as any)
-                                ?.pageFlip()
-                                ?.flip(pageIndex);
-                          }}
-                          style={
-                            {
-                              "--bm-i": String(idx),
-                              background: bm.color || "#f47e20",
-                            } as React.CSSProperties
-                          }
-                        >
-                          <span className="bm-tab__label">{bm.label}</span>
-                        </button>
-                      ));
+                      .map((bm) => {
+                        const pos = bmIndex.get(bm.id) ?? 0;
+
+                        return (
+                          <button
+                            key={bm.id}
+                            className="bm-tab left"
+                            title={`${bm.label} (p.${bm.page})`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const pageIndex = Math.max(
+                                0,
+                                (bm.page ?? 1) - 1
+                              );
+                              if (typeof ctrl.goToPage === "function")
+                                ctrl.goToPage(pageIndex);
+                              else
+                                (ctrl.bookRef.current as any)
+                                  ?.pageFlip()
+                                  ?.flip(pageIndex);
+                            }}
+                            style={
+                              {
+                                "--bm-i": String(pos),
+                                background: bm.color || "#f47e20",
+                              } as React.CSSProperties
+                            }
+                          >
+                            <span className="bm-tab__label">{bm.label}</span>
+                          </button>
+                        );
+                      });
                   })()}
                 </div>
 
-                {/* права рейка: всі сторінки ПІСЛЯ поточної правої */}
+                {/* права рейка: усі сторінки ПІСЛЯ поточної правої */}
                 <div className="bm-rail right">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
                       ? curr
-                      : curr === 1
-                      ? 1
                       : curr % 2 === 0
                       ? curr
                       : curr - 1;
-                    const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                    const rightNow = Math.min(
+                      leftNow + 1,
+                      ctrl.totalPages
+                    );
+
                     return bmSorted
                       .filter((bm) => bm.page > rightNow)
-                      .map((bm, idx) => (
-                        <button
-                          key={bm.id}
-                          className="bm-tab right"
-                          title={`${bm.label} (p.${bm.page})`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const pageIndex = Math.max(0, (bm.page ?? 1) - 1);
-                            if (typeof ctrl.goToPage === "function")
-                              ctrl.goToPage(pageIndex);
-                            else
-                              (ctrl.bookRef.current as any)
-                                ?.pageFlip()
-                                ?.flip(pageIndex);
-                          }}
-                          style={
-                            {
-                              "--bm-i": String(idx),
-                              background: bm.color || "#f47e20",
-                            } as React.CSSProperties
-                          }
-                        >
-                          <span className="bm-tab__label">{bm.label}</span>
-                        </button>
-                      ));
+                      .map((bm) => {
+                        const pos = bmIndex.get(bm.id) ?? 0;
+
+                        return (
+                          <button
+                            key={bm.id}
+                            className="bm-tab right"
+                            title={`${bm.label} (p.${bm.page})`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const pageIndex = Math.max(
+                                0,
+                                (bm.page ?? 1) - 1
+                              );
+                              if (typeof ctrl.goToPage === "function")
+                                ctrl.goToPage(pageIndex);
+                              else
+                                (ctrl.bookRef.current as any)
+                                  ?.pageFlip()
+                                  ?.flip(pageIndex);
+                            }}
+                            style={
+                              {
+                                "--bm-i": String(pos),
+                                background: bm.color || "#f47e20",
+                              } as React.CSSProperties
+                            }
+                          >
+                            <span className="bm-tab__label">{bm.label}</span>
+                          </button>
+                        );
+                      });
                   })()}
                 </div>
               </div>
@@ -772,22 +782,51 @@ export default function PublicViewer({
           box-sizing: border-box;
         }
 
-        :root {
-          /* Header/Footer */
-          --hdr: 56px;
-          --ftr: 64px;
+          :root{
+    /* Header/Footer */
+    --hdr: 56px;
+    --ftr: 64px;
 
-          /* Bookmark tabs */
-          --tabThickness: 36px; /* ширина вкладки */
-          --tabLength: 140px; /* висота вкладки */
-          --tabGap: 8px; /* вертикальний крок між вкладками */
-          --tabTop: 36px; /* верхній відступ від краю сторінки/рейки */
-          --tabInset: -35px; /* наскільки вкладка заходить всередину сторінки (негативне = назовні) */
+    /* Bookmark tabs */
+    --tabThickness: 36px;   /* ширина вкладки */
+    --tabLength: 140px;     /* висота вкладки */
+    --tabGap: 0px;          /* НУЛЬОВИЙ проміжок, йдуть «встик» */
+    --tabTop: 36px;
+    --tabInset: -35px;
+    --bm-step: 1;           /* множник кроку між вкладками, JS може змінити */
 
-          /* Сервісні */
-          --rail: calc(var(--tabThickness) + 12px); /* бокові поля сцени під рейки */
-          --corner-size: 70px; /* розмір «трикутника» для фліпу */
-        }
+    /* Сервісні */
+    --rail: calc(var(--tabThickness) + 12px);
+    --corner-size: 70px;
+  }
+
+  .bm-tab{
+    border: 0;
+    cursor: pointer;
+    --bmScale: 1;
+    will-change: transform;
+    color: #fff;
+    font-weight: 600;   /* було 800 – зробили тонше */
+    font-size: 13px;    /* було 15 – дрібніше */
+    line-height: 1;
+    border: 1px solid rgba(0,0,0,.18);
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+    transition: transform .18s ease, filter .18s ease;
+  }
+
+  .bm-rail .bm-tab{
+    position: absolute;
+    pointer-events: auto;
+    top: calc(
+      var(--tabTop) +
+      var(--bm-i) * var(--tabLength) * var(--bm-step, 1)
+    );
+    width: var(--tabThickness);
+    height: var(--tabLength);
+    background: #f47e20; /* може бути перевизначено інлайном */
+  }
+
+
 
         @media (max-width: 680px) {
           :root {
