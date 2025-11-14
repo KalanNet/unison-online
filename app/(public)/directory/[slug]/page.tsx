@@ -64,23 +64,22 @@ export async function generateMetadata({
   const slug = slugRaw ?? "";
   const data = slug ? await getMeta(slug) : null;
 
-  const is2025 = slug === "services-and-housing-directory-2025";
+  // 1) Базові значення з meta.json або дефолт
+  let title =
+    data?.meta?.title ??
+    (slug ? `Directory — ${slug}` : "Directory");
 
-  let title: string;
-  let description: string;
+  let description =
+    data?.meta?.description ??
+    "Unison Alberta directory viewer.";
 
-  if (is2025) {
-    // Жорстко задаємо meta для 2025 каталогу
+  // 2) Для 2025 каталогу жорстко перезаписуємо title/description
+  if (slug === "services-and-housing-directory-2025") {
     title = SOCIAL_TITLE_2025;
     description = SOCIAL_DESC_2025;
-  } else {
-    // Для інших директорій — або meta.json, або загальний дефолт
-    title = data?.meta?.title ?? (slug ? `Directory — ${slug}` : "Directory");
-    description = data?.meta?.description ?? "Unison Alberta directory viewer.";
   }
 
-  // 1) Якщо у meta.json є featuredUrl – беремо його.
-  // 2) Якщо ні – падаємо назад на ту ж featured, що й на головній.
+  // 3) Якщо у meta.json є featuredUrl – беремо його, інакше – дефолтний OG
   const ogImg = data?.meta?.featuredUrl || DEFAULT_OG_IMAGE;
 
   return {
