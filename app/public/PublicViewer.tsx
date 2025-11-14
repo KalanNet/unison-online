@@ -435,9 +435,8 @@ export default function PublicViewer({
 
     if (!shouldAttach) return null;
 
-    // Активна вкладка (єдина, яка прикріплена до поточного розвороту)
-    const ACTIVE_GROW = 6;  // на стільки px "виглядаємо" назовні
-    const ACTIVE_SHIFT = 3; // невеликий зсув, щоб залишитись "причепленою"
+    // наскільки активна вкладка «товстіша» назовні
+    const ACTIVE_GROW = 6;
     const tabWidth = `calc(var(--tabThickness,36px) + ${ACTIVE_GROW}px)`;
 
     const style: React.CSSProperties = {
@@ -450,7 +449,7 @@ export default function PublicViewer({
       alignItems: "center",
       justifyContent: "center",
       color: "#fff",
-      fontSize: 16,       // активна - 16px
+      fontSize: 16, // активна — 16px
       fontWeight: 500,
       lineHeight: 1,
       border: "1px solid rgba(0,0,0,.18)",
@@ -462,15 +461,19 @@ export default function PublicViewer({
         ? {
             left: 0,
             transformOrigin: "left center",
+            // tabInset негативний, +ACTIVE_GROW зменшує модуль і зберігає внутрішній край,
+            // а «товщина» росте тільки вліво (назовні)
             transform:
-              `translateZ(0.01px) translateX(calc(var(--tabInset,-35px) - ${ACTIVE_SHIFT}px))`,
+              `translateZ(0.01px) translateX(calc(var(--tabInset,-35px) + ${ACTIVE_GROW}px))`,
             borderRadius: "10px 0 0 10px",
           }
         : {
             right: 0,
             transformOrigin: "right center",
+            // для правої вкладки додаємо ACTIVE_GROW до виносу,
+            // внутрішній край лишається на тій самій позиції
             transform:
-              `translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px) + ${ACTIVE_SHIFT}px))`,
+              `translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px) + ${ACTIVE_GROW}px))`,
             borderRadius: "0 10px 10px 0",
           }),
     };
@@ -491,6 +494,7 @@ export default function PublicViewer({
       </button>
     );
   })}
+
 
                         {/* === /BOOKMARK TABS === */}
 
@@ -1070,24 +1074,27 @@ export default function PublicViewer({
         .bm-tab:active {
           transform: scale(1.03);
         }
-        .bm-tab__label {
+                .bm-tab__label {
+          writing-mode: vertical-rl;   /* базово зверху вниз */
           text-orientation: mixed;
           max-height: calc(var(--tabLength) - 10px);
           padding: 4px 0;
           overflow: hidden;
           text-overflow: ellipsis;
           letter-spacing: 0.08em;
+          display: inline-block;       /* щоб можна було крутити текст */
         }
 
-        /* ПРАВА сторона — як і було: згори вниз */
+        /* Права сторона — як є, згори вниз */
         .bm-tab.right .bm-tab__label {
-          writing-mode: vertical-rl;
+          transform: none;
         }
 
-        /* ЛІВА сторона — навпаки: знизу вгору */
+        /* Ліва сторона — тільки текст розвертаємо, знизу вгору */
         .bm-tab.left .bm-tab__label {
-          writing-mode: vertical-lr;
+          transform: rotate(180deg);
         }
+
 
         /* =========================================
          * 9) BOOKMARK RAILS (ALWAYS VISIBLE)
