@@ -60,18 +60,24 @@ export async function generateMetadata({
 }: {
   params: { slug: string | string[] };
 }): Promise<Metadata> {
-  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  const slugRaw = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  const slug = slugRaw ?? "";
   const data = slug ? await getMeta(slug) : null;
 
   const is2025 = slug === "services-and-housing-directory-2025";
 
-  const title =
-    data?.meta?.title ??
-    (is2025 ? SOCIAL_TITLE_2025 : `Directory — ${slug ?? ""}`);
+  let title: string;
+  let description: string;
 
-  const description =
-    data?.meta?.description ??
-    (is2025 ? SOCIAL_DESC_2025 : "Unison Alberta directory viewer.");
+  if (is2025) {
+    // Жорстко задаємо meta для 2025 каталогу
+    title = SOCIAL_TITLE_2025;
+    description = SOCIAL_DESC_2025;
+  } else {
+    // Для інших директорій — або meta.json, або загальний дефолт
+    title = data?.meta?.title ?? (slug ? `Directory — ${slug}` : "Directory");
+    description = data?.meta?.description ?? "Unison Alberta directory viewer.";
+  }
 
   // 1) Якщо у meta.json є featuredUrl – беремо його.
   // 2) Якщо ні – падаємо назад на ту ж featured, що й на головній.
