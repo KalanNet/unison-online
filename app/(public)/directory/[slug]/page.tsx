@@ -14,6 +14,16 @@ type MetaPayload = {
   bookmarks?: Bookmark[];
 };
 
+/* ---------- Constants ---------- */
+
+// Та сама featured-картинка, що й на головній (лежить у public/og-featured-home.jpg)
+const DEFAULT_OG_IMAGE = "/og-featured-home.jpg";
+
+// Meta для соцмереж саме для 2025 каталогу
+const SOCIAL_TITLE_2025 = "Services and Housing Directory 2025";
+const SOCIAL_DESC_2025 =
+  "A helpful resource for seniors in Calgary to find Services and Housing all gathered in Directory Catalogue.";
+
 /* ---------- Helpers ---------- */
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   // Відносний виклик внутрішнього API (Edge/Pages friendly)
@@ -53,15 +63,34 @@ export async function generateMetadata({
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const data = slug ? await getMeta(slug) : null;
 
-  const title = data?.meta?.title ?? `Directory — ${slug ?? ""}`;
-  const description = data?.meta?.description ?? "Unison Alberta directory viewer.";
-  const ogImg = data?.meta?.featuredUrl ?? "https://unison-online-dev.pages.dev/og.jpg";
+  const is2025 = slug === "services-and-housing-directory-2025";
+
+  const title =
+    data?.meta?.title ??
+    (is2025 ? SOCIAL_TITLE_2025 : `Directory — ${slug ?? ""}`);
+
+  const description =
+    data?.meta?.description ??
+    (is2025 ? SOCIAL_DESC_2025 : "Unison Alberta directory viewer.");
+
+  // 1) Якщо у meta.json є featuredUrl – беремо його.
+  // 2) Якщо ні – падаємо назад на ту ж featured, що й на головній.
+  const ogImg = data?.meta?.featuredUrl || DEFAULT_OG_IMAGE;
 
   return {
     title,
     description,
-    openGraph: { title, description, images: [ogImg] },
-    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
+    openGraph: {
+      title,
+      description,
+      images: [ogImg],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImg],
+    },
   };
 }
 
@@ -84,10 +113,13 @@ export default async function Page({
       const PublicViewer = (await import("app/public/PublicViewer")).default;
       const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
       const title = data?.meta?.title || slug || "Preview";
-      return <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />;
+      return (
+        <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />
+      );
     }
     // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
-    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
+    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback"))
+      .default;
     return <ClientFallback />;
   }
 
