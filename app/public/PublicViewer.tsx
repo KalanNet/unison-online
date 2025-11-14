@@ -1073,95 +1073,101 @@ export default function PublicViewer({
         }
 
         /* =========================================
-         * 8) BOOKMARK TABS — COMMON LOOK
-         * =======================================*/
-        .bm-tab {
-          border: 0;
-          cursor: pointer;
-          --bmScale: 1;
-          will-change: transform;
-          color: #fff;
-          font-weight: 500;
-          font-size: 15px;
-          line-height: 1;
-          border: 1px solid rgba(0, 0, 0, 0.18);
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-          transition: transform 0.18s ease, filter 0.18s ease;
-        }
-        .bm-tab:hover {
-          transform: scale(1.06);
-          filter: brightness(1.03);
-        }
-        .bm-tab:active {
-          transform: scale(1.03);
-        }
+ * 8) BOOKMARK TABS — COMMON LOOK
+ * =======================================*/
+.bm-tab {
+  border: 0;
+  cursor: pointer;
+  --bmScale: 1;
+  will-change: transform;
+  color: #fff;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.bm-tab:hover {
+  transform: scale(1.06);
+  filter: brightness(1.03);
+}
+.bm-tab:active {
+  transform: scale(1.03);
+}
 
-        .bm-tab__label {
-          writing-mode: vertical-rl; /* базово зверху вниз */
-          text-orientation: mixed;
-          max-height: calc(var(--tabLength) - 10px);
-          padding: 4px 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          letter-spacing: 0.08em;
-          display: inline-block;
-        }
+/* активна вкладка завжди вище за рейки */
+.bm-tab.active {
+  z-index: 260;
+}
 
-        /* Права сторона — як є, згори вниз */
-        .bm-tab.right .bm-tab__label {
-          transform: none;
-        }
+.bm-tab__label {
+  writing-mode: vertical-rl; /* базово зверху вниз */
+  text-orientation: mixed;
+  max-height: calc(var(--tabLength) - 10px);
+  padding: 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.08em;
+  display: inline-block;
+}
 
-        /* Ліва сторона — тільки текст розвертаємо, знизу вгору */
-        .bm-tab.left .bm-tab__label {
-          transform: rotate(180deg);
-        }
+/* Права сторона — як є, згори вниз */
+.bm-tab.right .bm-tab__label {
+  transform: none;
+}
 
-        /* =========================================
-         * 9) BOOKMARK RAILS (ALWAYS VISIBLE)
-         * =======================================*/
-        .bm-rails {
-          position: absolute;
-          inset: 0;
-          z-index: 200;
-          pointer-events: none;
-        }
+/* Ліва сторона — тільки текст розвертаємо, знизу вгору */
+.bm-tab.left .bm-tab__label {
+  transform: rotate(180deg);
+}
 
-        .bm-rail {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: var(--tabThickness);
-          pointer-events: none;
-        }
-        .bm-rail.left {
-          left: 0;
-          transform: translateX(var(--tabInset));
-        }
-        .bm-rail.right {
-          right: 0;
-          transform: translateX(calc(-1 * var(--tabInset)));
-        }
+/* =========================================
+ * 9) BOOKMARK RAILS (ALWAYS VISIBLE)
+ * =======================================*/
+.bm-rails {
+  position: absolute;
+  inset: 0;
+  z-index: 180;            /* нижче за .bm-tab.active */
+  pointer-events: none;
+}
 
-        .bm-rail .bm-tab {
-          position: absolute;
-          pointer-events: auto;
-          top: calc(
-            var(--tabTop) +
-              var(--bm-i) * var(--tabLength) * var(--bm-step, 1)
-          );
-          width: var(--tabThickness);
-          height: var(--tabLength);
-          background: #f47e20; /* колір може бути перезаписаний інлайном */
-        }
-        .bm-rail .bm-tab.left {
-          left: 0;
-          border-radius: 10px 0 0 10px;
-        }
-        .bm-rail .bm-tab.right {
-          right: 0;
-          border-radius: 0 10px 10px 0;
-        }
+.bm-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--tabThickness);
+  pointer-events: none;
+}
+.bm-rail.left {
+  left: 0;
+  transform: translateX(var(--tabInset));
+}
+.bm-rail.right {
+  right: 0;
+  transform: translateX(calc(-1 * var(--tabInset)));
+}
+
+.bm-rail .bm-tab {
+  position: absolute;
+  pointer-events: auto;
+  top: calc(
+    var(--tabTop) +
+    var(--bm-i) * var(--tabLength) * var(--bm-step, 1)
+  );
+  width: var(--tabThickness);
+  height: var(--tabLength);
+  background: #f47e20; /* колір може бути перезаписаний інлайном */
+}
+.bm-rail .bm-tab.left {
+  left: 0;
+  border-radius: 10px 0 0 10px;
+}
+.bm-rail .bm-tab.right {
+  right: 0;
+  border-radius: 0 10px 10px 0;
+}
+
 
         /* =========================================
          * 10) LARGE THIN PAGE ARROWS НА КРАЯХ
