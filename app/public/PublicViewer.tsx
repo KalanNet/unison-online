@@ -64,7 +64,7 @@ export default function PublicViewer({
   );
 
   // Коефіцієнт кроку між закладками (1 = повний рознос, 0.5 = ~50% перекриття)
-    const bmStep = React.useMemo(() => {
+      const bmStep = React.useMemo(() => {
     const total = bmSorted.length;
     if (total <= 1) return 1;
 
@@ -73,7 +73,7 @@ export default function PublicViewer({
 
     const TAB_LEN = 140;   // відповідає --tabLength
     const TOP = 36;        // відповідає --tabTop
-    const BOTTOM = 24;     // невеликий відступ знизу
+    const BOTTOM = 36;     // СИМЕТРИЧНИЙ відступ знизу
 
     // висота, яка лишається на стиснення МІЖ першою і останньою вкладкою
     const usable = bookHeight - TOP - BOTTOM - TAB_LEN;
@@ -83,8 +83,9 @@ export default function PublicViewer({
     if (usable >= denom) return 1;       // місця достатньо, вкладки не перекриваються
 
     const step = usable / denom;         // наскільки стискаємо
-    return Math.max(0.25, step);         // можна сховати майже все, але не менше 25%
+    return Math.max(0.25, step);         // мінімум 25%
   }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
+
 
     const jumpToPdfPage = React.useCallback(
     (page1: number) => {
@@ -564,7 +565,7 @@ export default function PublicViewer({
             {bmSorted.length > 0 && (
               <div className="bm-rails" aria-hidden={false}>
                 {/* ліва рейка: усі сторінки ДО поточної лівої */}
-                <div className="bm-rail left">
+                                <div className="bm-rail left">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
@@ -573,39 +574,39 @@ export default function PublicViewer({
                       ? curr
                       : curr - 1;
 
-                    return bmSorted
-                      .filter((bm) => bm.page < leftNow)
-                      .map((bm) => {
-                        const pos = bmIndex.get(bm.id) ?? 0;
+                    const leftBookmarks = bmSorted.filter((bm) => bm.page < leftNow);
 
-                        return (
-                          <button
-                            key={bm.id}
-                            className="bm-tab left"
-                            title={`${bm.label} (p.${bm.page})`}
-                            onClick={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  jumpToPdfPage(bm.page ?? 1);
-}}
+                    return leftBookmarks.map((bm, idx) => {
+                      const pos = idx; // локальний порядок тільки по «лівих» сторінках
 
-                            style={
-  {
-    "--bm-i": String(pos),
-    background: bm.color || "#f47e20",
-    zIndex: bmSorted.length - pos,     // перша завжди поверх
-  } as React.CSSProperties
-}
->
-                            <span className="bm-tab__label">{bm.label}</span>
-                          </button>
-                        );
-                      });
+                      return (
+                        <button
+                          key={bm.id}
+                          className="bm-tab left"
+                          title={`${bm.label} (p.${bm.page})`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            jumpToPdfPage(bm.page ?? 1);
+                          }}
+                          style={
+                            {
+                              "--bm-i": String(pos),
+                              background: bm.color || "#f47e20",
+                              zIndex: leftBookmarks.length - pos, // перша зверху
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span className="bm-tab__label">{bm.label}</span>
+                        </button>
+                      );
+                    });
                   })()}
                 </div>
+
 
                 {/* права рейка: усі сторінки ПІСЛЯ поточної правої */}
-                <div className="bm-rail right">
+                                <div className="bm-rail right">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
@@ -613,42 +614,38 @@ export default function PublicViewer({
                       : curr % 2 === 0
                       ? curr
                       : curr - 1;
-                    const rightNow = Math.min(
-                      leftNow + 1,
-                      ctrl.totalPages
-                    );
+                    const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
 
-                    return bmSorted
-                      .filter((bm) => bm.page > rightNow)
-                      .map((bm) => {
-                        const pos = bmIndex.get(bm.id) ?? 0;
+                    const rightBookmarks = bmSorted.filter((bm) => bm.page > rightNow);
 
-                        return (
-                          <button
-                            key={bm.id}
-                            className="bm-tab right"
-                            title={`${bm.label} (p.${bm.page})`}
-                            onClick={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  jumpToPdfPage(bm.page ?? 1);
-}}
+                    return rightBookmarks.map((bm, idx) => {
+                      const pos = idx;
 
-                            style={
-  {
-    "--bm-i": String(pos),
-    background: bm.color || "#f47e20",
-    zIndex: bmSorted.length - pos,
-  } as React.CSSProperties
-}
->
-
-                            <span className="bm-tab__label">{bm.label}</span>
-                          </button>
-                        );
-                      });
+                      return (
+                        <button
+                          key={bm.id}
+                          className="bm-tab right"
+                          title={`${bm.label} (p.${bm.page})`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            jumpToPdfPage(bm.page ?? 1);
+                          }}
+                          style={
+                            {
+                              "--bm-i": String(pos),
+                              background: bm.color || "#f47e20",
+                              zIndex: rightBookmarks.length - pos,
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span className="bm-tab__label">{bm.label}</span>
+                        </button>
+                      );
+                    });
                   })()}
                 </div>
+
               </div>
             )}
             {/* === /ALWAYS-VISIBLE RAILS === */}
