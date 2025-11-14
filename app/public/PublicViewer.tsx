@@ -466,7 +466,7 @@ export default function PublicViewer({
 
                             const style: React.CSSProperties = {
                               position: "absolute",
-                              zIndex: 90,
+                              zIndex: 300,
                               top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
                               width: "var(--tabThickness,36px)",
                               height: "var(--tabLength,140px)",
