@@ -20,8 +20,8 @@
   
 
   /* HERO palette */
-  --ua-deep: var(--uni-teal-2);
-  --ua-deep-2: #21353a;
+  --ua-deep: #001c22;
+  --ua-deep-2: #00647b;
   --ua-accent: var(--uni-orange);
   --ua-accent-2: #f47e20;
   --ua-text-inv: #f8faf9;
