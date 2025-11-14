@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://unison-online-dev.pages.dev";
 
+/* ---------- Default OG image ---------- */
+const OG_DEFAULT = "/og-featured-home.jpg";
+
 /* ---------- Metadata ---------- */
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -34,7 +37,7 @@ export const metadata: Metadata = {
       "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
     url: "https://unisonalberta.online/",
     siteName: "Unison Alberta",
-    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Unison Alberta" }],
+    images: [{ url: OG_DEFAULT, width: 1200, height: 630, alt: "Unison Alberta" }],
     locale: "en_CA",
     type: "website",
   },
@@ -43,7 +46,7 @@ export const metadata: Metadata = {
     title: "Unison Alberta — Senior Support in Alberta",
     description:
       "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
-    images: ["/og.jpg"],
+    images: [OG_DEFAULT],
   },
   icons: { icon: "/favicon.ico" },
 };
@@ -69,50 +72,58 @@ export default function RootLayout({
     <html lang="en-CA" suppressHydrationWarning>
       <head>
         {/* швидший TLS рукостиск з доменом логотипів/зовнішніх ресурсів */}
-        <link rel="preconnect" href="https://unisonalberta.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://unisonalberta.com"
+          crossOrigin="anonymous"
+        />
         {/* Не додаємо ручний preload картинки: Next/Image з `priority` зробить це сам */}
       </head>
 
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
-        <main className="flex-1">{children}</main>
-{/* мінімальний футер (server-friendly) */}
-{/* ===== FOOTER (desktop unchanged; wraps & centers on narrow) ===== */}
-<footer
-  className="border-t py-3"
-  style={{
-    background: "linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%)",
-    borderColor: "rgba(255,255,255,.08)",
-    color: "var(--ua-text-inv)",
-  }}
->
-  <div className="ua-container flex flex-wrap items-center justify-between gap-2">
-    {/* Ліва секція: 2 рядки (на вузьких центрується) */}
-    <div className="basis-full sm:basis-auto text-center sm:text-left" style={{ opacity: 0.9 }}>
-      <span className="block sm:inline">
-        Copyright © {year} – Unison Alberta Online
-      </span>
-      <span className="block sm:inline sm:ml-1">
-        All Rights Reserved.
-      </span>
-    </div>
-
-    {/* Права секція: на вузьких переходить на новий рядок і центрується */}
-    <div className="basis-full sm:basis-auto text-center sm:text-right">
-      <a
-        href="https://skyronis.com"
-        className="hover:underline"
-        rel="noopener noreferrer"
-        target="_blank"
-        aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
-        title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
       >
-        Created by SKYRON Intelligent Solutions
-      </a>
-    </div>
-  </div>
-</footer>
+        <main className="flex-1">{children}</main>
+        {/* мінімальний футер (server-friendly) */}
+        {/* ===== FOOTER (desktop unchanged; wraps & centers on narrow) ===== */}
+        <footer
+          className="border-t py-3"
+          style={{
+            background:
+              "linear-gradient(180deg, var(--ua-deep-2) 0%, var(--ua-deep) 100%)",
+            borderColor: "rgba(255,255,255,.08)",
+            color: "var(--ua-text-inv)",
+          }}
+        >
+          <div className="ua-container flex flex-wrap items-center justify-between gap-2">
+            {/* Ліва секція: 2 рядки (на вузьких центрується) */}
+            <div
+              className="basis-full sm:basis-auto text-center sm:text-left"
+              style={{ opacity: 0.9 }}
+            >
+              <span className="block sm:inline">
+                Copyright © {year} – Unison Alberta Online
+              </span>
+              <span className="block sm:inline sm:ml-1">
+                All Rights Reserved.
+              </span>
+            </div>
 
-
+            {/* Права секція: на вузьких переходить на новий рядок і центрується */}
+            <div className="basis-full sm:basis-auto text-center sm:text-right">
+              <a
+                href="https://skyronis.com"
+                className="hover:underline"
+                rel="noopener noreferrer"
+                target="_blank"
+                aria-label="Visit SKYRON Intelligent Solutions — IT consulting, development, and automation"
+                title="SKYRON Intelligent Solutions — IT consulting, development, and automation"
+              >
+                Created by SKYRON Intelligent Solutions
+              </a>
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   );
