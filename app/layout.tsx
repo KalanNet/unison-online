@@ -102,7 +102,7 @@ export default function RootLayout({
               style={{ opacity: 0.9 }}
             >
               <span className="block sm:inline">
-                Copyright © {year} – Unison Alberta Online
+                Copyright © {year} – Unison Alberta Online.
               </span>
               <span className="block sm:inline sm:ml-1">
                 All Rights Reserved.

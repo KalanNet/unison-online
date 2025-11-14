@@ -74,6 +74,8 @@ export default function Home() {
               href="/"
               className="ua-header__brand scale-90 sm:scale-100 origin-left"
               aria-label="Unison Alberta — Home"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <img
                 src="/unison-logo.svg"
@@ -87,6 +89,8 @@ export default function Home() {
                 href={DONATE}
                 className="ua-btn ua-btn--accent"
                 style={{ color: "#fff" }}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Donate now
               </a>
@@ -110,7 +114,12 @@ export default function Home() {
               </p>
 
               <div className="ua-hero__cta">
-                <a href={OFFICIAL} className="ua-btn ua-btn--dark">
+                <a
+                  href={OFFICIAL}
+                  className="ua-btn ua-btn--dark"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Official Website →
                 </a>
               </div>
@@ -172,8 +181,8 @@ export default function Home() {
             <h2 className="dir-title">Unison Annual Directory</h2>
             <p className="dir-lead">
               The Unison Directory is updated annually to provide valuable
-              information to older adults, family members, support worker or
-              referral agency about housing and relevant services within
+              information to older adults, family members, support workers or
+              referral agencies about housing and relevant services within
               Southern Alberta.
             </p>
 
@@ -207,7 +216,9 @@ export default function Home() {
                 <p style={{ marginTop: 12 }}>
                   <a
                     className="link-light"
-                    href="https://unison-online-dev.pages.dev/directory/services-and-housing-directory-2025"
+                    href="https://unisonalberta.online/directory/services-and-housing-directory-2025"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     Explore →
                   </a>

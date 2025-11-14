@@ -110,7 +110,7 @@ main{ flex:1 0 auto; }
   height:46px; padding:0 20px; border-radius:12px; font-weight:var(--fw-bold); border:1px solid transparent; text-decoration:none;
   box-shadow: 0 10px 26px rgba(0,0,0,.18);
 }
-.ua-btn--dark   { background:#6b7034; color:#fff; }
+.ua-btn--dark   { background:#f47e20; color:#fff; }
 .ua-btn--dark:hover{ filter:brightness(1.06); }
 .ua-btn--accent { background: var(--ua-accent); color:#1b0e00; }
 .ua-btn--accent:hover{ background: var(--uni-orange-2); }
