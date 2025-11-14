@@ -768,7 +768,7 @@ export default function PublicViewer({
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-      <style jsx global>{`
+            <style jsx global>{`
         /* =========================================
          * 1) BASE & CSS VARIABLES
          * =======================================*/
@@ -782,51 +782,23 @@ export default function PublicViewer({
           box-sizing: border-box;
         }
 
-          :root{
-    /* Header/Footer */
-    --hdr: 56px;
-    --ftr: 64px;
+        :root {
+          /* Header/Footer */
+          --hdr: 56px;
+          --ftr: 64px;
 
-    /* Bookmark tabs */
-    --tabThickness: 36px;   /* ширина вкладки */
-    --tabLength: 140px;     /* висота вкладки */
-    --tabGap: 0px;          /* НУЛЬОВИЙ проміжок, йдуть «встик» */
-    --tabTop: 36px;
-    --tabInset: -35px;
-    --bm-step: 1;           /* множник кроку між вкладками, JS може змінити */
+          /* Bookmark tabs */
+          --tabThickness: 36px;  /* ширина вкладки */
+          --tabLength: 140px;    /* висота вкладки */
+          --tabGap: 0px;         /* НУЛЬОВИЙ проміжок, йдуть «встик» */
+          --tabTop: 36px;
+          --tabInset: -35px;
+          --bm-step: 1;          /* множник кроку між вкладками, JS може змінити */
 
-    /* Сервісні */
-    --rail: calc(var(--tabThickness) + 12px);
-    --corner-size: 70px;
-  }
-
-  .bm-tab{
-    border: 0;
-    cursor: pointer;
-    --bmScale: 1;
-    will-change: transform;
-    color: #fff;
-    font-weight: 600;   /* було 800 – зробили тонше */
-    font-size: 13px;    /* було 15 – дрібніше */
-    line-height: 1;
-    border: 1px solid rgba(0,0,0,.18);
-    box-shadow: 0 2px 6px rgba(0,0,0,.12);
-    transition: transform .18s ease, filter .18s ease;
-  }
-
-  .bm-rail .bm-tab{
-    position: absolute;
-    pointer-events: auto;
-    top: calc(
-      var(--tabTop) +
-      var(--bm-i) * var(--tabLength) * var(--bm-step, 1)
-    );
-    width: var(--tabThickness);
-    height: var(--tabLength);
-    background: #f47e20; /* може бути перевизначено інлайном */
-  }
-
-
+          /* Сервісні */
+          --rail: calc(var(--tabThickness) + 12px);
+          --corner-size: 70px;
+        }
 
         @media (max-width: 680px) {
           :root {
@@ -858,7 +830,7 @@ export default function PublicViewer({
           min-height: var(--ftr);
           z-index: 101;
         }
-        button[aria-label="Publish"] {
+        button[aria-label='Publish'] {
           display: none !important;
         }
 
@@ -1083,8 +1055,8 @@ export default function PublicViewer({
           --bmScale: 1;
           will-change: transform;
           color: #fff;
-          font-weight: 800;
-          font-size: 15px;
+          font-weight: 400; /* тонкий шрифт */
+          font-size: 13px;
           line-height: 1;
           border: 1px solid rgba(0, 0, 0, 0.18);
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
@@ -1104,6 +1076,7 @@ export default function PublicViewer({
           padding: 4px 0;
           overflow: hidden;
           text-overflow: ellipsis;
+          letter-spacing: 0.08em; /* трохи більший крок між літерами */
         }
 
         /* =========================================
@@ -1136,11 +1109,12 @@ export default function PublicViewer({
           position: absolute;
           pointer-events: auto;
           top: calc(
-            var(--tabTop) + var(--bm-i) * (var(--tabLength) + var(--tabGap))
+            var(--tabTop) +
+              var(--bm-i) * var(--tabLength) * var(--bm-step, 1)
           );
           width: var(--tabThickness);
           height: var(--tabLength);
-          background: #f47e20;
+          background: #f47e20; /* колір може бути перезаписаний інлайном */
         }
         .bm-rail .bm-tab.left {
           left: 0;
@@ -1183,7 +1157,7 @@ export default function PublicViewer({
           right: 16px;
         }
         .page-arrow::before {
-          content: "";
+          content: '';
           display: block;
           width: 22px;
           height: 22px;
@@ -1212,6 +1186,7 @@ export default function PublicViewer({
           }
         }
       `}</style>
+
     </div>
   );
 }
