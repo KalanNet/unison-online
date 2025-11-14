@@ -64,35 +64,56 @@ export default function PublicViewer({
   );
 
   // Коефіцієнт кроку між закладками (1 = повний рознос, 0.5 = ~50% перекриття)
-      const bmStep = React.useMemo(() => {
+  const bmStep = React.useMemo(() => {
     const total = bmSorted.length;
     if (total <= 1) return 1;
 
     const bookHeight = Math.round((ctrl.baseSize?.h ?? 0) * (ctrl.fitScale ?? 1));
     if (!bookHeight || !Number.isFinite(bookHeight)) return 1;
 
-    const TAB_LEN = 140;   // відповідає --tabLength
-    const TOP = 36;        // відповідає --tabTop
-    const BOTTOM = 36;     // СИМЕТРИЧНИЙ відступ знизу
+    const TAB_LEN = 140; // відповідає --tabLength
+    const TOP = 36; // відповідає --tabTop
+    const BOTTOM = 36; // СИМЕТРИЧНИЙ відступ знизу
 
     // висота, яка лишається на стиснення МІЖ першою і останньою вкладкою
     const usable = bookHeight - TOP - BOTTOM - TAB_LEN;
     if (usable <= 0) return 1;
 
     const denom = (total - 1) * TAB_LEN; // сумарна висота проміжків
-    if (usable >= denom) return 1;       // місця достатньо, вкладки не перекриваються
+    if (usable >= denom) return 1; // місця достатньо, вкладки не перекриваються
 
-    const step = usable / denom;         // наскільки стискаємо
-    return Math.max(0.25, step);         // мінімум 25%
+    const step = usable / denom; // наскільки стискаємо
+    return Math.max(0.25, step); // мінімум 25%
   }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
 
-
-    const jumpToPdfPage = React.useCallback(
+  /* ---------- ВИПРАВЛЕНИЙ jumpToPdfPage ---------- */
+  const jumpToPdfPage = React.useCallback(
     (page1: number) => {
       if (!ctrl) return;
 
+      const total = ctrl.totalPages || 0;
+      const safePage =
+        total > 0
+          ? Math.max(1, Math.min(total, page1 || 1))
+          : Math.max(1, page1 || 1);
+
+      // поточний розворот у PDF-номерах (1-based)
+      const curr = ctrl.currentIndex + 1;
+      const leftNow = ctrl.single
+        ? curr
+        : curr % 2 === 0
+        ? curr
+        : curr - 1;
+      const rightNow = Math.min(leftNow + 1, total || leftNow);
+
+      // якщо потрібна сторінка вже у поточному розвороті (зліва або справа),
+      // нічого не робимо — не міняємо currentIndex і не чіпаємо FlipBook.
+      if (safePage === leftNow || safePage === rightNow) {
+        return;
+      }
+
       // page1 — 1-based (як у PDF), а FlipBook працює з 0-based
-      const target = Math.max(0, (page1 || 1) - 1);
+      const target = Math.max(0, safePage - 1);
 
       if (ctrl.currentIndex === target) return;
 
@@ -113,7 +134,7 @@ export default function PublicViewer({
     },
     [ctrl]
   );
-
+  /* ---------- /jumpToPdfPage ---------- */
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
@@ -503,9 +524,7 @@ export default function PublicViewer({
                             );
                           })}
 
-
                         {/* === /BOOKMARK TABS === */}
-
 
                         {/* PDF LINKS */}
                         {links?.length
@@ -561,11 +580,11 @@ export default function PublicViewer({
               })}
             </FlipBook>
 
-                       {/* === ALWAYS-VISIBLE RAILS === */}
+            {/* === ALWAYS-VISIBLE RAILS === */}
             {bmSorted.length > 0 && (
               <div className="bm-rails" aria-hidden={false}>
                 {/* ліва рейка: усі сторінки ДО поточної лівої */}
-                                <div className="bm-rail left">
+                <div className="bm-rail left">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
@@ -604,9 +623,8 @@ export default function PublicViewer({
                   })()}
                 </div>
 
-
                 {/* права рейка: усі сторінки ПІСЛЯ поточної правої */}
-                                <div className="bm-rail right">
+                <div className="bm-rail right">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
                     const leftNow = ctrl.single
@@ -645,7 +663,6 @@ export default function PublicViewer({
                     });
                   })()}
                 </div>
-
               </div>
             )}
             {/* === /ALWAYS-VISIBLE RAILS === */}
@@ -777,7 +794,7 @@ export default function PublicViewer({
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
 
-            <style jsx global>{`
+      <style jsx global>{`
         /* =========================================
          * 1) BASE & CSS VARIABLES
          * =======================================*/
@@ -797,12 +814,12 @@ export default function PublicViewer({
           --ftr: 64px;
 
           /* Bookmark tabs */
-          --tabThickness: 36px;  /* ширина вкладки */
-          --tabLength: 140px;    /* висота вкладки */
-          --tabGap: 0px;         /* НУЛЬОВИЙ проміжок, йдуть «встик» */
+          --tabThickness: 36px; /* ширина вкладки */
+          --tabLength: 140px; /* висота вкладки */
+          --tabGap: 0px; /* НУЛЬОВИЙ проміжок, йдуть «встик» */
           --tabTop: 36px;
           --tabInset: calc(-1 * var(--tabThickness));
-          --bm-step: 1;          /* множник кроку між вкладками, JS може змінити */
+          --bm-step: 1; /* множник кроку між вкладками, JS може змінити */
 
           /* Сервісні */
           --rail: calc(var(--tabThickness) + 12px);
@@ -839,7 +856,7 @@ export default function PublicViewer({
           min-height: var(--ftr);
           z-index: 101;
         }
-        button[aria-label='Publish'] {
+        button[aria-label="Publish"] {
           display: none !important;
         }
 
@@ -851,7 +868,7 @@ export default function PublicViewer({
           height: calc(100dvh - var(--hdr) - var(--ftr));
           display: flex;
           align-items: center;
-          justify-content: center;
+          justifyContent: center;
           overflow: hidden;
         }
 
@@ -1178,7 +1195,7 @@ export default function PublicViewer({
           right: 16px;
         }
         .page-arrow::before {
-          content: '';
+          content: "";
           display: block;
           width: 22px;
           height: 22px;
@@ -1207,7 +1224,6 @@ export default function PublicViewer({
           }
         }
       `}</style>
-
     </div>
   );
 }
