@@ -596,7 +596,7 @@ export default function PublicViewer({
                     const leftBookmarks = bmSorted.filter((bm) => bm.page < leftNow);
 
                     return leftBookmarks.map((bm, idx) => {
-                      const pos = idx; // локальний порядок тільки по «лівих» сторінках
+                      const pos = bmIndex.get(bm.id) ?? idx;// локальний порядок тільки по «лівих» сторінках
 
                       return (
                         <button
@@ -612,7 +612,7 @@ export default function PublicViewer({
                             {
                               "--bm-i": String(pos),
                               background: bm.color || "#f47e20",
-                              zIndex: leftBookmarks.length - pos, // перша зверху
+                              zIndex: 1000 - pos,
                             } as React.CSSProperties
                           }
                         >
@@ -637,7 +637,7 @@ export default function PublicViewer({
                     const rightBookmarks = bmSorted.filter((bm) => bm.page > rightNow);
 
                     return rightBookmarks.map((bm, idx) => {
-                      const pos = idx;
+                      const pos = bmIndex.get(bm.id) ?? idx;
 
                       return (
                         <button
@@ -653,7 +653,7 @@ export default function PublicViewer({
                             {
                               "--bm-i": String(pos),
                               background: bm.color || "#f47e20",
-                              zIndex: rightBookmarks.length - pos,
+                              zIndex: 1000 - pos,
                             } as React.CSSProperties
                           }
                         >
