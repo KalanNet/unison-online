@@ -73,7 +73,7 @@ export default function PublicViewer({
 
     const TAB_LEN = 140;   // відповідає --tabLength
     const TOP = 36;        // відповідає --tabTop
-    const BOTTOM = 36;     // невеликий відступ знизу
+    const BOTTOM = 24;     // невеликий відступ знизу
 
     // висота, яка лишається на стиснення МІЖ першою і останньою вкладкою
     const usable = bookHeight - TOP - BOTTOM - TAB_LEN;
@@ -441,7 +441,6 @@ export default function PublicViewer({
                             if (!shouldAttach) return null;
 
                             const ACTIVE_SCALE = 1.14; // наскільки «товстішає» активна вкладка
-                            const ACTIVE_SHIFT = 3;              // НОВЕ: на скільки пікселів більше виносимо назовні
 
                             const style: React.CSSProperties = {
                               position: "absolute",
@@ -461,32 +460,30 @@ export default function PublicViewer({
                               opacity: 0.98,
                               pointerEvents: "auto",
                               background: bm.color || "#f47e20",
-                               ...(isCurrentLeft
-    ? {
-        left: 0,
-        transformOrigin: "right center",
-        // ще на ACTIVE_SHIFT px назовні, щоб точно не лізти на сторінку
-        transform:
-          "translateZ(0.01px) translateX(calc(var(--tabInset,-35px) - " +
-          ACTIVE_SHIFT +
-          "px)) scaleX(" +
-          ACTIVE_SCALE +
-          ")",
-        borderRadius: "10px 0 0 10px",
-      }
-    : {
-        right: 0,
-        transformOrigin: "left center",
-        // симетрично для правої вкладки — теж тільки назовні
-        transform:
-          "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px) - " +
-          ACTIVE_SHIFT +
-          "px)) scaleX(" +
-          ACTIVE_SCALE +
-          ")",
-        borderRadius: "0 10px 10px 0",
-      }),
-};
+                              ...(isCurrentLeft
+                                ? {
+                                    left: 0,
+                                    transformOrigin: "right center",
+                                    // внутрішній (правий) край «приліплений» до сторінки,
+                                    // масштаб росте лише назовні (вліво)
+                                    transform:
+                                      "translateZ(0.01px) translateX(var(--tabInset,-35px)) scaleX(" +
+                                      ACTIVE_SCALE +
+                                      ")",
+                                    borderRadius: "10px 0 0 10px",
+                                  }
+                                : {
+                                    right: 0,
+                                    transformOrigin: "left center",
+                                    // внутрішній (лівий) край «приліплений» до сторінки,
+                                    // масштаб росте лише назовні (вправо)
+                                    transform:
+                                      "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px))) scaleX(" +
+                                      ACTIVE_SCALE +
+                                      ")",
+                                    borderRadius: "0 10px 10px 0",
+                                  }),
+                            };
 
                             return (
                               <button
@@ -807,7 +804,7 @@ export default function PublicViewer({
           --tabLength: 140px;    /* висота вкладки */
           --tabGap: 0px;         /* НУЛЬОВИЙ проміжок, йдуть «встик» */
           --tabTop: 36px;
-          --tabInset: -35px;
+          --tabInset: calc(-1 * var(--tabThickness));
           --bm-step: 1;          /* множник кроку між вкладками, JS може змінити */
 
           /* Сервісні */
