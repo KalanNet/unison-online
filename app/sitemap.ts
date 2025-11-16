@@ -3,20 +3,24 @@ import type { MetadataRoute } from "next";
 
 /**
  * Production sitemap generator
- * - Бере базовий URL сайту з ENV, має безпечний дефолт.
- * - Тягне індекс каталогу з R2 (index.json) і будує посилання /directory/[slug].
+ * - Бере базовий URL сайту, але завжди форсить прод-домен unisonalberta.online.
+ * - Тягне індекс каталогу з R2 (directory/index.json) і будує /directory/[slug].
  * - Акуратно обробляє різні формати index.json (масив рядків, масив об'єктів, map-об'єкт).
- * - Не додає приватні/secure-роути.
+ * - Ігнорує службові ключі generatedAt / items.
  * - Якщо R2 недоступний — віддає лише головну.
+ *
+ * ВАЖЛИВО: жодних `export const runtime` / `export const revalidate` тут.
+ * Кеш контролюється тільки через fetch().
  */
 
-// ❌ НІЯКИХ export const runtime / revalidate тут!
-// Кеш контролюємо тільки через fetch().
-const SITEMAP_REVALIDATE = 60 * 60 * 6; // 6 годин
+// 6 годин кешу sitemap при фетчі index.json
+const SITEMAP_REVALIDATE = 60 * 60 * 6;
 
-const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
-  "https://unisonalberta.online";
+// Базовий сайт: навіть якщо env містить dev-домен — примусово використовуємо прод
+const RAW_SITE = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "";
+const SITE = /unisonalberta\.online$/.test(RAW_SITE)
+  ? RAW_SITE
+  : "https://unisonalberta.online";
 
 const R2_PUBLIC =
   process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/+$/, "") ||
@@ -36,12 +40,32 @@ async function fetchDirectorySlugs(): Promise<
   if (!r.ok) throw new Error(`index.json HTTP ${r.status}`);
   const data = await r.json();
 
-  // 1) ["abc","def"]
+  // 🔹 0) Новий основний формат:
+  // {
+  //   "generatedAt": "...",
+  //   "items": [ { slug: "...", updatedAt: "...", ... }, ... ]
+  // }
+  if (data && typeof data === "object" && Array.isArray((data as any).items)) {
+    const items = (data as any).items as any[];
+    return items
+      .map((row) => ({
+        slug: String(row.slug ?? row.id ?? row.name ?? "").trim(),
+        lastModified:
+          row.updatedAt ??
+          row.publishedAt ??
+          row.lastModified ??
+          row.date ??
+          undefined,
+      }))
+      .filter((x) => x.slug);
+  }
+
+  // 1) Старий простий формат: ["abc","def"]
   if (Array.isArray(data) && data.every((v) => typeof v === "string")) {
     return (data as string[]).map((slug) => ({ slug }));
   }
 
-  // 2) [{slug:"abc", updatedAt:"..."}, {...}]
+  // 2) Старий розширений формат: [{slug:"abc", updatedAt:"..."}, {...}]
   if (Array.isArray(data) && data.length && typeof data[0] === "object") {
     return (data as any[])
       .map((row) => ({
@@ -56,18 +80,26 @@ async function fetchDirectorySlugs(): Promise<
       .filter((x) => x.slug);
   }
 
-  // 3) {"abc": {...}, "def": {...}} або {"abc": "2025-01-01"}
+  // 3) Map-об'єкт: {"abc": {...}, "def": {...}} або {"abc": "2025-01-01"}
   if (data && typeof data === "object") {
-    return Object.entries<any>(data).map(([slug, v]) => ({
-      slug,
-      lastModified:
-        (v &&
-          (v.updatedAt ||
-            v.publishedAt ||
-            v.lastModified ||
-            v.date)) ||
-        undefined,
-    }));
+    return Object.entries<any>(data)
+      .map(([slug, v]) => ({
+        slug,
+        lastModified:
+          (v &&
+            (v.updatedAt ||
+              v.publishedAt ||
+              v.lastModified ||
+              v.date)) ||
+          undefined,
+      }))
+      // відкидаємо службові ключі з нового формату
+      .filter(
+        (x) =>
+          x.slug &&
+          x.slug !== "generatedAt" &&
+          x.slug !== "items"
+      );
   }
 
   // Незнайомий формат
@@ -75,6 +107,7 @@ async function fetchDirectorySlugs(): Promise<
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Базові (публічні) сторінки
   const items: MetadataRoute.Sitemap = [
     {
       url: `${SITE}/`,
@@ -99,7 +132,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
   } catch {
-    // якщо index.json недоступний — залишаємо тільки головну
+    // Якщо index.json недоступний — sitemap все одно валідний (тільки головна)
   }
 
   return items;
