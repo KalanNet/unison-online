@@ -452,57 +452,55 @@ const canPrev = !!pdfDoc && currentIndex > 0;
 const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
 
 /**
- * Абсолютний перехід на індекс FlipBook (0-based)
- * – клемпить індекс
- * – прогріває кеш
- * – оновлює currentIndex
- * – синхронізує FlipBook
+ * Абсолютний перехід на вказаний індекс FlipBook (0-based).
+ * Використовується тільки для "стрибків": перша/остання, пошук, ручний ввід, закладки.
  */
 function gotoIndexAbs(target: number) {
-  if (!pdfDoc) return;
+  if (!pdfDoc || !bookRef.current) return;
 
   const last = pdfDoc.numPages - 1;
   const idx = Math.max(0, Math.min(last, target));
 
-  // вже на цій сторінці — нічого не робимо
-  if (idx === currentIndex) return;
-
-  // прогріваємо сусідні сторінки
+  // прогріваємо кеш під цільовий розворот
   warmPagesAround(idx);
 
-  // оновлюємо стейт
-  setCurrentIndex(idx);
-
-  // і даємо команду самому FlipBook
   try {
-    const api = (bookRef.current as any)?.pageFlip?.();
-    if (api?.turnToPage) {
-      api.turnToPage(idx);
-    } else if (typeof api?.flip === "function") {
-      api.flip(idx);
+    const api = (bookRef.current as any).pageFlip?.();
+    if (!api) return;
+    if (typeof api.turnToPage === "function") {
+      api.turnToPage(idx);     // jump на потрібний розворот
+    } else if (typeof api.flip === "function") {
+      api.flip(idx);           // fallback
     }
   } catch {
-    // не роняємо застосунок, якщо FlipBook щось кинув
+    // не ламаємо застосунок, якщо FlipBook щось кинув
   }
 }
 
-/** Один крок назад */
+/** Один крок назад – саме "фліп", а не jump */
 function goPrev() {
-  if (!canPrev) return;
-  gotoIndexAbs(currentIndex - 1);
+  if (!canPrev || !bookRef.current) return;
+  // прогріваємо сторінку, куди підемо
+  warmPagesAround(currentIndex - 1);
+  try {
+    (bookRef.current as any).pageFlip?.().flipPrev();
+  } catch {}
 }
 
-/** Один крок вперед */
+/** Один крок вперед – "фліп", а не jump */
 function goNext() {
-  if (!canNext) return;
-  gotoIndexAbs(currentIndex + 1);
+  if (!canNext || !bookRef.current) return;
+  warmPagesAround(currentIndex + 1);
+  try {
+    (bookRef.current as any).pageFlip?.().flipNext();
+  } catch {}
 }
 
-/** Перехід на PDF-сторінку p (1-based) */
+/** Перехід на PDF-сторінку p (1-based) для пошуку / закладок / ручного вводу */
 function goToPage(p: number) {
   if (!pdfDoc) return;
   const page = Math.max(1, Math.min(pdfDoc.numPages, p || 1));
-  gotoIndexAbs(page - 1); // → 0-based індекс FlipBook
+  gotoIndexAbs(page - 1); // 0-based індекс FlipBook
 }
 
 /** На першу сторінку */
@@ -517,8 +515,8 @@ function goLast() {
 }
 
 /**
- * Коли індекс змінюється (у т.ч. з onFlip самого FlipBook),
- * просто прогріваємо околиці.
+ * Коли currentIndex змінюється (через onFlip з самого FlipBook),
+ * додатково прогріваємо сусідні сторінки.
  */
 useEffect(() => {
   warmPagesAround(currentIndex);
@@ -581,7 +579,6 @@ useEffect(() => {
     const dy = Math.abs(lastY - startY);
     const dt = Date.now() - t0;
 
-    // надто вертикально або надто довго — ігноруємо
     if (dy > MAX_AY || dt > MAX_MS) return;
 
     if (dx <= -THRESH_X) {
@@ -616,7 +613,7 @@ function submitJump() {
   if (!pdfDoc) return;
   const raw = parseInt(pageJump || "1", 10);
   const num = Math.min(pdfDoc.numPages, Math.max(1, raw || 1));
-  goToPage(num); // далі все йде через gotoIndexAbs
+  goToPage(num);
 }
 
 
