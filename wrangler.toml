@@ -4,11 +4,11 @@ compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-NEXT_PUBLIC_SITE_URL = "https://unison-online-dev.pages.dev"
+NEXT_PUBLIC_SITE_URL = "https://unisonalberta.online"
 
 AUTH_COOKIE_NAME = "ua_auth"
 AUTH_COOKIE_TTL_DAYS = "7"
-AUTH_ALLOWED_HOSTS = "unison-online-dev.pages.dev,unisonalberta.online"
+AUTH_ALLOWED_HOSTS = "unisonalberta.online,unison-online-dev.pages.dev"
 
 # необов’язково, але корисно
 NODE_VERSION = "20.19.2"

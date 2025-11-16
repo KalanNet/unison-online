@@ -11,6 +11,10 @@ const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!;
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  "https://unisonalberta.online";
+
 const s3 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -145,15 +149,16 @@ export async function POST(req: NextRequest) {
     } catch { /* не ламаємо публікацію, якщо індекс не оновився */ }
 
     return ok({
-      ok: true,
-      stored: {
-        slug: finalSlug,
-        metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
-        featuredUrl: featuredPublicUrl,
-      },
-      urlPath: `/directory/${finalSlug}`,
-      publicUrl: `${R2_PUBLIC_URL}/directory/${finalSlug}`,
-    });
+  ok: true,
+  stored: {
+    slug: finalSlug,
+    metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
+    featuredUrl: featuredPublicUrl,
+  },
+  urlPath: `/directory/${finalSlug}`,
+  publicUrl: `${SITE_URL}/directory/${finalSlug}`,
+});
+
   } catch (e: any) {
     return err(String(e?.message || e), 500);
   }

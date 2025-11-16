@@ -74,6 +74,11 @@ async function prepareFeaturedUnder200KB(file: File): Promise<File> {
 
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
+const SITE_URL =
+  (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "") ||
+  (typeof window !== "undefined" ? window.location.origin : "");
+
+
 /* ---------- slug helpers (Unicode-safe) ---------- */
 
 
@@ -417,40 +422,40 @@ async function handlePublish(): Promise<void> {
 
   try {
     // EDIT: оновлення існуючої сторінки
-    if (initialMeta?.slug) {
-      const body: any = {
-  meta: {
-    title: ctrl.meta.title,
-    description: ctrl.meta.description,
-    featuredUrl: ctrl.meta.featuredUrl ?? null,
-  },
-  bookmarks: ctrl.bookmarks,
-  file: pdfUrl, // ← ТАК, відправляємо новий/поточний PDF
-};
+if (initialMeta?.slug) {
+  const body: any = {
+    meta: {
+      title: ctrl.meta.title,
+      description: ctrl.meta.description,
+      featuredUrl: ctrl.meta.featuredUrl ?? null,
+    },
+    bookmarks: ctrl.bookmarks,
+    file: pdfUrl, // ← новий/поточний PDF
+  };
 
-      if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
+  if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
 
-      const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j?.error || "Update failed");
+  const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j?.error || "Update failed");
 
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const full =
-        j?.publicUrl ||
-        (j?.urlPath && origin ? origin + j.urlPath : `${origin}/directory/${initialMeta.slug}`);
-      if (full) setPub({ url: full });
-      return;
-    }
+  const full =
+    j?.publicUrl ||
+    (j?.urlPath ? `${SITE_URL}${j.urlPath}` : `${SITE_URL}/directory/${initialMeta.slug}`);
+  if (full) setPub({ url: full });
+  return;
+}
+
 
     // NEW: публікація нового запису
-    const r = await ctrl.publishMetaAndBookmarks();
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const full = r?.publicUrl || (r?.urlPath && origin ? origin + r.urlPath : "");
-    if (full) setPub({ url: full });
+const r = await ctrl.publishMetaAndBookmarks();
+const full = r?.publicUrl || (r?.urlPath ? `${SITE_URL}${r.urlPath}` : "");
+if (full) setPub({ url: full });
+
   } catch (e: any) {
     console.error(e);
     notify(e?.message || "Publish failed");
