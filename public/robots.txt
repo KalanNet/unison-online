@@ -1,2 +1,51 @@
 User-agent: *
 Allow: /
+
+Disallow: /secure/
+Disallow: /login/
+Disallow: /admin/
+Disallow: /preview/
+Disallow: /api/
+Disallow: /_next/
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OpenAI-SearchCrawler
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+Sitemap: https://unisonalberta.online/sitemap.xml
+Host: https://unisonalberta.online

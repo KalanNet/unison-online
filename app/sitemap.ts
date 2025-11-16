@@ -1,4 +1,97 @@
 // app/sitemap.ts
-export default function sitemap() {
-  return [{ url: "https://unison-online.pages.dev/", changefreq: "weekly", priority: 0.7 }];
+import type { MetadataRoute } from "next";
+
+/**
+ * Production sitemap generator
+ * - Бере базовий URL сайту з ENV, має безпечний дефолт.
+ * - Тягне індекс каталогу з R2 (index.json) і будує посилання /directory/[slug].
+ * - Акуратно обробляє різні формати index.json (масив рядків, масив об'єктів, map-об'єкт).
+ * - Не додає приватні/secure-роути.
+ * - Має фолбек: якщо R2 недоступний — віддає лише головну.
+ */
+
+export const runtime = "edge";          // швидше та дешевше на CF Pages
+export const revalidate = 60 * 60 * 6;  // 6 годин для кешу sitemap
+
+const SITE =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  "https://unisonalberta.online";
+
+const R2_PUBLIC =
+  process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/+$/, "") ||
+  "https://cdn.unisonalberta.online";
+
+// Спроба прочитати і нормалізувати directory index з R2
+async function fetchDirectorySlugs(): Promise<
+  { slug: string; lastModified?: string | Date }[]
+> {
+  const INDEX_URL = `${R2_PUBLIC}/directory/index.json`;
+
+  const r = await fetch(INDEX_URL, {
+    next: { revalidate },
+    cache: "force-cache",
+  });
+
+  if (!r.ok) throw new Error(`index.json HTTP ${r.status}`);
+  const data = await r.json();
+
+  // Підтримка кількох можливих форматів:
+  // 1) ["abc","def"]
+  if (Array.isArray(data) && data.every((v) => typeof v === "string")) {
+    return (data as string[]).map((slug) => ({ slug }));
+  }
+
+  // 2) [{slug:"abc", updatedAt:"..."}, {...}]
+  if (Array.isArray(data) && data.length && typeof data[0] === "object") {
+    return (data as any[]).map((row) => ({
+      slug: String(row.slug ?? row.id ?? row.name ?? "").trim(),
+      lastModified:
+        row.updatedAt ?? row.publishedAt ?? row.lastModified ?? row.date ?? undefined,
+    })).filter((x) => x.slug);
+  }
+
+  // 3) {"abc": {...}, "def": {...}} або {"abc": "2025-01-01"}
+  if (data && typeof data === "object") {
+    return Object.entries<any>(data).map(([slug, v]) => ({
+      slug,
+      lastModified:
+        (v && (v.updatedAt || v.publishedAt || v.lastModified || v.date)) || undefined,
+    }));
+  }
+
+  // Незнайомий формат
+  throw new Error("Unsupported index.json format");
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Базові (публічні) сторінки
+  const items: MetadataRoute.Sitemap = [
+    {
+      url: `${SITE}/`,
+      changeFrequency: "weekly",
+      priority: 0.9,
+      lastModified: new Date(),
+    },
+  ];
+
+  try {
+    const entries = await fetchDirectorySlugs();
+
+    // Обмежимося здоровим пріоритетом і частотою змін
+    for (const { slug, lastModified } of entries) {
+      const url = `${SITE}/directory/${encodeURIComponent(slug)}`;
+      items.push({
+        url,
+        changeFrequency: "weekly",
+        priority: 0.7,
+        ...(lastModified
+          ? { lastModified: new Date(lastModified) }
+          : undefined),
+      });
+    }
+  } catch {
+    // Тихий фолбек: якщо індекс недоступний, sitemap все одно валідний (головна сторінка)
+  }
+
+  return items;
 }

@@ -5,6 +5,10 @@ import Viewer from "app/components/Viewer";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
+/* ---------- PROD base (єдине джерело істини) ---------- */
+const SITE =
+  (process.env.NEXT_PUBLIC_SITE_URL || "https://unisonalberta.online").replace(/\/+$/, "");
+
 /* ---------- helpers ---------- */
 function getSlugFromPublicUrl(href: string): string | null {
   try {
@@ -166,10 +170,10 @@ export default function ClientEditor() {
             }}
             onChange={handleUpload}
           />
-          <div style={{ marginTop: 22, color: "#bbb", fontSize: 17 }}>
-            {loading ? "Loading..." : "Please select a PDF file to begin."}
-          </div>
-          {error && <div style={{ color: "#e54", marginTop: 20 }}>{error}</div>}
+            <div style={{ marginTop: 22, color: "#bbb", fontSize: 17 }}>
+              {loading ? "Loading..." : "Please select a PDF file to begin."}
+            </div>
+            {error && <div style={{ color: "#e54", marginTop: 20 }}>{error}</div>}
         </div>
 
         {/* published list */}
@@ -185,6 +189,14 @@ export default function ClientEditor() {
                 .sort((a, b) => a.localeCompare(b))
                 .map((href) => {
                   const s = getSlugFromPublicUrl(href);
+                  // --- КАНОНІЧНІ прод-посилання ---
+                  const prodPublic = s
+                    ? `${SITE}/directory/${encodeURIComponent(s)}`
+                    : href.replace(/^https?:\/\/[^/]+/, SITE); // на випадок повного URL без slug
+                  const prodEdit = s
+                    ? `${SITE}/secure/editor?slug=${encodeURIComponent(s)}`
+                    : `${SITE}/secure/editor`;
+
                   return (
                     <li
                       key={href}
@@ -197,7 +209,7 @@ export default function ClientEditor() {
                       }}
                     >
                       <a
-                        href={href}
+                        href={prodPublic}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -209,12 +221,14 @@ export default function ClientEditor() {
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}
-                        title={href}
+                        title={prodPublic}
                       >
-                        {href}
+                        {prodPublic}
                       </a>
+
+                      {/* Go → прод-публічна сторінка */}
                       <a
-                        href={href}
+                        href={prodPublic}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ua-btn ua-btn--dark"
@@ -222,16 +236,18 @@ export default function ClientEditor() {
                       >
                         Go
                       </a>
+
+                      {/* Edit → прод-редактор з тим самим slug */}
                       {s ? (
-                        <Link
+                        <a
                           className="ua-btn"
-                          href={{ pathname: "/secure/editor", query: { slug: s } }}
-                          prefetch={false}
-                          replace
+                          href={prodEdit}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           title="Edit"
                         >
                           Edit
-                        </Link>
+                        </a>
                       ) : (
                         <button className="ua-btn" disabled title="Edit unavailable">
                           Edit
