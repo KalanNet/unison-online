@@ -449,75 +449,81 @@ nextMap.get(p)!.push({ ...box, hitIndex });
 
 // чи можна гортати назад/вперед
 const canPrev = !!pdfDoc && currentIndex > 0;
-const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
+const canNext = !!pdfDoc && !!pdfDoc.numPages && currentIndex < pdfDoc.numPages - 1;
 
 /**
- * Абсолютний перехід на вказаний індекс FlipBook (0-based).
- * Використовується тільки для "стрибків": перша/остання, пошук, ручний ввід, закладки.
+ * Єдина точка переходу всередині FlipBook.
+ * Працює по абсолютному 0-based індексу, завжди з анімацією.
+ * Використовує flip(index)/turnToPage(index), а НЕ flipPrev/flipNext,
+ * тому не ламається після ресайзів.
  */
-function gotoIndexAbs(target: number) {
+function goToIndex(targetIndex: number) {
   if (!pdfDoc || !bookRef.current) return;
 
   const last = pdfDoc.numPages - 1;
-  const idx = Math.max(0, Math.min(last, target));
+  const clamped = Math.max(0, Math.min(last, targetIndex));
 
-  // прогріваємо кеш під цільовий розворот
-  warmPagesAround(idx);
+  if (clamped === currentIndex) return;
 
+  // прогріваємо кеш біля цільової сторінки
+  warmPagesAround(clamped);
+
+  // оновлюємо стейт
+  setCurrentIndex(clamped);
+
+  // синхронізуємо сам FlipBook у наступний кадр
   try {
-    const api = (bookRef.current as any).pageFlip?.();
+    const maybeApi = (bookRef.current as any);
+    const api = typeof maybeApi.pageFlip === "function"
+      ? maybeApi.pageFlip()
+      : maybeApi;
+
     if (!api) return;
-    if (typeof api.turnToPage === "function") {
-      api.turnToPage(idx);     // jump на потрібний розворот
-    } else if (typeof api.flip === "function") {
-      api.flip(idx);           // fallback
-    }
+
+    // flip(index) → з анімацією; fallback на turnToPage
+    requestAnimationFrame(() => {
+      if (typeof api.flip === "function") {
+        api.flip(clamped);
+      } else if (typeof api.turnToPage === "function") {
+        api.turnToPage(clamped);
+      }
+    });
   } catch {
-    // не ламаємо застосунок, якщо FlipBook щось кинув
+    // не роняємо застосунок
   }
 }
 
-/** Один крок назад – саме "фліп", а не jump */
+/** Один крок назад */
 function goPrev() {
-  if (!canPrev || !bookRef.current) return;
-  // прогріваємо сторінку, куди підемо
-  warmPagesAround(currentIndex - 1);
-  try {
-    (bookRef.current as any).pageFlip?.().flipPrev();
-  } catch {}
+  if (!canPrev) return;
+  goToIndex(currentIndex - 1);
 }
 
-/** Один крок вперед – "фліп", а не jump */
+/** Один крок вперед */
 function goNext() {
-  if (!canNext || !bookRef.current) return;
-  warmPagesAround(currentIndex + 1);
-  try {
-    (bookRef.current as any).pageFlip?.().flipNext();
-  } catch {}
+  if (!canNext) return;
+  goToIndex(currentIndex + 1);
 }
 
-/** Перехід на PDF-сторінку p (1-based) для пошуку / закладок / ручного вводу */
+/** Перехід на PDF-сторінку p (1-based) */
 function goToPage(p: number) {
   if (!pdfDoc) return;
-  const page = Math.max(1, Math.min(pdfDoc.numPages, p || 1));
-  gotoIndexAbs(page - 1); // 0-based індекс FlipBook
+  const safePage = Math.max(1, Math.min(pdfDoc.numPages, p || 1));
+  goToIndex(safePage - 1); // 0-based індекс FlipBook
 }
 
 /** На першу сторінку */
 function goFirst() {
-  gotoIndexAbs(0);
+  goToIndex(0);
 }
 
 /** На останню сторінку */
 function goLast() {
   if (!pdfDoc) return;
-  gotoIndexAbs(pdfDoc.numPages - 1);
+  goToIndex(pdfDoc.numPages - 1);
 }
 
-/**
- * Коли currentIndex змінюється (через onFlip з самого FlipBook),
- * додатково прогріваємо сусідні сторінки.
- */
+// фоновий прогрів околиць поточної сторінки
 useEffect(() => {
   warmPagesAround(currentIndex);
 }, [currentIndex, pdfDoc]);
@@ -528,20 +534,15 @@ useEffect(() => {
   if (!el || !isNarrow) return;
 
   let touching = false;
-  let startX = 0,
-    startY = 0,
-    lastX = 0,
-    lastY = 0,
-    t0 = 0;
+  let startX = 0, startY = 0, lastX = 0, lastY = 0, t0 = 0;
 
   const THRESH_X = 40; // мін. горизонтальний зсув (px)
-  const MAX_AY = 30;   // допустима вертикальна похибка (px)
-  const MAX_MS = 600;  // ліміт тривалості жесту (ms)
+  const MAX_AY   = 30; // допустима вертикальна похибка (px)
+  const MAX_MS   = 600; // жорсткий ліміт жесту (ms)
 
   function onStart(e: TouchEvent) {
     if (e.touches.length !== 1) return;
     const target = e.target as HTMLElement;
-    // не заважаємо клікам по контролах
     if (
       target &&
       (target.closest("a, button, input, textarea, select") ||
@@ -565,7 +566,6 @@ useEffect(() => {
     const dx = lastX - startX;
     const dy = Math.abs(lastY - startY);
 
-    // явний горизонтальний жест → блокуємо нативний скрол
     if (Math.abs(dx) > 12 && dy < MAX_AY) {
       e.preventDefault();
     }
@@ -597,24 +597,28 @@ useEffect(() => {
     el.removeEventListener("touchmove", onMove as any, true);
     el.removeEventListener("touchend", onEnd as any, true);
   };
-}, [isNarrow, goNext, goPrev, stageRef]);
+}, [isNarrow, goNext, goPrev, stageRef.current as any]);
 
-/* ---------- pageJump (інпут у футері) ---------- */
 const [pageJump, setPageJump] = useState<string>("1");
 
 useEffect(() => {
-  const p = currentIndex + 1; // 1-based
-  // у спред-режимі показуємо саме ЛІВУ сторінку поточного розвороту
+  const p = currentIndex + 1;
   const leftNow = single ? p : p === 1 ? 1 : p % 2 === 0 ? p : p - 1;
   setPageJump(String(leftNow));
 }, [currentIndex, single]);
 
 function submitJump() {
   if (!pdfDoc) return;
-  const raw = parseInt(pageJump || "1", 10);
-  const num = Math.min(pdfDoc.numPages, Math.max(1, raw || 1));
+  const num = Math.min(
+    pdfDoc.numPages,
+    Math.max(1, parseInt(pageJump || "1", 10) || 1)
+  );
   goToPage(num);
 }
+
+
+
+
 
 
 

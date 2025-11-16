@@ -742,37 +742,38 @@ React.useEffect(() => {
 
             {/* Кутові хендли для гортання */}
             <div className="flip-handles" aria-hidden>
-              {/* Ліві кути — попередня сторінка */}
-              <button
-                className="fh tl"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-                }}
-              />
-              <button
-                className="fh bl"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-                }}
-              />
-              {/* Праві кути — наступна сторінка */}
-              <button
-                className="fh tr"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-                }}
-              />
-              <button
-                className="fh br"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-                }}
-              />
-            </div>
+  {/* Ліві кути — попередня сторінка */}
+  <button
+    className="fh tl"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      ctrl.goPrev();
+    }}
+  />
+  <button
+    className="fh bl"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      ctrl.goPrev();
+    }}
+  />
+  {/* Праві кути — наступна сторінка */}
+  <button
+    className="fh tr"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      ctrl.goNext();
+    }}
+  />
+  <button
+    className="fh br"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      ctrl.goNext();
+    }}
+  />
+</div>
+
           </div>
         </div>
       </section>
