@@ -351,6 +351,61 @@ React.useEffect(() => {
     );
   }
 
+    // --- НАВІГАЦІЯ ЧЕРЕЗ FOOTER: СИНХРОН З FLIPBOOK --- //
+  const navGoTo = React.useCallback(
+    (target: number) => {
+      const total = ctrl.totalPages || 0;
+      if (!total) return;
+
+      const safe = Math.max(0, Math.min(target, total - 1));
+      if (safe === ctrl.currentIndex) return;
+
+      // 1) оновлюємо state контролера
+      ctrl.setCurrentIndex(safe);
+
+      // 2) синхронізуємо сам FlipBook
+      setTimeout(() => {
+        const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+        if (api?.turnToPage) {
+          api.turnToPage(safe);
+        } else if (typeof (ctrl as any).goToPage === "function") {
+          (ctrl as any).goToPage(safe);
+        } else if (api?.flip) {
+          api.flip(safe);
+        }
+      }, 0);
+    },
+    [ctrl]
+  );
+
+  const navGoFirst = React.useCallback(() => {
+    navGoTo(0);
+  }, [navGoTo]);
+
+  const navGoLast = React.useCallback(() => {
+    const total = ctrl.totalPages || 0;
+    if (!total) return;
+    navGoTo(total - 1);
+  }, [navGoTo, ctrl.totalPages]);
+
+  const navGoNext = React.useCallback(() => {
+    if (!ctrl.canNext) return;
+    navGoTo(ctrl.currentIndex + 1);
+  }, [navGoTo, ctrl.currentIndex, ctrl.canNext]);
+
+  const navGoPrev = React.useCallback(() => {
+    if (!ctrl.canPrev) return;
+    navGoTo(ctrl.currentIndex - 1);
+  }, [navGoTo, ctrl.currentIndex, ctrl.canPrev]);
+
+  const navSubmitJump = React.useCallback(() => {
+    const n = parseInt(String(ctrl.pageJump), 10);
+    if (!Number.isFinite(n)) return;
+    navGoTo(n - 1); // pageJump 1-based, FlipBook 0-based
+  }, [ctrl.pageJump, navGoTo]);
+  // --- /НАВІГАЦІЯ ЧЕРЕЗ FOOTER --- //
+
+
   // прапорці для обкладинок (десктоп)
   const isFrontCover = ctrl.currentIndex === 0;
   const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
@@ -828,26 +883,27 @@ React.useEffect(() => {
       )}
       {/* === /RIGHT SEARCH FLYOUT === */}
 
-      <ViewerFooter
+            <ViewerFooter
         refEl={ctrl.toolbarRef}
         isNarrow={ctrl.isNarrow}
         numPages={ctrl.totalPages}
         currentIndex={ctrl.currentIndex}
         canPrev={ctrl.canPrev}
         canNext={ctrl.canNext}
-        goFirst={ctrl.goFirst}
-        goPrev={ctrl.goPrev}
-        goNext={ctrl.goNext}
-        goLast={ctrl.goLast}
+        goFirst={navGoFirst}
+        goPrev={navGoPrev}
+        goNext={navGoNext}
+        goLast={navGoLast}
         pageJump={ctrl.pageJump}
         setPageJump={ctrl.setPageJump}
-        submitJump={ctrl.submitJump}
+        submitJump={navSubmitJump}
         loupeOn={ctrl.loupeOn}
         setLoupeOn={ctrl.setLoupeOn}
         loupeState={ctrl.loupe}
         LOUPE_SIZE={ctrl.LOUPE_SIZE}
         LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
       />
+
 
       <style jsx global>{`
         /* =========================================
