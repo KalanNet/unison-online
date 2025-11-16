@@ -122,13 +122,53 @@ export default function EditorHeader({
           </a>
 
           {/* Share */}
-          <button className="lh-iconbtn" onClick={handleShare} title="Share" aria-label="Share">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M12 16V4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M8 8l4-4 4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+<button className="lh-iconbtn" onClick={handleShare} title="Share" aria-label="Share">
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    {/* три кола */}
+    <circle
+      cx="6"
+      cy="12"
+      r="2"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+    />
+    <circle
+      cx="18"
+      cy="6"
+      r="2"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+    />
+    <circle
+      cx="18"
+      cy="18"
+      r="2"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+    />
+    {/* лінії між ними */}
+    <path
+      d="M8 11 L16 7"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8 13 L16 17"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+</button>
+
 
           {/* Fullscreen */}
           <button
