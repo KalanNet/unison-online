@@ -1,38 +1,21 @@
-User-agent: *
-Allow: /
-
-Disallow: /secure/
-Disallow: /login/
-Disallow: /admin/
-Disallow: /preview/
-Disallow: /api/
-Disallow: /_next/
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: OpenAI-SearchCrawler
-Allow: /
+# ===== CUSTOM RULES =====
 
 User-agent: Googlebot
 Allow: /
 
-User-agent: Google-Extended
+User-agent: Bingbot
 Allow: /
 
-User-agent: bingbot
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Yandex
 Allow: /
 
 User-agent: CCBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: anthropic-ai
 Allow: /
 
 User-agent: PerplexityBot
@@ -47,5 +30,14 @@ Allow: /
 User-agent: Bytespider
 Allow: /
 
+# ===== DEFAULT CATCH-ALL =====
+User-agent: *
+Allow: /
+
+# ===== CLOUDFLARE MANAGED RULES =====
+# (Не чіпати — CF оновлює автоматично)
+Content-signal: search=yes,ai-train=no
+
+# ===== SITEMAP =====
 Sitemap: https://unisonalberta.online/sitemap.xml
 Host: https://unisonalberta.online
