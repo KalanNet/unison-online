@@ -7,11 +7,12 @@ import type { MetadataRoute } from "next";
  * - Тягне індекс каталогу з R2 (index.json) і будує посилання /directory/[slug].
  * - Акуратно обробляє різні формати index.json (масив рядків, масив об'єктів, map-об'єкт).
  * - Не додає приватні/secure-роути.
- * - Має фолбек: якщо R2 недоступний — віддає лише головну.
+ * - Якщо R2 недоступний — віддає лише головну.
  */
 
-export const runtime = "edge";          // швидше та дешевше на CF Pages
-export const revalidate = 60 * 60 * 6;  // 6 годин для кешу sitemap
+// ❌ НІЯКИХ export const runtime / revalidate тут!
+// Кеш контролюємо тільки через fetch().
+const SITEMAP_REVALIDATE = 60 * 60 * 6; // 6 годин
 
 const SITE =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
@@ -28,14 +29,13 @@ async function fetchDirectorySlugs(): Promise<
   const INDEX_URL = `${R2_PUBLIC}/directory/index.json`;
 
   const r = await fetch(INDEX_URL, {
-    next: { revalidate },
+    next: { revalidate: SITEMAP_REVALIDATE },
     cache: "force-cache",
   });
 
   if (!r.ok) throw new Error(`index.json HTTP ${r.status}`);
   const data = await r.json();
 
-  // Підтримка кількох можливих форматів:
   // 1) ["abc","def"]
   if (Array.isArray(data) && data.every((v) => typeof v === "string")) {
     return (data as string[]).map((slug) => ({ slug }));
@@ -43,11 +43,17 @@ async function fetchDirectorySlugs(): Promise<
 
   // 2) [{slug:"abc", updatedAt:"..."}, {...}]
   if (Array.isArray(data) && data.length && typeof data[0] === "object") {
-    return (data as any[]).map((row) => ({
-      slug: String(row.slug ?? row.id ?? row.name ?? "").trim(),
-      lastModified:
-        row.updatedAt ?? row.publishedAt ?? row.lastModified ?? row.date ?? undefined,
-    })).filter((x) => x.slug);
+    return (data as any[])
+      .map((row) => ({
+        slug: String(row.slug ?? row.id ?? row.name ?? "").trim(),
+        lastModified:
+          row.updatedAt ??
+          row.publishedAt ??
+          row.lastModified ??
+          row.date ??
+          undefined,
+      }))
+      .filter((x) => x.slug);
   }
 
   // 3) {"abc": {...}, "def": {...}} або {"abc": "2025-01-01"}
@@ -55,7 +61,12 @@ async function fetchDirectorySlugs(): Promise<
     return Object.entries<any>(data).map(([slug, v]) => ({
       slug,
       lastModified:
-        (v && (v.updatedAt || v.publishedAt || v.lastModified || v.date)) || undefined,
+        (v &&
+          (v.updatedAt ||
+            v.publishedAt ||
+            v.lastModified ||
+            v.date)) ||
+        undefined,
     }));
   }
 
@@ -64,7 +75,6 @@ async function fetchDirectorySlugs(): Promise<
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Базові (публічні) сторінки
   const items: MetadataRoute.Sitemap = [
     {
       url: `${SITE}/`,
@@ -77,7 +87,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const entries = await fetchDirectorySlugs();
 
-    // Обмежимося здоровим пріоритетом і частотою змін
     for (const { slug, lastModified } of entries) {
       const url = `${SITE}/directory/${encodeURIComponent(slug)}`;
       items.push({
@@ -90,7 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
   } catch {
-    // Тихий фолбек: якщо індекс недоступний, sitemap все одно валідний (головна сторінка)
+    // якщо index.json недоступний — залишаємо тільки головну
   }
 
   return items;
