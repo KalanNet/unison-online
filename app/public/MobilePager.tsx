@@ -102,28 +102,27 @@ export default function MobilePager(p: Props) {
   const FOOTER_PX = 56;
 
   const rootStyle: React.CSSProperties = {
-    // var(--app-h) виставляє useEditorController (visualViewport.height)
     height: `calc(var(--app-h, 100dvh) - ${HEADER_PX}px)`,
     display: "grid",
     gridTemplateRows: `1fr ${FOOTER_PX}px`,
     background: "#21353a",
-    minHeight: 0, // критично для гріду
+    minHeight: 0,
     overflow: "hidden",
   };
 
   return (
     <div className="mpg-root" style={rootStyle}>
-      {/* Канва (займає увесь перший рядок 1fr) */}
+      {/* Канва */}
       <div
         ref={ctrl.stageRef}
         className="mpg-canvas"
         style={{
-          height: "100%",      // ← ключ: канва рівно дорівнює своєму грід-рядку
-          minHeight: 0,        // ← дозволяє внутрішньому флексу не роздуватись
+          height: "100%",
+          minHeight: 0,
           display: "grid",
           placeItems: "center",
           padding: "10px 10px 12px",
-          overflow: "hidden",  // ← нічого не виходить за межі канви
+          overflow: "hidden",
         }}
       >
         <MobileSwipe
@@ -144,7 +143,6 @@ export default function MobilePager(p: Props) {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             style={{
-              // ФІКС: сторінка займає ВСЮ висоту канви і тримає пропорції PDF
               height: "100%",
               maxHeight: "100%",
               width: "auto",
@@ -247,9 +245,36 @@ export default function MobilePager(p: Props) {
         </MobileSwipe>
       </div>
 
-      {/* Локальний МОБІЛЬНИЙ ФУТЕР (завжди в другому грід-рядку) */}
+      {/* МОБІЛЬНИЙ ФУТЕР */}
       <footer className="mpg-bar" aria-label="Mobile pager controls">
         <div className="mpg-bar__grid">
+          {/* first page */}
+          <button
+            className="mpg-btn"
+            onClick={ctrl.goFirst}
+            disabled={!ctrl.canPrev}
+            aria-label="First page"
+            title="First page"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M6 5v14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18 6l-6 6 6 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+          </button>
+
+          {/* prev */}
           <button
             className="mpg-btn"
             onClick={ctrl.goPrev}
@@ -257,9 +282,19 @@ export default function MobilePager(p: Props) {
             aria-label="Previous page"
             title="Previous"
           >
-            ◀
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M15 6l-6 6 6 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
           </button>
 
+          {/* центр з інпутом */}
           <div className="mpg-mid">
             <input
               inputMode="numeric"
@@ -279,6 +314,7 @@ export default function MobilePager(p: Props) {
             <span className="mpg-total">{ctrl.totalPages || "…"}</span>
           </div>
 
+          {/* next */}
           <button
             className="mpg-btn"
             onClick={ctrl.goNext}
@@ -286,15 +322,54 @@ export default function MobilePager(p: Props) {
             aria-label="Next page"
             title="Next"
           >
-            ▶
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M9 6l6 6-6 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+          </button>
+
+          {/* last page */}
+          <button
+            className="mpg-btn"
+            onClick={ctrl.goLast}
+            disabled={!ctrl.canNext}
+            aria-label="Last page"
+            title="Last page"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M18 5v14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M6 6l6 6-6 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
           </button>
         </div>
       </footer>
 
       {/* Мінімальні глобальні стилі для стабільного макета */}
       <style jsx global>{`
-        .mpg-root { color: #2d3018; }
-        .mpg-canvas { height: 100%; }
+        .mpg-root {
+          color: #2d3018;
+        }
+        .mpg-canvas {
+          height: 100%;
+        }
 
         .mpg-bar {
           height: 56px;
@@ -304,7 +379,7 @@ export default function MobilePager(p: Props) {
         }
         .mpg-bar__grid {
           display: grid;
-          grid-template-columns: auto 1fr auto;
+          grid-template-columns: auto auto 1fr auto auto;
           gap: 8px;
           align-items: center;
           height: 100%;
@@ -315,8 +390,18 @@ export default function MobilePager(p: Props) {
           border: 1px solid #e6eadf;
           border-radius: 0.6rem;
           background: #fff;
+          display: inline-grid;
+          place-items: center;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+          color: #2d3018;
         }
-        .mpg-btn[disabled] { opacity: 0.45; }
+        .mpg-btn svg {
+          display: block;
+        }
+        .mpg-btn[disabled] {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
         .mpg-mid {
           display: flex;
           justify-content: center;
@@ -329,14 +414,37 @@ export default function MobilePager(p: Props) {
           height: 36px;
           border: 1px solid #e7ebdf;
           border-radius: 0.5rem;
+          font-weight: 700;
+          color: #2d3018;
+          background: #fff;
         }
-        .mpg-sep { color: #5c6750; }
-        .mpg-total { color: #2d3018; }
+        .mpg-sep {
+          color: #5c6750;
+        }
+        .mpg-total {
+          color: #2d3018;
+          font-weight: 700;
+        }
 
-        .pdf-link { border: 0; background: transparent; display: block; }
-        .mpg-hl-layer { position: absolute; inset: 0; pointer-events: none; }
-        .hl { background: #f4ce6944; outline: 1px solid #f4ce69; border-radius: 3px; }
-        .hl.is-active { background: #f47e2050; outline-color: #f47e20; }
+        .pdf-link {
+          border: 0;
+          background: transparent;
+          display: block;
+        }
+        .mpg-hl-layer {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+        .hl {
+          background: #f4ce6944;
+          outline: 1px solid #f4ce69;
+          border-radius: 3px;
+        }
+        .hl.is-active {
+          background: #f47e2050;
+          outline-color: #f47e20;
+        }
       `}</style>
     </div>
   );

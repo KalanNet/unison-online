@@ -275,7 +275,7 @@ React.useEffect(() => {
       });
     };
 
-    const mCtrl = {
+        const mCtrl = {
       ...ctrl,
       goToPage: (idx: number) => {
         const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
@@ -286,16 +286,32 @@ React.useEffect(() => {
       goNext: () => {
         if (!ctrl.canNext) return;
         const next = ctrl.currentIndex + 1;
-        ctrl.setCurrentIndex(next);
-        ensureRendered(next);
-        warmPagesAround(next);
+        const safe = Math.min(next, ctrl.totalPages - 1);
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
       },
       goPrev: () => {
         if (!ctrl.canPrev) return;
         const prev = ctrl.currentIndex - 1;
-        ctrl.setCurrentIndex(prev);
-        ensureRendered(prev);
-        warmPagesAround(prev);
+        const safe = Math.max(prev, 0);
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
+      },
+      goFirst: () => {
+        if (!ctrl.totalPages) return;
+        const idx = 0;
+        ctrl.setCurrentIndex(idx);
+        ensureRendered(idx);
+        warmPagesAround(idx);
+      },
+      goLast: () => {
+        if (!ctrl.totalPages) return;
+        const idx = ctrl.totalPages - 1;
+        ctrl.setCurrentIndex(idx);
+        ensureRendered(idx);
+        warmPagesAround(idx);
       },
       submitJump: () => {
         const n = parseInt(String(ctrl.pageJump), 10);
@@ -307,6 +323,7 @@ React.useEffect(() => {
         warmPagesAround(safe);
       },
     };
+
 
     return (
       <div className="viewer-root" style={{ background: "#21353a" }}>
