@@ -446,127 +446,179 @@ nextMap.get(p)!.push({ ...box, hitIndex });
 
 
 /* ---------- navigation ---------- */
+
+// чи можна гортати назад/вперед
 const canPrev = !!pdfDoc && currentIndex > 0;
 const canNext = !!pdfDoc && currentIndex < (pdfDoc?.numPages ?? 1) - 1;
 
+/**
+ * Абсолютний перехід на індекс FlipBook (0-based)
+ * – клемпить індекс
+ * – прогріває кеш
+ * – оновлює currentIndex
+ * – синхронізує FlipBook
+ */
+function gotoIndexAbs(target: number) {
+  if (!pdfDoc) return;
+
+  const last = pdfDoc.numPages - 1;
+  const idx = Math.max(0, Math.min(last, target));
+
+  // вже на цій сторінці — нічого не робимо
+  if (idx === currentIndex) return;
+
+  // прогріваємо сусідні сторінки
+  warmPagesAround(idx);
+
+  // оновлюємо стейт
+  setCurrentIndex(idx);
+
+  // і даємо команду самому FlipBook
+  try {
+    const api = (bookRef.current as any)?.pageFlip?.();
+    if (api?.turnToPage) {
+      api.turnToPage(idx);
+    } else if (typeof api?.flip === "function") {
+      api.flip(idx);
+    }
+  } catch {
+    // не роняємо застосунок, якщо FlipBook щось кинув
+  }
+}
+
+/** Один крок назад */
 function goPrev() {
-  if (!bookRef.current || !canPrev) return;
-  warmPagesAround(currentIndex - 1);         // підогріваємо наперед
-  bookRef.current.pageFlip().flipPrev();
+  if (!canPrev) return;
+  gotoIndexAbs(currentIndex - 1);
 }
 
+/** Один крок вперед */
 function goNext() {
-  if (!bookRef.current || !canNext) return;
-  warmPagesAround(currentIndex + 1);         // підогріваємо наперед
-  bookRef.current.pageFlip().flipNext();
+  if (!canNext) return;
+  gotoIndexAbs(currentIndex + 1);
 }
 
+/** Перехід на PDF-сторінку p (1-based) */
 function goToPage(p: number) {
-  if (!bookRef.current || !pdfDoc) return;
-  const idx = Math.max(0, Math.min(pdfDoc.numPages - 1, p - 1));
-  warmPagesAround(idx);                       // прогрів цільового індексу
-  bookRef.current.pageFlip().flip(idx);
+  if (!pdfDoc) return;
+  const page = Math.max(1, Math.min(pdfDoc.numPages, p || 1));
+  gotoIndexAbs(page - 1); // → 0-based індекс FlipBook
 }
 
-function goFirst() { goToPage(1); }
-function goLast()  { if (pdfDoc) goToPage(pdfDoc.numPages); }
+/** На першу сторінку */
+function goFirst() {
+  gotoIndexAbs(0);
+}
 
+/** На останню сторінку */
+function goLast() {
+  if (!pdfDoc) return;
+  gotoIndexAbs(pdfDoc.numPages - 1);
+}
+
+/**
+ * Коли індекс змінюється (у т.ч. з onFlip самого FlipBook),
+ * просто прогріваємо околиці.
+ */
 useEffect(() => {
   warmPagesAround(currentIndex);
 }, [currentIndex, pdfDoc]);
 
-
-
-  /* ---------- swipe-to-flip (mobile, anywhere) ---------- */
+/* ---------- swipe-to-flip (mobile, anywhere) ---------- */
 useEffect(() => {
-  const el = stageRef.current;
-  if (!el || !isNarrow) return;
+  const el = stageRef.current;
+  if (!el || !isNarrow) return;
 
+  let touching = false;
+  let startX = 0,
+    startY = 0,
+    lastX = 0,
+    lastY = 0,
+    t0 = 0;
 
-  let touching = false;
-  let startX = 0, startY = 0, lastX = 0, lastY = 0, t0 = 0;
+  const THRESH_X = 40; // мін. горизонтальний зсув (px)
+  const MAX_AY = 30;   // допустима вертикальна похибка (px)
+  const MAX_MS = 600;  // ліміт тривалості жесту (ms)
 
+  function onStart(e: TouchEvent) {
+    if (e.touches.length !== 1) return;
+    const target = e.target as HTMLElement;
+    // не заважаємо клікам по контролах
+    if (
+      target &&
+      (target.closest("a, button, input, textarea, select") ||
+        target.getAttribute("contenteditable") === "true")
+    ) {
+      return;
+    }
+    touching = true;
+    const t = e.touches[0];
+    startX = lastX = t.clientX;
+    startY = lastY = t.clientY;
+    t0 = Date.now();
+  }
 
-  const THRESH_X = 40;    // мін. горизонтальний зсув (px)
-  const MAX_AY   = 30;    // допустима вертикальна похибка (px)
-  const MAX_MS   = 600;   // жорсткий ліміт жесту (ms)
+  function onMove(e: TouchEvent) {
+    if (!touching || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    lastX = t.clientX;
+    lastY = t.clientY;
 
+    const dx = lastX - startX;
+    const dy = Math.abs(lastY - startY);
 
-  function onStart(e: TouchEvent) {
-    if (e.touches.length !== 1) return;
-    // не заважаємо натискам по лінках/контролах
-    const target = e.target as HTMLElement;
-    if (target && (target.closest('a, button, input, textarea, select') || target.getAttribute('contenteditable') === 'true')) return;
-    touching = true;
-    const t = e.touches[0];
-    startX = lastX = t.clientX;
-    startY = lastY = t.clientY;
-    t0 = Date.now();
-  }
+    // явний горизонтальний жест → блокуємо нативний скрол
+    if (Math.abs(dx) > 12 && dy < MAX_AY) {
+      e.preventDefault();
+    }
+  }
 
+  function onEnd() {
+    if (!touching) return;
+    touching = false;
 
-  function onMove(e: TouchEvent) {
-    if (!touching || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    lastX = t.clientX; lastY = t.clientY;
+    const dx = lastX - startX;
+    const dy = Math.abs(lastY - startY);
+    const dt = Date.now() - t0;
 
+    // надто вертикально або надто довго — ігноруємо
+    if (dy > MAX_AY || dt > MAX_MS) return;
 
-    const dx = lastX - startX;
-    const dy = Math.abs(lastY - startY);
+    if (dx <= -THRESH_X) {
+      goNext();
+    } else if (dx >= THRESH_X) {
+      goPrev();
+    }
+  }
 
+  el.addEventListener("touchstart", onStart, { capture: true, passive: true });
+  el.addEventListener("touchmove", onMove, { capture: true, passive: false });
+  el.addEventListener("touchend", onEnd, { capture: true, passive: true });
 
-    // якщо вже явно горизонтальний жест — блокуємо нативний скролл
-    if (Math.abs(dx) > 12 && dy < MAX_AY) {
-      e.preventDefault(); // потребує {passive:false}
-    }
-  }
+  return () => {
+    el.removeEventListener("touchstart", onStart as any, true);
+    el.removeEventListener("touchmove", onMove as any, true);
+    el.removeEventListener("touchend", onEnd as any, true);
+  };
+}, [isNarrow, goNext, goPrev, stageRef]);
 
+/* ---------- pageJump (інпут у футері) ---------- */
+const [pageJump, setPageJump] = useState<string>("1");
 
-  function onEnd(e: TouchEvent) {
-    if (!touching) return;
-    touching = false;
+useEffect(() => {
+  const p = currentIndex + 1; // 1-based
+  // у спред-режимі показуємо саме ЛІВУ сторінку поточного розвороту
+  const leftNow = single ? p : p === 1 ? 1 : p % 2 === 0 ? p : p - 1;
+  setPageJump(String(leftNow));
+}, [currentIndex, single]);
 
+function submitJump() {
+  if (!pdfDoc) return;
+  const raw = parseInt(pageJump || "1", 10);
+  const num = Math.min(pdfDoc.numPages, Math.max(1, raw || 1));
+  goToPage(num); // далі все йде через gotoIndexAbs
+}
 
-    const dx = lastX - startX;
-    const dy = Math.abs(lastY - startY);
-    const dt = Date.now() - t0;
-
-
-    // фільтр вертикальних свайпів/довгих дотиків
-    if (dy > MAX_AY || dt > MAX_MS) return;
-
-
-    if (dx <= -THRESH_X) { goNext(); }
-    else if (dx >= THRESH_X) { goPrev(); }
-  }
-
-
-  // capture:true, passive:false щоб мати змогу preventDefault
-  el.addEventListener('touchstart', onStart, { capture: true, passive: true });
-  el.addEventListener('touchmove',  onMove,  { capture: true, passive: false });
-  el.addEventListener('touchend',   onEnd,   { capture: true, passive: true });
-
-
-  return () => {
-    el.removeEventListener('touchstart', onStart as any, true);
-    el.removeEventListener('touchmove',  onMove  as any, true);
-    el.removeEventListener('touchend',   onEnd   as any, true);
-  };
-}, [isNarrow, goNext, goPrev, stageRef.current]);
-
-
-
-  const [pageJump, setPageJump] = useState<string>("1");
-  useEffect(() => {
-    const p = currentIndex + 1;
-    const leftNow = single ? p : p === 1 ? 1 : (p % 2 === 0 ? p : p - 1);
-    setPageJump(String(leftNow));
-  }, [currentIndex, single]);
-  function submitJump() {
-    if (!pdfDoc) return;
-    const num = Math.min(pdfDoc.numPages, Math.max(1, parseInt(pageJump || "1", 10) || 1));
-    goToPage(num);
-  }
 
 
   /* ---------- loupe (desktop only) ---------- */
