@@ -477,20 +477,24 @@ function gotoIndexAbs(target: number) {
   }
 }
 
-/** Один крок назад – тепер через gotoIndexAbs (без flipPrev) */
+/** Один крок назад – саме "фліп", а не jump */
 function goPrev() {
-  if (!canPrev) return;
-  // крок назад від поточного індексу
-  gotoIndexAbs(currentIndex - 1);
+  if (!canPrev || !bookRef.current) return;
+  // прогріваємо сторінку, куди підемо
+  warmPagesAround(currentIndex - 1);
+  try {
+    (bookRef.current as any).pageFlip?.().flipPrev();
+  } catch {}
 }
 
-/** Один крок вперед – тепер через gotoIndexAbs (без flipNext) */
+/** Один крок вперед – "фліп", а не jump */
 function goNext() {
-  if (!canNext) return;
-  // крок вперед від поточного індексу
-  gotoIndexAbs(currentIndex + 1);
+  if (!canNext || !bookRef.current) return;
+  warmPagesAround(currentIndex + 1);
+  try {
+    (bookRef.current as any).pageFlip?.().flipNext();
+  } catch {}
 }
-
 
 /** Перехід на PDF-сторінку p (1-based) для пошуку / закладок / ручного вводу */
 function goToPage(p: number) {
