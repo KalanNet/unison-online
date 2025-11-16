@@ -938,7 +938,7 @@ export default function PublicViewer({
           top: var(--hdr);
           right: 12px;
           bottom: var(--ftr);
-          width: min(360px, 92vw);
+          width: min(300px, 92vw);
           background: #fff;
           color: #1b2430;
           border: 1px solid #e7ebdf;
