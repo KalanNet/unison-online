@@ -141,21 +141,76 @@ export default function PublicViewer({
     initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
   }
 
-  // === AUTO-SEARCH (debounced, only on q/file change) ===
-  const lastSigRef = React.useRef<string>("");
-  React.useEffect(() => {
-    if (!ctrl) return;
-    const qTrim = q.trim();
-    const sig = `${file}::${qTrim}`;
-    if (lastSigRef.current === sig) return;
-    lastSigRef.current = sig;
+  // === AUTO-SEARCH (1: запуск пошуку) ===
+const lastSearchSigRef = React.useRef<string>("");
+const lastJumpSigRef = React.useRef<string>("");
 
-    const t = setTimeout(() => {
-      ctrl.runSearch(qTrim);
-    }, 250);
+React.useEffect(() => {
+  if (!ctrl) return;
+  const qTrim = q.trim();
+  const sig = `${file}::${qTrim}`;
 
-    return () => clearTimeout(t);
-  }, [q, file, !!ctrl]);
+  // якщо рядок точно не змінився — не перезапускаємо пошук
+  if (lastSearchSigRef.current === sig) return;
+  lastSearchSigRef.current = sig;
+
+  const t = setTimeout(() => {
+    // легка затримка тільки на сам пошук (щоб не молотити API на кожен символ)
+    ctrl.runSearch(qTrim);
+    // як тільки користувач почав друкувати інший запит — скинемо прапор автопереходу
+    lastJumpSigRef.current = "";
+  }, 400);
+
+  return () => clearTimeout(t);
+}, [q, file, !!ctrl]);
+
+// === AUTO-JUMP (2: автоперехід до першого результату через 1.2 c) ===
+React.useEffect(() => {
+  if (!ctrl) return;
+
+  const qTrim = q.trim();
+  if (!qTrim) return;
+  if (!ctrl.hits || ctrl.hits.length === 0) return;
+
+  const sig = `${file}::${qTrim}`;
+
+  // якщо вже стрибали за цим самим запитом — не повторюємо
+  if (lastJumpSigRef.current === sig) return;
+
+  const t = setTimeout(() => {
+    // перевіряємо, що користувач не змінив запит за ці 1.2 c
+    const nowSig = `${file}::${q.trim()}`;
+    if (nowSig !== sig) return;
+
+    lastJumpSigRef.current = sig;
+
+    const first = ctrl.hits[0];
+    if (!first?.page) return;
+
+    const target = Math.max(0, first.page - 1); // 0-based
+
+    if (ctrl.currentIndex === target) return;
+
+    // підсвітити перший результат
+    (ctrl as any).setActiveHit?.(0);
+    ctrl.setCurrentIndex(target);
+
+    // синхронізувати FlipBook
+    setTimeout(() => {
+      const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+      if (api?.turnToPage) {
+        api.turnToPage(target);
+      } else if (typeof (ctrl as any).goToPage === "function") {
+        (ctrl as any).goToPage(target);
+      } else if (api?.flip) {
+        api.flip(target);
+      }
+    }, 0);
+  }, 1200); // 1.2 c «на роздуми»
+
+  return () => clearTimeout(t);
+}, [q, file, !!ctrl, ctrl.hits]);
+
   // === /AUTO-SEARCH ===
 
   // ---- РАННІ ВАЛІДАЦІЇ ----
