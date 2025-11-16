@@ -223,6 +223,8 @@ function SlugInput({
   );
 }
 
+// app/components/Viewer.tsx
+
 export default function Viewer({
   file,
   title,
@@ -236,13 +238,16 @@ export default function Viewer({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-// NEW: pending color для кастомної палітри (лише попередній вибір)
-const [customColor, setCustomColor] = useState<string>("#ffffff");
+  // NEW: pending color для кастомної палітри (лише попередній вибір)
+  const [customColor, setCustomColor] = useState<string>("#ffffff");
 
   // NEW: стан для модалки після успішної публікації
   const [pub, setPub] = useState<{ url: string } | null>(null);
+  const [copyOk, setCopyOk] = useState(false);        // ← 👈 ДОДАЛИ ЦЕ
+
   // Локальна назва завантаженого файлу (для відображення короткої назви)
   const [featuredName, setFeaturedName] = useState<string | null>(null);
+
 
   const [pdfUrl, setPdfUrl] = useState<string>(file);
   // Ініціалізація контролера з безпечним catch (без setState у рендері)
@@ -970,23 +975,54 @@ if (full) setPub({ url: full });
 
       {/* === Success Publish Modal === */}
       {pub && (
-        <div className="pub-overlay" role="dialog" aria-modal="true" aria-labelledby="pub-title">
-          <div className="pub-card">
-            <div className="pub-check" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M20 7L9 18l-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <h3 id="pub-title">Published successfully</h3>
-            <p className="pub-url" title={pub.url}>{pub.url}</p>
-            <div className="pub-actions">
-              <button className="ua-btn" onClick={() => navigator.clipboard?.writeText(pub.url)} title="Copy link">Copy link</button>
-              <a className="ua-btn ua-btn--dark" href={pub.url} target="_blank" rel="noopener noreferrer" title="Open">Open</a>
-              <button className="ua-btn slim" onClick={() => setPub(null)} title="Close">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+  <div className="pub-overlay" role="dialog" aria-modal="true" aria-labelledby="pub-title">
+    <div className="pub-card">
+      <div className="pub-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="M20 7L9 18l-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <h3 id="pub-title">Published successfully</h3>
+      <p className="pub-url" title={pub.url}>{pub.url}</p>
+      <div className="pub-actions">
+        <button
+          className={`ua-btn pub-copy-btn${copyOk ? " is-copied" : ""}`}
+          onClick={async () => {
+            if (!pub?.url) return;
+            try {
+              await (navigator.clipboard?.writeText(pub.url) ?? Promise.resolve());
+              setCopyOk(true);
+              window.setTimeout(() => setCopyOk(false), 2000);
+            } catch {
+              // тихо ігноруємо, щоб не ламати UX
+            }
+          }}
+          title={copyOk ? "Copied" : "Copy link"}
+        >
+          {copyOk && (
+            <span className="pub-copy-icon" aria-hidden="true">
+              ✓
+            </span>
+          )}
+          {copyOk ? "Copied" : "Copy link"}
+        </button>
+
+        <a
+          className="ua-btn ua-btn--dark"
+          href={pub.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open"
+        >
+          Open
+        </a>
+        <button className="ua-btn slim" onClick={() => setPub(null)} title="Close">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* СТИЛІ */}
       <style jsx global>{`
@@ -1158,6 +1194,52 @@ if (full) setPub({ url: full });
         .ua-btn.slim{padding:8px 12px}
         .ua-btn:hover{background:#f7faf4;border-color:#bfcdb0}
         .ua-btn--dark:hover{background:#2a4a56;border-color:#2a4a56}
+        // app/components/Viewer.tsx – всередині style jsx global
+
+        .ua-btn{border-radius:10px;padding:10px 14px;font-weight:700;border:1px solid #cfd8c6;background:#fff;color:#2d3018}
+        .ua-btn--dark{background:#21353a;color:#fff;border-color:#21353a}
+        .ua-btn.slim{padding:8px 12px}
+        .ua-btn:hover{background:#f7faf4;border-color:#bfcdb0}
+        .ua-btn--dark:hover{background:#2a4a56;border-color:#2a4a56}
+
+        /* --- Copy link success --- */
+        .pub-copy-btn{
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:6px;
+          transition:
+            background-color .2s ease,
+            border-color .2s ease,
+            color .2s ease,
+            transform .2s ease,
+            box-shadow .2s ease;
+        }
+        .pub-copy-btn.is-copied{
+          background:#e6f5e2;
+          border-color:#9acd6a;
+          color:#1f3a1a;
+          box-shadow:0 0 0 1px rgba(154,205,106,.25), 0 6px 18px rgba(0,0,0,.12);
+          animation: pub-copy-pop .35s ease-out;
+        }
+        .pub-copy-icon{
+          width:16px;
+          height:16px;
+          border-radius:999px;
+          border:1px solid currentColor;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          font-size:11px;
+        }
+        @keyframes pub-copy-pop{
+          0%{ transform:scale(.94); opacity:.7; }
+          60%{ transform:scale(1.06); opacity:1; }
+          100%{ transform:scale(1); }
+        }
+
+
+
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: ctrl.globalCss }} />
     </div>
