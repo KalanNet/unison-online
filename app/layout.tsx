@@ -48,7 +48,16 @@ export const metadata: Metadata = {
       "Empowering seniors 50+ to live their best lives through resources, directories and community programs.",
     images: [OG_DEFAULT],
   },
-  icons: { icon: "/favicon.ico" },
+  // ---- FAVICONS
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png?v=3", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png?v=3", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.ico?v=3" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon.ico?v=3"],
+  },
 };
 
 /* ---------- Viewport / theme ---------- */
@@ -71,21 +80,21 @@ export default function RootLayout({
   return (
     <html lang="en-CA" suppressHydrationWarning>
       <head>
-        {/* швидший TLS рукостиск з доменом логотипів/зовнішніх ресурсів */}
         <link
           rel="preconnect"
           href="https://unisonalberta.com"
           crossOrigin="anonymous"
         />
-        {/* Не додаємо ручний preload картинки: Next/Image з `priority` зробить це сам */}
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
+        <link rel="shortcut icon" href="/favicon.ico?v=3" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
       </head>
 
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
       >
         <main className="flex-1">{children}</main>
-        {/* мінімальний футер (server-friendly) */}
-        {/* ===== FOOTER (desktop unchanged; wraps & centers on narrow) ===== */}
         <footer
           className="border-t py-3"
           style={{
@@ -96,7 +105,6 @@ export default function RootLayout({
           }}
         >
           <div className="ua-container flex flex-wrap items-center justify-between gap-2">
-            {/* Ліва секція: 2 рядки (на вузьких центрується) */}
             <div
               className="basis-full sm:basis-auto text-center sm:text-left"
               style={{ opacity: 0.9 }}
@@ -108,8 +116,6 @@ export default function RootLayout({
                 All Rights Reserved.
               </span>
             </div>
-
-            {/* Права секція: на вузьких переходить на новий рядок і центрується */}
             <div className="basis-full sm:basis-auto text-center sm:text-right">
               <a
                 href="https://skyronis.com"
