@@ -48,12 +48,38 @@ export default function MobilePager(p: Props) {
     setPanEl(el ?? null);
   }, []);
 
+  // обчислення максимально допустимого зсуву для поточного масштабу
+  function getMaxPan(zoomNow: number) {
+    const el = pageRef.current;
+    if (!el) return { maxX: 0, maxY: 0 };
+    // зображення вписане в контейнер (object-fit: contain),
+    // базовий розмір контенту = розміру контейнера
+    const baseW = el.clientWidth;
+    const baseH = el.clientHeight;
+    const extraW = Math.max(0, baseW * zoomNow - baseW);
+    const extraH = Math.max(0, baseH * zoomNow - baseH);
+    return { maxX: extraW / 2, maxY: extraH / 2 };
+  }
+
+  // Коли змінилась сторінка або пошуковий запит — скинути зум/пан
   useEffect(() => {
     setZoom(1);
     setTx(0);
     setTy(0);
   }, [pageNum, p.searchQuery]);
 
+  // При зміні zoom — притиснути tx/ty і автоцентрувати коли ≈1
+  useEffect(() => {
+    const { maxX, maxY } = getMaxPan(zoom);
+    setTx((x) => Math.min(maxX, Math.max(-maxX, x)));
+    setTy((y) => Math.min(maxY, Math.max(-maxY, y)));
+    if (zoom <= 1.001) {
+      setTx(0);
+      setTy(0);
+    }
+  }, [zoom]);
+
+  // === Touch-події без movementX/movementY ===
   const pts = React.useRef<Map<number, { x: number; y: number }>>(new Map());
   const baseDist = React.useRef<number | null>(null);
   const baseZoom = React.useRef(1);
@@ -76,26 +102,45 @@ export default function MobilePager(p: Props) {
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!pts.current.has(e.pointerId)) return;
-    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const prev = pts.current.get(e.pointerId)!;
+    const curr = { x: e.clientX, y: e.clientY };
+    pts.current.set(e.pointerId, curr);
 
     if (pts.current.size === 2 && baseDist.current) {
       const ratio = dist() / baseDist.current;
       const next = Math.min(4, Math.max(1, baseZoom.current * ratio));
       setZoom(next);
     } else if (pts.current.size === 1 && zoom > 1) {
-      setTx((x) => x + e.movementX);
-      setTy((y) => y + e.movementY);
+      const dx = curr.x - prev.x;
+      const dy = curr.y - prev.y;
+      const { maxX, maxY } = getMaxPan(zoom);
+      setTx((x) => Math.min(maxX, Math.max(-maxX, x + dx)));
+      setTy((y) => Math.min(maxY, Math.max(-maxY, y + dy)));
     }
   };
 
-  const onPointerUp = (e: React.PointerEvent) => {
-    pts.current.delete(e.pointerId);
+  const onPointerUp = (_e: React.PointerEvent) => {
+    // прибрати палець
+    pts.current.delete(_e.pointerId);
     if (pts.current.size < 2) baseDist.current = null;
+
+    // якщо зум майже 1 — центр і м'яке повернення
+    if (zoom <= 1.001) {
+      setZoom(1);
+      setTx(0);
+      setTy(0);
+    } else {
+      const { maxX, maxY } = getMaxPan(zoom);
+      setTx((x) => Math.min(maxX, Math.max(-maxX, x)));
+      setTy((y) => Math.min(maxY, Math.max(-maxY, y)));
+    }
   };
 
-  const maxPan = 180;
-  const tX = Math.max(-maxPan, Math.min(maxPan, tx));
-  const tY = Math.max(-maxPan, Math.min(maxPan, ty));
+  // Кламп у рендері по реальних межах (без магічних чисел)
+  const { maxX: clampX, maxY: clampY } = getMaxPan(zoom);
+  const tX = Math.max(-clampX, Math.min(clampX, tx));
+  const tY = Math.max(-clampY, Math.min(clampY, ty));
 
   // ===== ЛЕЙАУТ: 1fr (канва) + 56px (футер) =====
   const HEADER_PX = 56;
@@ -126,7 +171,7 @@ export default function MobilePager(p: Props) {
         }}
       >
         <MobileSwipe
-          key={ctrl.currentIndex}
+          key={pageNum}
           onSwipeLeft={ctrl.goNext}
           onSwipeRight={ctrl.goPrev}
           enabled
@@ -174,7 +219,7 @@ export default function MobilePager(p: Props) {
                     transform: `translate3d(${tX}px, ${tY}px, 0) scale(${zoom})`,
                     transformOrigin: "center center",
                     willChange: "transform",
-                    transition: zoom === 1 ? "transform 180ms ease-out" : "none",
+                    transition: zoom <= 1.001 ? "transform 200ms ease-out" : "none",
                   }}
                 />
 
