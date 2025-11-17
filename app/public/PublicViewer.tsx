@@ -327,19 +327,20 @@ React.useEffect(() => {
 
     return (
   <div className="viewer-root" style={{ background: "#21353a" }}>
-    <MobileHeader
-      title={ctrl.title}
-      file={file}
-      searchQuery={q}
-      setSearchQuery={setQ}
-      runSearch={(qq: string) => setQ(qq)} // тригерить авто-пошук через useEffect
-      searching={ctrl.searching}
-      hits={ctrl.hits}
-      onGoto={(p: number) => mCtrl.goToPage(p - 1)} // p з хедера 1-based
-      onShare={ctrl.handleShare}
-      splashActive={false}
-      bookmarks={bookmarks}          // ← ДОДАНО: показ закладок у меню
-    />
+            <MobileHeader
+          title={ctrl.title}
+          file={file}
+          searchQuery={q}
+          setSearchQuery={setQ}
+          runSearch={(qq: string) => setQ(qq)}
+          searching={ctrl.searching}
+          hits={ctrl.hits}
+          onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+          onShare={ctrl.handleShare}
+          bookmarks={bookmarks}             // ← pass bookmarks to the drawer
+          splashActive={false}
+        />
+
 
     <MobilePager
       ctrl={mCtrl as any}

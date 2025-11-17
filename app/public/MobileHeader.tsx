@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type Hit = { id: string; page: number; snippet: string };
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
@@ -33,7 +33,9 @@ export default function MobileHeader(p: Props) {
   }, []);
 
   const showActions = mounted && !p.splashActive;
-  const bmSorted = React.useMemo(
+  const hasQuery = p.searchQuery.trim().length > 0;
+
+  const bmSorted = useMemo(
     () => [...(p.bookmarks ?? [])].sort((a, b) => a.page - b.page),
     [p.bookmarks]
   );
@@ -53,56 +55,76 @@ export default function MobileHeader(p: Props) {
         <div className="mh-drawer" role="dialog" aria-modal="true">
           <div className="mh-dim" onClick={() => setOpen(false)} />
           <div className="mh-panel">
-            {/* ЄДИНИЙ пошук зверху */}
-            <div className="mh-row">
-              <input
-                className="mh-inp"
-                placeholder="Search…"
-                value={p.searchQuery}
-                onChange={(e) => p.setSearchQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") p.runSearch(p.searchQuery); }}
-                aria-label="Search"
-              />
+            {/* CONTENT AREA — fills from top to just above the input */}
+            <div className="mh-content">
+              {/* When searching: show results from the very top (no bookmarks). */}
+              {hasQuery || p.searching ? (
+                <>
+                  <div className="mh-sec-hd">Search results</div>
+                  <div className="mh-list">
+                    {p.searching && <div className="mh-empty">Searching…</div>}
+                    {!p.searching && p.hits.length === 0 && (
+                      <div className="mh-empty">No matches.</div>
+                    )}
+                    {!p.searching &&
+                      p.hits.map((h) => (
+                        <button
+                          key={h.id}
+                          className="mh-item"
+                          onClick={() => { p.onGoto(h.page); setOpen(false); }}
+                          title={`Go to p.${h.page}`}
+                        >
+                          <b>p.{h.page}</b> <span>{h.snippet}</span>
+                        </button>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                /* No search: bookmarks at the very top */
+                <>
+                  <div className="mh-sec-hd">Bookmarks</div>
+                  <div className="mh-list">
+                    {bmSorted.length === 0 ? (
+                      <div className="mh-empty">No bookmarks yet.</div>
+                    ) : (
+                      bmSorted.map((b) => (
+                        <button
+                          key={b.id}
+                          className="mh-bm"
+                          onClick={() => { p.onGoto(b.page); setOpen(false); }}
+                          title={`Go to p.${b.page}`}
+                        >
+                          <span className="mh-dot" style={{ background: b.color || "#f47e20" }} />
+                          <span className="mh-bm-title">{b.label}</span>
+                          <span className="mh-bm-meta">p.{b.page}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Результати показуємо тільки коли вони справді є */}
-            {p.hits.length > 0 && (
-              <div className="mh-section">
-                <div className="mh-sec-hd">Search results</div>
-                <div className="mh-list">
-                  {p.hits.slice(0, 200).map((h) => (
-                    <button
-                      key={h.id}
-                      className="mh-item"
-                      onClick={() => { p.onGoto(h.page); setOpen(false); }}
-                      title={`Go to p.${h.page}`}
-                    >
-                      <b>p.{h.page}</b> <span>{h.snippet}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Закладки */}
-            <div className="mh-section">
-              <div className="mh-sec-hd">Bookmarks</div>
-              <div className="mh-list">
-                {bmSorted.length === 0 ? (
-                  <div className="mh-empty">No bookmarks yet.</div>
-                ) : (
-                  bmSorted.map((b) => (
-                    <button
-                      key={b.id}
-                      className="mh-item"
-                      onClick={() => { p.onGoto(b.page); setOpen(false); }}
-                      title={`Go to p.${b.page}`}
-                    >
-                      <span className="mh-dot" style={{ background: b.color || "#f47e20" }} />
-                      <span className="mh-bm-title">{b.label}</span>
-                      <span className="mh-bm-meta">p.{b.page}</span>
-                    </button>
-                  ))
+            {/* SINGLE search field pinned at the bottom */}
+            <div className="mh-row mh-row-bottom">
+              <div className="mh-inp-wrap">
+                <input
+                  className="mh-inp"
+                  placeholder="Search…"
+                  value={p.searchQuery}
+                  onChange={(e) => p.setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") p.runSearch(p.searchQuery); }}
+                  aria-label="Search"
+                />
+                {hasQuery && (
+                  <button
+                    className="mh-clear"
+                    aria-label="Clear search"
+                    title="Clear"
+                    onClick={() => p.setSearchQuery("")}
+                  >
+                    ×
+                  </button>
                 )}
               </div>
             </div>
@@ -118,21 +140,46 @@ export default function MobileHeader(p: Props) {
 
         .mh-drawer{ position:fixed; inset:0; z-index:50; }
         .mh-dim{ position:absolute; inset:0; background:rgba(0,0,0,.25); }
+        .mh-panel{
+          position:absolute; right:0; top:0; bottom:0; width:75vw; max-width:480px;
+          background:#fff; color:#2d3018; box-shadow:-8px 0 28px rgba(0,0,0,.2);
+          padding:14px; display:flex; flex-direction:column; gap:12px;
+          border-left:1px solid #e7ebdf; border-radius:12px 0 0 12px;
+        }
 
-        .mh-panel{ position:absolute; right:0; top:0; bottom:0; width:75vw; max-width:480px; background:#fff; box-shadow:-8px 0 28px rgba(0,0,0,.2); padding:14px; display:flex; flex-direction:column; gap:14px; border-left:1px solid #e7ebdf; border-radius:12px 0 0 12px; }
+        /* Fills available space */
+        .mh-content{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+        .mh-sec-hd{ font-weight:800; }
+        .mh-list{ flex:1 1 auto; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-right:2px; }
+        .mh-empty{ color:#6b735f; font-size:12px; padding:6px 2px; }
 
         .mh-row{ display:flex; gap:6px; }
-        .mh-inp{ flex:1; border:1px solid #e7ebdf; border-radius:.6rem; padding:.5rem .65rem; }
+        .mh-row-bottom{ margin-top:auto; }
+        .mh-inp-wrap{ position:relative; width:100%; }
+        .mh-inp{
+          width:100%; border:1px solid #e7ebdf; border-radius:.6rem; padding:.55rem .9rem;
+          padding-right:2.0rem; /* space for clear button */
+          background:#fafbf8;
+        }
+        .mh-clear{
+          position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
+          width:28px; height:28px; border-radius:8px; border:1px solid #e7ebdf;
+          background:#fff; font-weight:900; line-height:1; display:grid; place-items:center;
+        }
 
-        .mh-section{ display:flex; flex-direction:column; gap:8px; }
-        .mh-sec-hd{ font-weight:800; color:#2d3018; }
-        .mh-list{ max-height:40vh; overflow:auto; display:flex; flex-direction:column; gap:6px; }
-        .mh-item{ text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem; background:#fff; font-size:14px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; }
+        .mh-item{
+          text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem;
+          background:#fff; font-size:14px; display:block;
+        }
         .mh-item b{ margin-right:.4rem; }
+
+        .mh-bm{
+          border:1px solid #eef0ea; background:#fff; border-radius:.6rem;
+          padding:.55rem .65rem; display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; text-align:left;
+        }
         .mh-dot{ width:12px; height:12px; border-radius:999px; border:1px solid rgba(0,0,0,.12); }
         .mh-bm-title{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mh-bm-meta{ color:#6b735f; font-size:12px; }
-        .mh-empty{ color:#6b735f; font-size:12px; }
       `}</style>
     </>
   );
