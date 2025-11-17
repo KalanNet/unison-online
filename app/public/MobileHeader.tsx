@@ -209,10 +209,10 @@ export default function MobileHeader(p: Props) {
       )}
 
       <style jsx global>{`
-        .mheader{ position:sticky; top:0; z-index:30; background:#fafbf8; border-bottom:1px solid #e9ede3; padding:8px 10px; display:flex; align-items:center; gap:8px; height:56px; }
+        .mheader{ position:sticky; top:0; z-index:30; background:#fafbf8; padding:8px 10px; display:flex; align-items:center; gap:8px; height:56px; }
         .mh-title{ font-weight:900; color:#2d3018; font-size:15px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
         .mh-burger{ margin-left:auto; width:40px; height:40px; border:1px solid #dcded5; border-radius:.5rem; background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:5px; }
-        .mh-burger span{ width:22px; height:3.5px; background:#2d3018; border-radius:3px; display:block; }
+        .mh-burger span{ width:22px; height:3px; background:#2d3018; border-radius:3px; display:block; }
 
         .mh-drawer{ position:fixed; inset:0; z-index:50; }
         .mh-dim{ position:absolute; inset:0; background:rgba(0,0,0,.25); }
