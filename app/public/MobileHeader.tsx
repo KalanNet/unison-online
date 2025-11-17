@@ -1,6 +1,7 @@
+// app/(public)/MobileHeader.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 type Hit = { id: string; page: number; snippet: string };
 
@@ -8,6 +9,7 @@ type Props = {
   title: string;
   file: string;
 
+  // search state
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   runSearch: (q: string) => void;
@@ -23,31 +25,51 @@ type Props = {
 
 export default function MobileHeader(p: Props) {
   const [open, setOpen] = useState(false);
-  const [showResults, setShowResults] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // ESC — просто закриває панель (нічого не очищаємо)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey, { passive: true });
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   function submit() {
     p.runSearch(p.searchQuery);
-    setShowResults(true);
   }
 
+  const hasQuery = p.searchQuery.trim().length > 0;
   const showActions = mounted && !p.splashActive;
 
   return (
     <>
       <header className="mheader">
-        <div className="mh-title" title={p.title}>{p.title}</div>
+        <div className="mh-title" title={p.title}>
+          {p.title}
+        </div>
         {showActions && (
-          <button className="mh-burger" onClick={() => setOpen(true)} aria-label="Menu">
-            <span/><span/><span/>
+          <button
+            className="mh-burger"
+            onClick={() => setOpen(true)}
+            aria-label="Menu"
+            title="Menu"
+          >
+            <span />
+            <span />
+            <span />
           </button>
         )}
       </header>
 
       {open && (
         <div className="mh-drawer" role="dialog" aria-modal="true">
-          <div className="mh-dim" onClick={() => { setOpen(false); setShowResults(false); }} />
+          {/* бекдроп — закриває, але НЕ чистить пошук/результати */}
+          <div className="mh-dim" onClick={() => setOpen(false)} />
+
+          {/* ПРАВА панель */}
           <div className="mh-panel">
             <div className="mh-row">
               <input
@@ -55,92 +77,184 @@ export default function MobileHeader(p: Props) {
                 placeholder="Search…"
                 value={p.searchQuery}
                 onChange={(e) => p.setSearchQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
               />
               <button
-                className="mh-btn ghost"
-                onClick={() => { p.setSearchQuery(""); setShowResults(false); }}
-                aria-label="Clear"
-                title="Clear"
-              >✕</button>
-            </div>
-
-            <div className="mh-actions">
-              <a className="mh-ib" href={p.file} download title="Download PDF">
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 3v12" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                  <path d="M8 11l4 4 4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M4 21h16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                </svg>
-              </a>
-              <button className="mh-ib" onClick={p.onShare} title="Share">
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                  <path d="M12 16V4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                  <path d="M8 8l4-4 4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                className="mh-btn"
+                onClick={submit}
+                disabled={p.searching}
+                aria-label="Search"
+                title="Search"
+              >
+                {p.searching ? "…" : "Go"}
               </button>
             </div>
 
-            {showResults && (
-              <div className="mh-results">
-                {p.hits.slice(0, 100).map((h) => (
+            <div className="mh-actions">
+              <a className="mh-ib" href={p.file} download title="Download PDF" aria-label="Download PDF">
+                ⬇
+              </a>
+              <button className="mh-ib" onClick={p.onShare} title="Share" aria-label="Share">
+                ⤴
+              </button>
+            </div>
+
+            {/* РЕЗУЛЬТАТИ — НЕ видаляємо ані при кліку, ані при закритті панелі */}
+            <div className="mh-results">
+              {!hasQuery ? (
+                <div className="mh-empty">Type to search…</div>
+              ) : p.searching ? (
+                <div className="mh-empty">Searching…</div>
+              ) : p.hits.length === 0 ? (
+                <div className="mh-empty">No matches.</div>
+              ) : (
+                p.hits.slice(0, 200).map((h) => (
                   <button
                     key={h.id}
                     className="mh-res"
-                    onClick={() => { p.onGoto(h.page); setOpen(false); setShowResults(false); }}
+                    onClick={() => {
+                      // переходимо на сторінку, але НЕ очищаємо запит/результати
+                      p.onGoto(h.page);
+                      setOpen(false); // панель можна закрити, дані лишаються
+                    }}
                     title={`Go to p.${h.page}`}
                   >
                     <b>p.{h.page}</b> <span>{h.snippet}</span>
                   </button>
-                ))}
-                {!p.hits.length && <div className="mh-empty">No results yet</div>}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
 
       <style jsx global>{`
-        .mheader{ position:sticky; top:0; z-index:30; background:#fafbf8; border-bottom:1px solid #e9ede3; padding:8px 10px; display:flex; align-items:center; gap:8px; height:56px; }
-        .mh-title{ font-weight:900; color:#2d3018; font-size:15px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .mheader {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          background: #fafbf8;
+          border-bottom: 1px solid #e9ede3;
+          padding: 8px 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          height: 56px;
+        }
+        .mh-title {
+          font-weight: 900;
+          color: #2d3018;
+          font-size: 15px;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
         .mh-burger {
-  margin-left: auto;
-  width: 40px;
-  height: 40px;
-  border: 1px solid #dcded5;
-  border-radius: .5rem;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;           /* відстань між лініями */
-}
+          margin-left: auto;
+          width: 40px;
+          height: 40px;
+          border: 1px solid #dcded5;
+          border-radius: 0.5rem;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 5px;
+        }
+        .mh-burger span {
+          width: 22px;
+          height: 3.5px;
+          background: #2d3018;
+          border-radius: 3px;
+          display: block;
+        }
 
-.mh-burger span {
-  width: 22px;        /* довші лінії */
-  height: 3.5px;      /* товсті лінії */
-  background: #2d3018;
-  border-radius: 3px; /* м'які, але не круглі */
-  display: block;
-}
+        .mh-drawer {
+          position: fixed;
+          inset: 0;
+          z-index: 50;
+        }
+        .mh-dim {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.25);
+        }
 
+        /* ПАНЕЛЬ СПРАВА */
+        .mh-panel {
+          position: absolute;
+          right: 0;              /* ← правий край */
+          top: 0;
+          bottom: 0;
+          width: 75vw;
+          max-width: 480px;
+          background: #fff;
+          box-shadow: -8px 0 28px rgba(0, 0, 0, 0.2); /* тінь зліва від панелі */
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          border-left: 1px solid #e7ebdf;
+          border-radius: 12px 0 0 12px;
+        }
 
-        .mh-drawer{ position:fixed; inset:0; z-index:50; }
-        .mh-dim{ position:absolute; inset:0; background:rgba(0,0,0,.25); }
-        .mh-panel{ position:absolute; left:0; top:0; bottom:0; width:75vw; max-width:480px; background:#fff; box-shadow: 8px 0 28px rgba(0,0,0,.2); padding:14px; display:flex; flex-direction:column; gap:10px; }
-
-        .mh-row{ display:flex; gap:6px; }
-        .mh-inp{ flex:1; border:1px solid #e7ebdf; border-radius:.6rem; padding:.5rem .65rem; }
-        .mh-btn{ border:1px solid #e7ebdf; border-radius:.6rem; padding:.5rem .75rem; background:#fff; font-weight:700; }
-        .mh-btn.ghost{ background:#f8f8f6; }
-        .mh-actions{ display:flex; gap:10px; }
-        .mh-ib{ background:#fff; border:1px solid #e7ebdf; border-radius:.7rem; width:42px; height:42px; display:grid; place-items:center; color:#2d3018; }
-        .mh-results{ overflow:auto; border-top:1px solid #eef0ea; padding-top:10px; display:flex; flex-direction:column; gap:6px; }
-        .mh-res{ text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem; background:#fff; font-size:14px; }
-        .mh-res b{ margin-right:.4rem; }
-        .mh-empty{ color:#6b735f; font-size:12px; }
+        .mh-row {
+          display: flex;
+          gap: 6px;
+        }
+        .mh-inp {
+          flex: 1;
+          border: 1px solid #e7ebdf;
+          border-radius: 0.6rem;
+          padding: 0.5rem 0.65rem;
+        }
+        .mh-btn {
+          border: 1px solid #e7ebdf;
+          border-radius: 0.6rem;
+          padding: 0.5rem 0.75rem;
+          background: #fff;
+          font-weight: 700;
+        }
+        .mh-actions {
+          display: flex;
+          gap: 10px;
+        }
+        .mh-ib {
+          background: #fff;
+          border: 1px solid #e7ebdf;
+          border-radius: 0.7rem;
+          width: 42px;
+          height: 42px;
+          display: grid;
+          place-items: center;
+          color: #2d3018;
+        }
+        .mh-results {
+          overflow: auto;
+          border-top: 1px solid #eef0ea;
+          padding-top: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .mh-res {
+          text-align: left;
+          border: 1px solid #eef0ea;
+          border-radius: 0.6rem;
+          padding: 0.55rem 0.65rem;
+          background: #fff;
+          font-size: 14px;
+        }
+        .mh-res b {
+          margin-right: 0.4rem;
+        }
+        .mh-empty {
+          color: #6b735f;
+          font-size: 12px;
+        }
       `}</style>
     </>
   );
