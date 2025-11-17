@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type Hit = { id: string; page: number; snippet: string };
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
@@ -26,11 +26,42 @@ export default function MobileHeader(p: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // ESC → close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     window.addEventListener("keydown", onKey, { passive: true });
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // HW Back button → close (push a marker state when opening)
+  useEffect(() => {
+    if (!open) return;
+    const marker = { __mh_open: true };
+    try { history.pushState(marker, ""); } catch {}
+    const onPop = () => setOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open]);
+
+  // Close by swipe-down on the panel
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open || !panelRef.current) return;
+    let y0 = 0, dy = 0, moved = false;
+    const onStart = (e: TouchEvent) => { y0 = e.touches[0].clientY; dy = 0; moved = true; };
+    const onMove  = (e: TouchEvent) => { if (!moved) return; dy = e.touches[0].clientY - y0; };
+    const onEnd   = () => { if (dy > 60) setOpen(false); moved = false; };
+
+    const el = panelRef.current;
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove",  onMove,  { passive: true });
+    el.addEventListener("touchend",   onEnd,   { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove",  onMove);
+      el.removeEventListener("touchend",   onEnd);
+    };
+  }, [open]);
 
   const showActions = mounted && !p.splashActive;
   const hasQuery = p.searchQuery.trim().length > 0;
@@ -54,48 +85,25 @@ export default function MobileHeader(p: Props) {
       {open && (
         <div className="mh-drawer" role="dialog" aria-modal="true">
           <div className="mh-dim" onClick={() => setOpen(false)} />
-          <div className="mh-panel">
-            {/* CONTENT (results OR bookmarks) */}
+          <div ref={panelRef} className="mh-panel">
+            {/* CONTENT: результати над полем пошуку; якщо пошуку немає — просто порожній простір */}
             <div className="mh-content">
-              {hasQuery || p.searching ? (
+              {(hasQuery || p.searching) && (
                 <>
                   <div className="mh-sec-hd">Search results</div>
                   <div className="mh-list">
                     {p.searching && <div className="mh-empty">Searching…</div>}
                     {!p.searching && p.hits.length === 0 && <div className="mh-empty">No matches.</div>}
-                    {!p.searching &&
-                      p.hits.map((h) => (
-                        <button
-                          key={h.id}
-                          className="mh-item"
-                          onClick={() => { p.onGoto(h.page); setOpen(false); }}
-                          title={`Go to p.${h.page}`}
-                        >
-                          <b>p.{h.page}</b> <span>{h.snippet}</span>
-                        </button>
-                      ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mh-sec-hd">Bookmarks</div>
-                  <div className="mh-list">
-                    {bmSorted.length === 0 ? (
-                      <div className="mh-empty">No bookmarks yet.</div>
-                    ) : (
-                      bmSorted.map((b) => (
-                        <button
-                          key={b.id}
-                          className="mh-bm"
-                          onClick={() => { p.onGoto(b.page); setOpen(false); }}
-                          title={`Go to p.${b.page}`}
-                        >
-                          <span className="mh-dot" style={{ background: b.color || "#f47e20" }} />
-                          <span className="mh-bm-title">{b.label}</span>
-                          <span className="mh-bm-meta">p.{b.page}</span>
-                        </button>
-                      ))
-                    )}
+                    {!p.searching && p.hits.map((h) => (
+                      <button
+                        key={h.id}
+                        className="mh-item"
+                        onClick={() => { p.onGoto(h.page); setOpen(false); }}
+                        title={`Go to p.${h.page}`}
+                      >
+                        <b>p.{h.page}</b> <span>{h.snippet}</span>
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
@@ -125,7 +133,32 @@ export default function MobileHeader(p: Props) {
               </div>
             </div>
 
-            {/* NEW: explicit Close button */}
+            {/* BOOKMARKS — одразу ПІД полем пошуку; приховуються під час активного пошуку */}
+            {!hasQuery && !p.searching && (
+              <div className="mh-bookmarks">
+                <div className="mh-sec-hd">Bookmarks</div>
+                <div className="mh-list">
+                  {bmSorted.length === 0 ? (
+                    <div className="mh-empty">No bookmarks yet.</div>
+                  ) : (
+                    bmSorted.map((b) => (
+                      <button
+                        key={b.id}
+                        className="mh-bm"
+                        onClick={() => { p.onGoto(b.page); setOpen(false); }}
+                        title={`Go to p.${b.page}`}
+                      >
+                        <span className="mh-dot" style={{ background: b.color || "#f47e20" }} />
+                        <span className="mh-bm-title">{b.label}</span>
+                        <span className="mh-bm-meta">p.{b.page}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Close */}
             <div className="mh-close-wrap">
               <button
                 className="mh-close-btn"
@@ -177,12 +210,12 @@ export default function MobileHeader(p: Props) {
         .mh-item{ text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem; background:#fff; font-size:14px; display:block; }
         .mh-item b{ margin-right:.4rem; }
 
+        .mh-bookmarks{ }
         .mh-bm{ border:1px solid #eef0ea; background:#fff; border-radius:.6rem; padding:.55rem .65rem; display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; text-align:left; }
         .mh-dot{ width:12px; height:12px; border-radius:999px; border:1px solid rgba(0,0,0,.12); }
         .mh-bm-title{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mh-bm-meta{ color:#6b735f; font-size:12px; }
 
-        /* Close button */
         .mh-close-wrap{ padding-top:2px; }
         .mh-close-btn{
           width:100%; padding:.6rem .9rem; border:1px solid #e7ebdf; border-radius:.65rem;
