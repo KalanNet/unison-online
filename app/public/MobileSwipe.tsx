@@ -105,36 +105,48 @@ export default function MobileSwipe({
   };
 
   // ====== Обчислення “контент збільшений” ======
-  const [contentZoomed, setContentZoomed] = React.useState(false);
+  // --- стало ---
+const [contentZoomed, setContentZoomed] = React.useState(false);
 
-  const recomputeZoomed = React.useCallback(() => {
-    if (typeof isZoomed === "boolean") { setContentZoomed(isZoomed); return; }
-    const el = panEl;
-    if (!el) { setContentZoomed(false); return; }
+// 1) якщо isZoomed переданий ззовні — керуємо лише ним (без RO/interval)
+React.useEffect(() => {
+  if (typeof isZoomed === "boolean") {
+    setContentZoomed(isZoomed);
+  }
+}, [isZoomed]);
 
-    const scale = readElementScale(el);
-    const scrollZoomed =
-      el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+// 2) fallback-режим (коли isZoomed не передають)
+//    – трохи більший допуск проти сабпікселів
+const recomputeZoomed = React.useCallback(() => {
+  if (typeof isZoomed === "boolean") return; // керує зовнішній прапорець
+  const el = panEl;
+  if (!el) { setContentZoomed(false); return; }
 
-    setContentZoomed(scale > 1.01 || scrollZoomed);
-  }, [panEl, isZoomed]);
+  const scale = readElementScale(el);
+  const scrollZoomed =
+    el.scrollWidth > el.clientWidth + 4 || el.scrollHeight > el.clientHeight + 4;
 
-  React.useEffect(() => { recomputeZoomed(); }, [recomputeZoomed]);
+  setContentZoomed(scale > 1.01 || scrollZoomed);
+}, [panEl, isZoomed]);
 
-  // Якщо внутрішній контейнер змінює розміри/скрол — трекаємо
-  React.useEffect(() => {
-    const el = panEl;
-    if (!el) return;
-    const ro = new ResizeObserver(recomputeZoomed);
-    ro.observe(el);
-    let int: any = null;
-    // просте опитування скролу (дешево), бо scroll events не завжди доходять до нас
-    int = window.setInterval(recomputeZoomed, 200);
-    return () => {
-      ro.disconnect();
-      if (int) window.clearInterval(int);
-    };
-  }, [panEl, recomputeZoomed]);
+React.useEffect(() => {
+  if (typeof isZoomed === "boolean") return; // не підписуємося у керованому режимі
+  recomputeZoomed();
+}, [recomputeZoomed]);
+
+React.useEffect(() => {
+  if (typeof isZoomed === "boolean") return; // не підписуємося у керованому режимі
+  const el = panEl;
+  if (!el) return;
+  const ro = new ResizeObserver(recomputeZoomed);
+  ro.observe(el);
+  const int = window.setInterval(recomputeZoomed, 250);
+  return () => {
+    ro.disconnect();
+    window.clearInterval(int);
+  };
+}, [panEl, recomputeZoomed]);
+
 
   // ====== Коли свайп вимкнений — скидаємо трансформації ======
   const swipeBlocked = !enabled || suspendSwipe || contentZoomed || activeTouchCount.current > 1;
@@ -258,9 +270,10 @@ export default function MobileSwipe({
 
   // коли свайп заблокований — даємо браузеру/контейнеру повну свободу жестів
   const wrapperStyle: React.CSSProperties = {
-    willChange: "transform, opacity",
-    touchAction: swipeBlocked ? "auto" : "pan-y",
-  };
+  willChange: "transform, opacity",
+  // горизонтальний жест завжди наш; вертикальний скрол у цьому блоці не потрібен
+  touchAction: "none",
+};
 
   return (
     <div ref={ref} className="swipe-card" style={wrapperStyle}>

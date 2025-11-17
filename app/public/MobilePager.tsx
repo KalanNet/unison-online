@@ -173,7 +173,6 @@ export default function MobilePager(p: Props) {
   panEl={panEl ?? null}
   isZoomed={zoom > 1.001} // ← так
 >
-
           <div
             ref={pageRefCb}
             className="mpg-page"
@@ -195,7 +194,7 @@ export default function MobilePager(p: Props) {
               borderRadius: 4,
               position: "relative",
               overflow: "hidden",
-              touchAction: zoom > 1 ? "none" : "pan-y",
+              touchAction: "none",
               minHeight: 0,
             }}
           >
