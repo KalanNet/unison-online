@@ -92,13 +92,13 @@ export default function MobilePager(p: Props) {
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.current.size === 2) {
-      baseDist.current = dist();
-      baseZoom.current = zoom;
-    }
-  };
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); // ← тут
+  pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pts.current.size === 2) {
+    baseDist.current = dist();
+    baseZoom.current = zoom;
+  }
+};
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!pts.current.has(e.pointerId)) return;
@@ -120,22 +120,17 @@ export default function MobilePager(p: Props) {
     }
   };
 
-  const onPointerUp = (_e: React.PointerEvent) => {
-    // прибрати палець
-    pts.current.delete(_e.pointerId);
-    if (pts.current.size < 2) baseDist.current = null;
-
-    // якщо зум майже 1 — центр і м'яке повернення
-    if (zoom <= 1.001) {
-      setZoom(1);
-      setTx(0);
-      setTy(0);
-    } else {
-      const { maxX, maxY } = getMaxPan(zoom);
-      setTx((x) => Math.min(maxX, Math.max(-maxX, x)));
-      setTy((y) => Math.min(maxY, Math.max(-maxY, y)));
-    }
-  };
+  const onPointerUp = (e: React.PointerEvent) => {
+  (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); // ← тут
+  pts.current.delete(e.pointerId);
+  if (pts.current.size < 2) baseDist.current = null;
+  if (zoom <= 1.001) { setZoom(1); setTx(0); setTy(0); }
+  else {
+    const { maxX, maxY } = getMaxPan(zoom);
+    setTx((x) => Math.min(maxX, Math.max(-maxX, x)));
+    setTy((y) => Math.min(maxY, Math.max(-maxY, y)));
+  }
+};
 
   // Кламп у рендері по реальних межах (без магічних чисел)
   const { maxX: clampX, maxY: clampY } = getMaxPan(zoom);
@@ -171,13 +166,14 @@ export default function MobilePager(p: Props) {
         }}
       >
         <MobileSwipe
-          key={pageNum}
-          onSwipeLeft={ctrl.goNext}
-          onSwipeRight={ctrl.goPrev}
-          enabled
-          panEl={panEl ?? null}
-          isZoomed={zoom > 1}
-        >
+  key={pageNum}
+  onSwipeLeft={ctrl.goNext}
+  onSwipeRight={ctrl.goPrev}
+  enabled
+  panEl={panEl ?? null}
+  isZoomed={zoom > 1.001} // ← так
+>
+
           <div
             ref={pageRefCb}
             className="mpg-page"
