@@ -55,17 +55,14 @@ export default function MobileHeader(p: Props) {
         <div className="mh-drawer" role="dialog" aria-modal="true">
           <div className="mh-dim" onClick={() => setOpen(false)} />
           <div className="mh-panel">
-            {/* CONTENT AREA — fills from top to just above the input */}
+            {/* CONTENT (results OR bookmarks) */}
             <div className="mh-content">
-              {/* When searching: show results from the very top (no bookmarks). */}
               {hasQuery || p.searching ? (
                 <>
                   <div className="mh-sec-hd">Search results</div>
                   <div className="mh-list">
                     {p.searching && <div className="mh-empty">Searching…</div>}
-                    {!p.searching && p.hits.length === 0 && (
-                      <div className="mh-empty">No matches.</div>
-                    )}
+                    {!p.searching && p.hits.length === 0 && <div className="mh-empty">No matches.</div>}
                     {!p.searching &&
                       p.hits.map((h) => (
                         <button
@@ -80,7 +77,6 @@ export default function MobileHeader(p: Props) {
                   </div>
                 </>
               ) : (
-                /* No search: bookmarks at the very top */
                 <>
                   <div className="mh-sec-hd">Bookmarks</div>
                   <div className="mh-list">
@@ -105,7 +101,7 @@ export default function MobileHeader(p: Props) {
               )}
             </div>
 
-            {/* SINGLE search field pinned at the bottom */}
+            {/* SEARCH input pinned at the bottom */}
             <div className="mh-row mh-row-bottom">
               <div className="mh-inp-wrap">
                 <input
@@ -128,6 +124,19 @@ export default function MobileHeader(p: Props) {
                 )}
               </div>
             </div>
+
+            {/* NEW: explicit Close button */}
+            <div className="mh-close-wrap">
+              <button
+                className="mh-close-btn"
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close menu"
+                title="Close"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -147,7 +156,6 @@ export default function MobileHeader(p: Props) {
           border-left:1px solid #e7ebdf; border-radius:12px 0 0 12px;
         }
 
-        /* Fills available space */
         .mh-content{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; overflow:hidden; }
         .mh-sec-hd{ font-weight:800; }
         .mh-list{ flex:1 1 auto; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-right:2px; }
@@ -158,8 +166,7 @@ export default function MobileHeader(p: Props) {
         .mh-inp-wrap{ position:relative; width:100%; }
         .mh-inp{
           width:100%; border:1px solid #e7ebdf; border-radius:.6rem; padding:.55rem .9rem;
-          padding-right:2.0rem; /* space for clear button */
-          background:#fafbf8;
+          padding-right:2.0rem; background:#fafbf8;
         }
         .mh-clear{
           position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
@@ -167,19 +174,21 @@ export default function MobileHeader(p: Props) {
           background:#fff; font-weight:900; line-height:1; display:grid; place-items:center;
         }
 
-        .mh-item{
-          text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem;
-          background:#fff; font-size:14px; display:block;
-        }
+        .mh-item{ text-align:left; border:1px solid #eef0ea; border-radius:.6rem; padding:.55rem .65rem; background:#fff; font-size:14px; display:block; }
         .mh-item b{ margin-right:.4rem; }
 
-        .mh-bm{
-          border:1px solid #eef0ea; background:#fff; border-radius:.6rem;
-          padding:.55rem .65rem; display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; text-align:left;
-        }
+        .mh-bm{ border:1px solid #eef0ea; background:#fff; border-radius:.6rem; padding:.55rem .65rem; display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; text-align:left; }
         .mh-dot{ width:12px; height:12px; border-radius:999px; border:1px solid rgba(0,0,0,.12); }
         .mh-bm-title{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mh-bm-meta{ color:#6b735f; font-size:12px; }
+
+        /* Close button */
+        .mh-close-wrap{ padding-top:2px; }
+        .mh-close-btn{
+          width:100%; padding:.6rem .9rem; border:1px solid #e7ebdf; border-radius:.65rem;
+          background:#fff; font-weight:800; color:#2d3018; box-shadow:0 4px 12px rgba(0,0,0,.06);
+        }
+        .mh-close-btn:active{ transform:translateY(0.5px); }
       `}</style>
     </>
   );
