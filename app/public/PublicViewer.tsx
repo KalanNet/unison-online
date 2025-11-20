@@ -7,6 +7,8 @@ import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
+import AdRail from "./AdRail";
+
 
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
@@ -41,6 +43,9 @@ export default function PublicViewer({
   // --- Search UI state (for header) ---
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
+    // Ad-rail state
+  const [adOpen, setAdOpen] = React.useState(true);
+
 
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
@@ -50,6 +55,12 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
+    // автопоказ на титулці / автозакриття на інших сторінках
+  React.useEffect(() => {
+    if (!ctrl || !ctrl.pdfDoc) return;
+    setAdOpen(ctrl.currentIndex === 0);
+  }, [ctrl?.currentIndex, ctrl?.pdfDoc]);
+
 
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
   const bmSorted = React.useMemo(
@@ -388,6 +399,8 @@ React.useEffect(() => {
           setQ(v);
         }}
       />
+      {/* Left advertising rail */}
+      <AdRail open={adOpen} onToggle={() => setAdOpen(v => !v)} />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
         {/* резервуємо місце і пробрасываем --bm-step у CSS */}
