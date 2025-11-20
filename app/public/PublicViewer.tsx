@@ -372,8 +372,8 @@ React.useEffect(() => {
 
    // --- ДЕСКТОП (FlipBook) ---
   return (
-    <div className="viewer-root">
-      <LeftAdsPanel />   {/* плаваюча ліва панель поверх всього */}
+  <div className="viewer-root">
+      <LeftAdsPanel autoCollapsed={!ctrl.single} />
 
       <EditorHeader
         title={ctrl.title}

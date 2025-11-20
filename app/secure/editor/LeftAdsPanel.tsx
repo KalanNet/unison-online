@@ -3,10 +3,22 @@
 
 import React from "react";
 
-export default function LeftAdsPanel() {
+type LeftAdsPanelProps = {
+  /** Зовнішній прапорець: чи має панель бути згорнута */
+  autoCollapsed?: boolean;
+};
+
+export default function LeftAdsPanel({ autoCollapsed }: LeftAdsPanelProps) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
+
+  // Синхронізація з зовнішнім прапорцем (фліпбук перейшов у 2-сторінковий режим)
+  React.useEffect(() => {
+    if (typeof autoCollapsed === "boolean") {
+      setCollapsed(autoCollapsed);
+    }
+  }, [autoCollapsed]);
 
   // Автоскрол вгору по колу
   React.useEffect(() => {
