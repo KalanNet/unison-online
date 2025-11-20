@@ -37,16 +37,15 @@ export default function AdRail({ open, onToggle }: Props) {
 
       <style jsx>{`
         .ad-rail {
-          position: fixed;
-          top: calc(var(--hdr, 56px) + 12px);
-          bottom: calc(var(--ftr, 64px) + 12px);
-          left: 0;
-          width: 240px;
-          z-index: 310; /* нижче за search-flyout (320), вище за стрілки/рейки */
-          transform: translateX(0);
-          transition: transform 260ms ease;
-          pointer-events: auto;
-        }
+  position: fixed;
+  inset: 80px auto 24px 0;
+  width: 240px;
+  transform: translateX(-212px);
+  transition: transform 260ms ease, opacity 260ms ease;
+  z-index: 300;                 /* ← поверх FlipBook/overlays */
+  pointer-events: none;
+}
+
 
         .ad-rail.is-closed {
           /* сховали, але залишили «вушко» 32px */
