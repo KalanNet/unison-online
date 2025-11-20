@@ -4,10 +4,8 @@
 import React from "react";
 
 type Props = {
-  open: boolean;                // чи відкрита панель зараз
-  onToggle: () => void;         // клік по стрілці
-  // коли титулка — показуємо панель автоматично (батько керує open),
-  // у картках — нейтральний текст англійською
+  open: boolean;
+  onToggle: () => void;
 };
 
 export default function AdRail({ open, onToggle }: Props) {
@@ -32,20 +30,23 @@ export default function AdRail({ open, onToggle }: Props) {
         ))}
       </div>
 
-      {/* ізольовані стилі */}
       <style jsx>{`
         .ad-rail {
           position: fixed;
-          inset: 80px auto 24px 0; /* під хедером, над футером */
+          /* прив’язуємося до змінних з PublicViewer */
+          top: calc(var(--hdr, 56px) + 12px);
+          bottom: calc(var(--ftr, 64px) + 12px);
+          left: 0;
           width: 240px;
-          transform: translateX(-212px); /* захована (залишається вушка-стрілка) */
-          transition: transform 260ms ease, opacity 260ms ease;
-          z-index: 30;
-          pointer-events: none; /* щоб не заважати клікам у вьювері, крім самої панелі */
-        }
-        .ad-rail.is-open {
+          z-index: 1100; /* вище за всі внутрішні absolute/flip-handles/search-flyout */
           transform: translateX(0);
+          transition: transform 260ms ease, opacity 260ms ease;
+          /* важливо: панель має приймати кліки в обох станах */
           pointer-events: auto;
+        }
+        .ad-rail.is-closed {
+          /* схована, але стрілка (28px) лишається видима */
+          transform: translateX(calc(-100% + 28px));
         }
 
         .ad-toggle {
@@ -61,8 +62,7 @@ export default function AdRail({ open, onToggle }: Props) {
           font-size: 20px;
           font-weight: 700;
           cursor: pointer;
-          box-shadow: 0 2px 8px rgba(0,0,0,.25);
-          pointer-events: auto;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         }
         .chev {
           display: block;
@@ -75,15 +75,15 @@ export default function AdRail({ open, onToggle }: Props) {
           width: 100%;
           overflow: auto;
           padding: 12px;
-          background: #24363b; /* близько до фону в’ювера */
-          border-right: 1px solid rgba(255,255,255,.08);
-          box-shadow: 0 6px 18px rgba(0,0,0,.35);
+          background: #24363b;
+          border-right: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
           border-radius: 0 8px 8px 0;
         }
 
         .ad-card {
           background: #2b4046;
-          border: 2px dashed #ff4d4f;  /* тимчасовий червоний бордер як у макеті */
+          border: 2px dashed #ff4d4f; /* тимчасовий червоний бордер для тесту */
           border-radius: 10px;
           padding: 12px;
           margin-bottom: 12px;
