@@ -55,14 +55,6 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
-    // автопоказ на титулці / автозакриття після 2-ї сторінки
-React.useEffect(() => {
-  if (!ctrl || !ctrl.pdfDoc) return;
-  // деякі конфіги FlipBook після старту віддають 1 на титулці
-  const idx = Number.isFinite(ctrl.currentIndex) ? ctrl.currentIndex : 0;
-  // відкрито, поки користувач на титулці або ще не встиг гортати (0 або 1)
-  setAdOpen(idx <= 1);
-}, [ctrl?.currentIndex, ctrl?.pdfDoc]);
 
 
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
@@ -446,7 +438,16 @@ React.useEffect(() => {
               useMouseEvents={false}
               clickEventForward
               startPage={(initPageRef.current ?? 0) as number}
-              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+                            onFlip={(e: { data: number }) => {
+                const pageIndex = typeof e.data === "number" ? e.data : 0;
+                ctrl!.setCurrentIndex(pageIndex);
+
+                // якщо користувач пішов далі обкладинки (0 або 1) — автоматично сховаємо панель
+                if (pageIndex > 1 && adOpen) {
+                  setAdOpen(false);
+                }
+              }}
+
               style={{
                 width: "100%",
                 height: "100%",
