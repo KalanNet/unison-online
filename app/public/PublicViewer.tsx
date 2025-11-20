@@ -55,11 +55,14 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
-    // автопоказ на титулці / автозакриття на інших сторінках
-  React.useEffect(() => {
-    if (!ctrl || !ctrl.pdfDoc) return;
-    setAdOpen(ctrl.currentIndex === 0);
-  }, [ctrl?.currentIndex, ctrl?.pdfDoc]);
+    // автопоказ на титулці / автозакриття після 2-ї сторінки
+React.useEffect(() => {
+  if (!ctrl || !ctrl.pdfDoc) return;
+  // деякі конфіги FlipBook після старту віддають 1 на титулці
+  const idx = Number.isFinite(ctrl.currentIndex) ? ctrl.currentIndex : 0;
+  // відкрито, поки користувач на титулці або ще не встиг гортати (0 або 1)
+  setAdOpen(idx <= 1);
+}, [ctrl?.currentIndex, ctrl?.pdfDoc]);
 
 
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
