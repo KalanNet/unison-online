@@ -46,6 +46,10 @@ export default function AdRail({ open, onToggle }: Props) {
   pointer-events: none;
 }
 
+.ad-rail.is-open {
+  transform: translateX(0);      /* ← показуємо панель повністю */
+  pointer-events: auto;          /* ← даємо можливість кліків */
+}
 
         .ad-rail.is-closed {
           /* сховали, але залишили «вушко» 32px */
