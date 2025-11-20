@@ -20,7 +20,7 @@ export default function LeftAdsPanel() {
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
 
-          width: 210px;
+          width: 400px;
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           display: flex;
@@ -32,7 +32,7 @@ export default function LeftAdsPanel() {
 
         .lh-ads-slot {
           /* Картки вдвічі вищі: було 110px */
-          flex: 0 0 220px;
+          flex: 0 0 600px;
           border-radius: 10px;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.09);
