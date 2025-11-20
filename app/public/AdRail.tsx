@@ -3,12 +3,15 @@
 
 import React from "react";
 
-type Props = {
-  open: boolean;
-  onToggle: () => void;
-};
+type Props = { open: boolean; onToggle: () => void };
 
 export default function AdRail({ open, onToggle }: Props) {
+  // тимчасовий лог для перевірки монтування
+  React.useEffect(() => {
+    // @ts-ignore
+    console.log("[AdRail] mounted, open =", open);
+  }, [open]);
+
   return (
     <aside className={`ad-rail ${open ? "is-open" : "is-closed"}`} aria-label="Advertising rail">
       <button
@@ -31,44 +34,39 @@ export default function AdRail({ open, onToggle }: Props) {
       </div>
 
       <style jsx>{`
+        /* ===== СУПЕР-ЯВНІ СТИЛІ ДЛЯ ДІАГНОСТИКИ ===== */
         .ad-rail {
           position: fixed;
-          /* прив’язуємося до змінних з PublicViewer */
-          top: calc(var(--hdr, 56px) + 12px);
-          bottom: calc(var(--ftr, 64px) + 12px);
+          top: 0;                /* без залежності від var(--hdr) */
+          bottom: 0;             /* без залежності від var(--ftr) */
           left: 0;
-          width: 240px;
-          z-index: 1100; /* вище за всі внутрішні absolute/flip-handles/search-flyout */
+          width: 250px;
+          z-index: 99999;        /* вище за все */
           transform: translateX(0);
-          transition: transform 260ms ease, opacity 260ms ease;
-          /* важливо: панель має приймати кліки в обох станах */
-          pointer-events: auto;
+          transition: transform 260ms ease;
+          background: rgba(255, 0, 0, 0.03); /* щоб точно було видно область */
+          outline: 3px solid #ff4d4f;        /* помітний бордер для тесту */
         }
         .ad-rail.is-closed {
-          /* схована, але стрілка (28px) лишається видима */
-          transform: translateX(calc(-100% + 28px));
+          transform: translateX(calc(-100% + 32px)); /* «вушко» 32px завжди видно */
         }
 
         .ad-toggle {
           position: absolute;
           top: 40%;
-          right: -28px;
-          width: 28px;
-          height: 56px;
-          border-radius: 0 8px 8px 0;
+          right: -32px;
+          width: 32px;
+          height: 64px;
+          border-radius: 0 10px 10px 0;
           border: none;
           background: #e3e7ea;
           color: #1a2b2f;
-          font-size: 20px;
-          font-weight: 700;
+          font-size: 22px;
+          font-weight: 800;
           cursor: pointer;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         }
-        .chev {
-          display: block;
-          transform: translateY(-1px);
-          user-select: none;
-        }
+        .chev { display: block; transform: translateY(-1px); user-select: none; }
 
         .ad-rail-inner {
           height: 100%;
@@ -83,25 +81,17 @@ export default function AdRail({ open, onToggle }: Props) {
 
         .ad-card {
           background: #2b4046;
-          border: 2px dashed #ff4d4f; /* тимчасовий червоний бордер для тесту */
+          border: 2px dashed #ff4d4f;
           border-radius: 10px;
           padding: 12px;
           margin-bottom: 12px;
           min-height: 84px;
           display: grid;
           align-content: center;
-        }
-        .ad-title {
-          font-weight: 700;
-          font-size: 14px;
           color: #fff;
-          margin-bottom: 4px;
         }
-        .ad-text {
-          font-size: 12px;
-          color: #c7d3d8;
-          line-height: 1.25;
-        }
+        .ad-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+        .ad-text  { font-size: 12px; color: #c7d3d8; line-height: 1.25; }
 
         @media (max-width: 980px) {
           .ad-rail { display: none; }
