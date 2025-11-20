@@ -7,6 +7,8 @@ import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
+import LeftAdsPanel from "../secure/editor/LeftAdsPanel"; // ⬅️ ДОДАТИ ЦЕ
+
 
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
@@ -368,9 +370,11 @@ React.useEffect(() => {
   const isFrontCover = ctrl.currentIndex === 0;
   const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
 
-  // --- ДЕСКТОП (FlipBook) ---
+   // --- ДЕСКТОП (FlipBook) ---
   return (
     <div className="viewer-root">
+      <LeftAdsPanel />   {/* плаваюча ліва панель поверх всього */}
+
       <EditorHeader
         title={ctrl.title}
         onSearch={(term) => setQ(term)} // лише оновлюємо стан; пошук зробить useEffect
