@@ -366,14 +366,15 @@ React.useEffect(() => {
   }
   
 
-  // прапорці для обкладинок (десктоп)
-  const isFrontCover = ctrl.currentIndex === 0;
-  const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
+// прапорці для обкладинок (десктоп)
+const isFrontCover = ctrl.currentIndex === 0;
+const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
 
-   // --- ДЕСКТОП (FlipBook) ---
-  return (
+// --- ДЕСКТОП (FlipBook) ---
+return (
   <div className="viewer-root">
-      <LeftAdsPanel autoCollapsed={!ctrl.single} />
+      {/* Панель відкрита тільки на титулці, на всіх інших сторінках ховається */}
+      <LeftAdsPanel autoCollapsed={!isFrontCover} />
 
       <EditorHeader
         title={ctrl.title}
