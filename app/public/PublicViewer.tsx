@@ -442,10 +442,7 @@ React.useEffect(() => {
                 const pageIndex = typeof e.data === "number" ? e.data : 0;
                 ctrl!.setCurrentIndex(pageIndex);
 
-                // якщо користувач пішов далі обкладинки (0 або 1) — автоматично сховаємо панель
-                if (pageIndex > 1 && adOpen) {
-                  setAdOpen(false);
-                }
+
               }}
 
               style={{
