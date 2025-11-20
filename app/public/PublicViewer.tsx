@@ -7,8 +7,6 @@ import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
-import AdRail from "./AdRail";
-
 
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
@@ -43,9 +41,6 @@ export default function PublicViewer({
   // --- Search UI state (for header) ---
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
-    // Ad-rail state
-  const [adOpen, setAdOpen] = React.useState(true);
-
 
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
@@ -55,7 +50,6 @@ export default function PublicViewer({
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
-
 
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
   const bmSorted = React.useMemo(
@@ -394,8 +388,6 @@ React.useEffect(() => {
           setQ(v);
         }}
       />
-      {/* Left advertising rail */}
-      <AdRail open={adOpen} onToggle={() => setAdOpen(v => !v)} />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
         {/* резервуємо місце і пробрасываем --bm-step у CSS */}
@@ -438,13 +430,7 @@ React.useEffect(() => {
               useMouseEvents={false}
               clickEventForward
               startPage={(initPageRef.current ?? 0) as number}
-                            onFlip={(e: { data: number }) => {
-                const pageIndex = typeof e.data === "number" ? e.data : 0;
-                ctrl!.setCurrentIndex(pageIndex);
-
-
-              }}
-
+              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
               style={{
                 width: "100%",
                 height: "100%",
