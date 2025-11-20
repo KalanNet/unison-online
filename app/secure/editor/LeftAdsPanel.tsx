@@ -73,14 +73,14 @@ export default function LeftAdsPanel() {
           padding: 18px 14px;
           z-index: 1050;
           box-shadow: 4px 0 18px rgba(0, 0, 0, 0.32);
-          overflow: hidden;
+          overflow: visible; /* щоб стрілка могла вилазити назовні */
           transition: transform 0.35s ease;
         }
 
-        /* коли згорнута — зсуваємо майже повністю вліво,
-           залишаючи ~40px ручки */
+        /* коли згорнута — вся панель виїжджає вліво за екран,
+           у в’юпорті лишається тільки стрілка (яка висунута назовні) */
         .lh-leftads.is-collapsed {
-          transform: translateX(calc(-100% + 40px));
+          transform: translateX(-100%);
         }
 
         .lh-leftads-inner {
@@ -112,7 +112,7 @@ export default function LeftAdsPanel() {
         .lh-toggle {
           position: absolute;
           top: 50%;
-          right: 0;
+          right: -40px; /* трохи назовні панелі */
           transform: translateY(-50%);
           width: 40px;
           height: 80px;
@@ -130,17 +130,17 @@ export default function LeftAdsPanel() {
         .lh-toggle::before {
           content: "";
           display: block;
-          width: 14px;
-          height: 14px;
-          border-top: 2px solid rgba(255, 255, 255, 0.9);
-          border-right: 2px solid rgba(255, 255, 255, 0.9);
-          /* За замовчуванням — стрілка "вліво" (закрити всередину) */
-          transform: rotate(135deg);
+          width: 18px;
+          height: 18px;
+          border-left: 3px solid rgba(255, 255, 255, 0.9);
+          border-top: 3px solid rgba(255, 255, 255, 0.9);
+          /* За замовчуванням — стрілка вліво (закрити панель) */
+          transform: rotate(-45deg);
         }
 
         /* Коли панель згорнута — стрілка дивиться вправо (розгорнути) */
         .lh-leftads.is-collapsed .lh-toggle::before {
-          transform: rotate(-45deg);
+          transform: rotate(135deg);
         }
 
         .lh-toggle:hover {
