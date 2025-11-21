@@ -885,6 +885,7 @@ return (
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  playFlip(); // 🔊 звук ДО переходу
 
                   const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
                   if (ctrl.currentIndex === target) {
@@ -920,25 +921,27 @@ return (
       {/* === /RIGHT SEARCH FLYOUT === */}
 
       <ViewerFooter
-        refEl={ctrl.toolbarRef}
-        isNarrow={ctrl.isNarrow}
-        numPages={ctrl.totalPages}
-        currentIndex={ctrl.currentIndex}
-        canPrev={ctrl.canPrev}
-        canNext={ctrl.canNext}
-        goFirst={ctrl.goFirst}
-        goPrev={ctrl.goPrev}
-        goNext={ctrl.goNext}
-        goLast={ctrl.goLast}
-        pageJump={ctrl.pageJump}
-        setPageJump={ctrl.setPageJump}
-        submitJump={footerApi.submitJump}
-        loupeOn={ctrl.loupeOn}
-        setLoupeOn={ctrl.setLoupeOn}
-        loupeState={ctrl.loupe}
-        LOUPE_SIZE={ctrl.LOUPE_SIZE}
-        LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
-      />
+  refEl={ctrl.toolbarRef}
+  isNarrow={ctrl.isNarrow}
+  numPages={ctrl.totalPages}
+  currentIndex={ctrl.currentIndex}
+  canPrev={ctrl.canPrev}
+  canNext={ctrl.canNext}
+  /* звук ДО переходу — обгорнуті методи */
+  goFirst={footerApi.goFirst}
+  goPrev={footerApi.goPrev}
+  goNext={footerApi.goNext}
+  goLast={footerApi.goLast}
+  pageJump={ctrl.pageJump}
+  setPageJump={ctrl.setPageJump}
+  submitJump={footerApi.submitJump}
+  loupeOn={ctrl.loupeOn}
+  setLoupeOn={ctrl.setLoupeOn}
+  loupeState={ctrl.loupe}
+  LOUPE_SIZE={ctrl.LOUPE_SIZE}
+  LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
+/>
+
 
       <style jsx global>{`
         /* =========================================
