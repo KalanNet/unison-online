@@ -47,16 +47,22 @@ export default function PublicViewer({
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
 
+  // 🔇 локальний мут
+const [soundMuted, setSoundMuted] = React.useState(false);
+const toggleSound = React.useCallback(() => setSoundMuted(v => !v), []);
+
+
 // 🔊 один-єдиний audio-об’єкт
 const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
 const playFlip = React.useCallback(() => {
+  if (soundMuted) return;           // ⬅️ якщо вимкнено — не граємо
   const a = flipAudioRef.current;
   if (!a) return;
   try {
     a.currentTime = 0;
     void a.play();
   } catch {}
-}, []);
+}, [soundMuted]);
 
 // 1) ХУК КОНТРОЛЕРА — без onFlip, звук вмикаємо самі
 const ctrl = useViewerController({ file, title });
@@ -940,7 +946,12 @@ return (
   loupeState={ctrl.loupe}
   LOUPE_SIZE={ctrl.LOUPE_SIZE}
   LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
+
+  /* ⬇️ ось тут було помилково з ctrl */
+  soundMuted={soundMuted}
+  toggleSound={toggleSound}
 />
+
 
 
       <style jsx global>{`
