@@ -47,20 +47,19 @@ export default function PublicViewer({
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
 
-  // 🔊 один-єдиний audio-об’єкт
-  const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
-  const playFlip = React.useCallback(() => {
-    const a = flipAudioRef.current;
-    if (!a) return;
-    try {
-      a.currentTime = 0;
-      void a.play();
-    } catch {}
-  }, []);
+// 🔊 один-єдиний audio-об’єкт
+const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
+const playFlip = React.useCallback(() => {
+  const a = flipAudioRef.current;
+  if (!a) return;
+  try {
+    a.currentTime = 0;
+    void a.play();
+  } catch {}
+}, []);
 
-
-  // 1) ХУК КОНТРОЛЕРА — БЕЗ try/catch і setState під час рендера
-  const ctrl = useViewerController({ file, title, onFlip: playFlip });
+// 1) ХУК КОНТРОЛЕРА — без onFlip, звук вмикаємо самі
+const ctrl = useViewerController({ file, title });
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
@@ -102,14 +101,17 @@ export default function PublicViewer({
 
   /* ---------- ВИПРАВЛЕНИЙ jumpToPdfPage ---------- */
   const jumpToPdfPage = React.useCallback(
-    (page1: number) => {
-      if (!ctrl) return;
+  (page1: number) => {
+    if (!ctrl) return;
 
-      const total = ctrl.totalPages || 0;
-      const safePage =
-        total > 0
-          ? Math.max(1, Math.min(total, page1 || 1))
-          : Math.max(1, page1 || 1);
+    // 🔊 звук на старті стрибка
+    playFlip();
+
+    const total = ctrl.totalPages || 0;
+    const safePage =
+      total > 0
+        ? Math.max(1, Math.min(total, page1 || 1))
+        : Math.max(1, page1 || 1);
 
       // поточний розворот у PDF-номерах (1-based)
       const curr = ctrl.currentIndex + 1;
@@ -290,53 +292,66 @@ React.useEffect(() => {
     };
 
         const mCtrl = {
-      ...ctrl,
-      goToPage: (idx: number) => {
-        const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
-        ctrl.setCurrentIndex(safe);
-        ensureRendered(safe);
-        warmPagesAround(safe);
-      },
-      goNext: () => {
-        if (!ctrl.canNext) return;
-        const next = ctrl.currentIndex + 1;
-        const safe = Math.min(next, ctrl.totalPages - 1);
-        ctrl.setCurrentIndex(safe);
-        ensureRendered(safe);
-        warmPagesAround(safe);
-      },
-      goPrev: () => {
-        if (!ctrl.canPrev) return;
-        const prev = ctrl.currentIndex - 1;
-        const safe = Math.max(prev, 0);
-        ctrl.setCurrentIndex(safe);
-        ensureRendered(safe);
-        warmPagesAround(safe);
-      },
-      goFirst: () => {
-        if (!ctrl.totalPages) return;
-        const idx = 0;
-        ctrl.setCurrentIndex(idx);
-        ensureRendered(idx);
-        warmPagesAround(idx);
-      },
-      goLast: () => {
-        if (!ctrl.totalPages) return;
-        const idx = ctrl.totalPages - 1;
-        ctrl.setCurrentIndex(idx);
-        ensureRendered(idx);
-        warmPagesAround(idx);
-      },
-      submitJump: () => {
-        const n = parseInt(String(ctrl.pageJump), 10);
-        if (!Number.isFinite(n)) return;
-        const target = Math.max(1, Math.min(n, ctrl.totalPages)) - 1; // 0-based
-        const safe = Math.max(0, Math.min(target, ctrl.totalPages - 1));
-        ctrl.setCurrentIndex(safe);
-        ensureRendered(safe);
-        warmPagesAround(safe);
-      },
-    };
+  ...ctrl,
+  goToPage: (idx: number) => {
+    const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
+    if (safe === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+  goNext: () => {
+    if (!ctrl.canNext) return;
+    const next = ctrl.currentIndex + 1;
+    const safe = Math.min(next, ctrl.totalPages - 1);
+    if (safe === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+  goPrev: () => {
+    if (!ctrl.canPrev) return;
+    const prev = ctrl.currentIndex - 1;
+    const safe = Math.max(prev, 0);
+    if (safe === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+  goFirst: () => {
+    if (!ctrl.totalPages) return;
+    const idx = 0;
+    if (idx === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(idx);
+    ensureRendered(idx);
+    warmPagesAround(idx);
+  },
+  goLast: () => {
+    if (!ctrl.totalPages) return;
+    const idx = ctrl.totalPages - 1;
+    if (idx === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(idx);
+    ensureRendered(idx);
+    warmPagesAround(idx);
+  },
+  submitJump: () => {
+    const n = parseInt(String(ctrl.pageJump), 10);
+    if (!Number.isFinite(n)) return;
+    const target = Math.max(1, Math.min(n, ctrl.totalPages)) - 1;
+    const safe = Math.max(0, Math.min(target, ctrl.totalPages - 1));
+    if (safe === ctrl.currentIndex) return;
+    playFlip(); // 🔊
+    ctrl.setCurrentIndex(safe);
+    ensureRendered(safe);
+    warmPagesAround(safe);
+  },
+};
+
 
 
     return (
@@ -758,34 +773,38 @@ return (
             <div className="flip-handles" aria-hidden>
               {/* Ліві кути — попередня сторінка */}
               <button
-                className="fh tl"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-                }}
-              />
-              <button
-                className="fh bl"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-                }}
-              />
-              {/* Праві кути — наступна сторінка */}
-              <button
-                className="fh tr"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-                }}
-              />
-              <button
-                className="fh br"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-                }}
-              />
+  className="fh tl"
+  onMouseDown={(e) => {
+    e.preventDefault();
+    playFlip(); // 🔊
+    (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
+  }}
+/>
+<button
+  className="fh bl"
+  onMouseDown={(e) => {
+    e.preventDefault();
+    playFlip(); // 🔊
+    (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
+  }}
+/>
+<button
+  className="fh tr"
+  onMouseDown={(e) => {
+    e.preventDefault();
+    playFlip(); // 🔊
+    (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
+  }}
+/>
+<button
+  className="fh br"
+  onMouseDown={(e) => {
+    e.preventDefault();
+    playFlip(); // 🔊
+    (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
+  }}
+/>
+
             </div>
           </div>
         </div>

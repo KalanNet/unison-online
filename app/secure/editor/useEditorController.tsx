@@ -86,19 +86,6 @@ export function useViewerController({
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-    const firstIndexRef = useRef(true);
-
-  // 🔊 ЄДИНА точка, де викликаємо звук
-  useEffect(() => {
-    if (!onFlip) return;          // в адмінці звуку немає
-    if (firstIndexRef.current) {  // перший рендер – без звуку
-      firstIndexRef.current = false;
-      return;
-    }
-    onFlip();
-  }, [currentIndex, onFlip]);
-
-
   const [fitScale, setFitScale] = useState(1);
   const [pageW, setPageW] = useState<number>(1000);
   const [pageH, setPageH] = useState<number>(1414);
