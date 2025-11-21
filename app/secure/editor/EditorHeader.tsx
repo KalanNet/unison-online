@@ -13,6 +13,9 @@ type Props = {
   searchQuery?: string;
   onSearchChange?: (v: string) => void;
 
+  /** підказка з контролера: фактичне слово, за яким знайшли результати */
+  searchSuggestion?: string;
+
   /** для кнопки Download */
   file: string;
 
@@ -31,10 +34,11 @@ export default function EditorHeader({
   title,
   onSearch,
   isSearching,
-    searchOpen,
+  searchOpen,
   onSearchToggle,
   searchQuery,
   onSearchChange,
+  searchSuggestion,
   file,
   isFs,
   toggleFullscreen,
@@ -46,8 +50,19 @@ export default function EditorHeader({
     if (q) onSearch(q);
   };
 
+  const normalizedQuery = (searchQuery ?? "").toLowerCase();
+  const normalizedSuggestion = (searchSuggestion ?? "").toLowerCase();
+  const hasSuggestion =
+    !!searchSuggestion && normalizedSuggestion !== normalizedQuery;
+
   return (
-    <header className="local-header" style={{ background: "#fafbf8", borderBottom: "1px solid #e9ede3" }}>
+    <header
+      className="local-header"
+      style={{
+        background: "#fafbf8",
+        borderBottom: "1px solid #e9ede3",
+      }}
+    >
       <div
         className="container"
         style={{
@@ -74,101 +89,167 @@ export default function EditorHeader({
           {title || "Flipbook Editor"}
         </h1>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
           {/* Search */}
-{searchOpen ? (
-  <input
-    className="lh-search"
-    value={searchQuery ?? ""}
-    onChange={(e) => onSearchChange?.(e.target.value)}
-    placeholder="Search…"
-    aria-label="Search in PDF"
-    autoFocus
-    onKeyDown={(e) => {
-      if (e.key === "Escape") {
-        onSearchChange?.("");
-        onSearchToggle?.(false);
-      }
-      if (e.key === "Enter") {
-        onSearch?.(searchQuery ?? "");
-      }
-    }}
-    style={{ width: 180 }}
-  />
-) : (
-  <button
-    className="lh-iconbtn"
-    onClick={() => onSearchToggle?.(true)}
-    title="Search"
-    disabled={!!isSearching}
-    aria-label="Search"
-  >
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M20 20l-4.35-4.35" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-    </svg>
-  </button>
-)}
+          {searchOpen ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <input
+                className="lh-search"
+                value={searchQuery ?? ""}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                placeholder="Search…"
+                aria-label="Search in PDF"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    onSearchChange?.("");
+                    onSearchToggle?.(false);
+                  }
+                  if (e.key === "Enter") {
+                    onSearch?.(searchQuery ?? "");
+                  }
+                }}
+                style={{ width: 180 }}
+              />
 
-
+              {/* Did-you-mean / фактичне слово для пошуку */}
+              {hasSuggestion && (
+                <div className="lh-hint">
+                  Showing results for{" "}
+                  <button
+                    type="button"
+                    className="lh-hint-btn"
+                    onClick={() => {
+                      onSearchChange?.(searchSuggestion!);
+                      onSearch(searchSuggestion!);
+                    }}
+                  >
+                    {searchSuggestion}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              className="lh-iconbtn"
+              onClick={() => onSearchToggle?.(true)}
+              title="Search"
+              disabled={!!isSearching}
+              aria-label="Search"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                />
+                <path
+                  d="M20 20l-4.35-4.35"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          )}
 
           {/* Download */}
-          <a className="lh-iconbtn" href={file} download title="Download PDF" aria-label="Download">
+          <a
+            className="lh-iconbtn"
+            href={file}
+            download
+            title="Download PDF"
+            aria-label="Download"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3v12" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M8 11l4 4 4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M4 21h16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+              <path
+                d="M12 3v12"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8 11l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M4 21h16"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
             </svg>
           </a>
 
           {/* Share */}
-<button className="lh-iconbtn" onClick={handleShare} title="Share" aria-label="Share">
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-    {/* три кола */}
-    <circle
-      cx="6"
-      cy="12"
-      r="2"
-      stroke="currentColor"
-      strokeWidth="2"
-      fill="none"
-    />
-    <circle
-      cx="18"
-      cy="6"
-      r="2"
-      stroke="currentColor"
-      strokeWidth="2"
-      fill="none"
-    />
-    <circle
-      cx="18"
-      cy="18"
-      r="2"
-      stroke="currentColor"
-      strokeWidth="2"
-      fill="none"
-    />
-    {/* лінії між ними */}
-    <path
-      d="M8 11 L16 7"
-      stroke="currentColor"
-      strokeWidth="2"
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M8 13 L16 17"
-      stroke="currentColor"
-      strokeWidth="2"
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-</button>
-
+          <button
+            className="lh-iconbtn"
+            onClick={handleShare}
+            title="Share"
+            aria-label="Share"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              {/* три кола */}
+              <circle
+                cx="6"
+                cy="12"
+                r="2"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              />
+              <circle
+                cx="18"
+                cy="6"
+                r="2"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              />
+              <circle
+                cx="18"
+                cy="18"
+                r="2"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              />
+              {/* лінії між ними */}
+              <path
+                d="M8 11 L16 7"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8 13 L16 17"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
 
           {/* Fullscreen */}
           <button
@@ -178,10 +259,34 @@ export default function EditorHeader({
             aria-label={isFs ? "Exit full screen" : "Full screen"}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 3H5a2 2 0 0 0-2 2v4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M3 15v4a2 2 0 0 0 2 2h4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M15 3h4a2 2 0 0 1 2 2v4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M21 15v4a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+              <path
+                d="M9 3H5a2 2 0 0 0-2 2v4"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d="M3 15v4a2 2 0 0 0 2 2h4"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d="M15 3h4a2 2 0 0 1 2 2v4"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d="M21 15v4a2 2 0 0 1-2 2h-4"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
 
@@ -204,33 +309,51 @@ export default function EditorHeader({
           background: #fff;
           color: #2d3018;
           border: 1px solid #e7ebdf;
-          padding: .45rem .8rem;
-          border-radius: .7rem;
-          box-shadow: 0 4px 12px rgba(0,0,0,.06);
+          padding: 0.45rem 0.8rem;
+          border-radius: 0.7rem;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
         }
         .lh-iconbtn {
           background: #fff;
           border: 1px solid #e7ebdf;
-          border-radius: .65rem;
-          padding: .42rem .6rem;
+          border-radius: 0.65rem;
+          padding: 0.42rem 0.6rem;
           line-height: 0;
           display: inline-grid;
           place-items: center;
           color: #2d3018;
-          box-shadow: 0 4px 12px rgba(0,0,0,.06);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
         }
-          .lh-search{
-  height:32px;
-  padding:6px 10px;
-  border-radius:8px;
-  border:1px solid rgba(0,0,0,.12);
-  background:#fff;
-  color:#2d3018;
-  font-size:14px;
-  min-width:0;
-}
-
-        .lh-iconbtn[disabled] { opacity: .5; pointer-events: none; }
+        .lh-search {
+          height: 32px;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid rgba(0, 0, 0, 0.12);
+          background: #fff;
+          color: #2d3018;
+          font-size: 14px;
+          min-width: 0;
+        }
+        .lh-iconbtn[disabled] {
+          opacity: 0.5;
+          pointer-events: none;
+        }
+        .lh-hint {
+          font-size: 12px;
+          color: #2d3018;
+          opacity: 0.9;
+        }
+        .lh-hint-btn {
+          background: transparent;
+          border: none;
+          padding: 0;
+          margin: 0 0 0 3px;
+          color: #2d6cdf;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
       `}</style>
     </header>
   );

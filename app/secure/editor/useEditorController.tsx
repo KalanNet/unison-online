@@ -1,168 +1,183 @@
 // app/secure/editor/useEditorController.tsx
 "use client";
 
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import HTMLFlipBook from "react-pageflip";
 const FlipBook = HTMLFlipBook as unknown as React.ComponentType<any>;
 
-
 const MOBILE_BP = 600;
-
 
 // ——— WebP capability detector (кешований) ———
 let __WEBP_OK: boolean | null = null;
 function canEncodeWebP(): boolean {
-  if (__WEBP_OK !== null) return __WEBP_OK;
-  try {
-    const t = document.createElement("canvas").toDataURL("image/webp");
-    __WEBP_OK = typeof t === "string" && t.startsWith("data:image/webp");
-  } catch {
-    __WEBP_OK = false;
-  }
-  return __WEBP_OK;
+  if (__WEBP_OK !== null) return __WEBP_OK;
+  try {
+    const t = document.createElement("canvas").toDataURL("image/webp");
+    __WEBP_OK = typeof t === "string" && t.startsWith("data:image/webp");
+  } catch {
+    __WEBP_OK = false;
+  }
+  return __WEBP_OK;
 }
-
-
 
 type PDFJS = typeof import("pdfjs-dist");
 type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
 
-
 export type SearchBox = { x: number; y: number; w: number; h: number };
 export type SearchHit = { id: string; page: number; box: SearchBox; snippet: string };
 type PageBmp = {
-  url: string; w: number; h: number;
-  links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>;
+  url: string;
+  w: number;
+  h: number;
+  links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>;
 };
 
-
 function genId() {
-  try { // @ts-ignore
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  } catch {}
-  return Math.random().toString(36).slice(2) + "-" + Date.now().toString(36);
+  try {
+    // @ts-ignore
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  } catch {}
+  return Math.random().toString(36).slice(2) + "-" + Date.now().toString(36);
 }
 function sanitizeLink(a: any): string | null {
-  let url = (a && (a.unsafeUrl || a.url)) || "";
-  if (!url) return null;
-  if (/^javascript:/i.test(url)) {
-    const m = url.match(/https?:\/\/[^\s'")]+/i) || url.match(/mailto:[^\s'")]+/i) || url.match(/tel:[^\s'")]+/i);
-    url = m ? m[0] : "";
-  }
-  return /^(https?:|mailto:|tel:)/i.test(url) ? url : null;
+  let url = (a && (a.unsafeUrl || a.url)) || "";
+  if (!url) return null;
+  if (/^javascript:/i.test(url)) {
+    const m =
+      url.match(/https?:\/\/[^\s'")]+/i) ||
+      url.match(/mailto:[^\s'")]+/i) ||
+      url.match(/tel:[^\s'")]+/i);
+    url = m ? m[0] : "";
+  }
+  return /^(https?:|mailto:|tel:)/i.test(url) ? url : null;
 }
 function useIsNarrow(max = 600) {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width:${max}px)`); const on = () => setNarrow(mq.matches);
-    on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on);
-  }, [max]);
-  return narrow;
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width:${max}px)`);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [max]);
+  return narrow;
 }
-
 
 export function useViewerController({ file, title }: { file: string; title?: string }) {
-  /* ---------- refs та базові стани ---------- */
-  const stageRef = useRef<HTMLDivElement>(null);
-  const bookRef = useRef<any>(null);
-  const localHeaderRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  /* ---------- refs та базові стани ---------- */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const bookRef = useRef<any>(null);
+  const localHeaderRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  const isNarrow = useIsNarrow(600);
+  const single = isNarrow;
+
+  const [pdfjs, setPdfjs] = useState<PDFJS | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const [fitScale, setFitScale] = useState(1);
+  const [pageW, setPageW] = useState<number>(1000);
+  const [pageH, setPageH] = useState<number>(1414);
+
+  const cacheRef = useRef<Map<number, PageBmp>>(new Map());
+
+  // app/secure/editor/useEditorController.tsx — objectURL utils
+  const urlsRef = useRef<Set<string>>(new Set());
+  function registerUrl(u: string) {
+    try {
+      urlsRef.current.add(u);
+    } catch {}
+  }
+  function revokeAllUrls() {
+    try {
+      urlsRef.current.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {}
+      });
+      urlsRef.current.clear();
+    } catch {}
+  }
+
+  // словник слів з PDF (для пошуку схожих слів)
+  const pdfWordsRef = useRef<Set<string> | null>(null);
+
+  // пошук
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [activeHit, setActiveHit] = useState<number>(-1);
+  type HighlightBox = SearchBox & { hitIndex?: number };
+
+  const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>>(
+    () => new Map()
+  );
+
+  // слово, яке фактично використали для пошуку (якщо застосували підказку)
+  const [searchSuggestion, setSearchSuggestion] = useState<string | null>(null);
+
+  // fullscreen (десктоп)
+  const [isFs, setIsFs] = useState(false);
+
+  // Share hint
+  const [shareHint, setShareHint] = useState("");
 
 
-  const isNarrow = useIsNarrow(600);
-  const single = isNarrow;
 
+  /* ---------- pdf.js init ---------- */
+  useEffect(() => {
+    let mounted = true;
+    let worker: Worker | null = null;
+    (async () => {
+      if (typeof window === "undefined") return;
+      const lib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      worker = new Worker(
+        new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url),
+        { type: "module" }
+      );
+      (lib as any).GlobalWorkerOptions.workerPort = worker;
+      if (mounted) setPdfjs(lib);
+    })();
+    return () => {
+      mounted = false;
+      try {
+        worker?.terminate();
+      } catch {}
+    };
+  }, []);
 
-  const [pdfjs, setPdfjs] = useState<PDFJS | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  /* ---------- load file ---------- */
+  useEffect(() => {
+    if (!pdfjs || !file) return;
+    (async () => {
+      // новий файл → зачистити попередні objectURL та кеш
+      revokeAllUrls();
+      cacheRef.current.clear();
+      pdfWordsRef.current = null; // скидаємо словник слів для нового PDF
 
+      const res = await fetch(file);
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const task = pdfjs.getDocument({ data: buf });
+      const doc = await task.promise;
 
-  const [fitScale, setFitScale] = useState(1);
-  const [pageW, setPageW] = useState<number>(1000);
-  const [pageH, setPageH] = useState<number>(1414);
+      setPdfDoc(doc);
+      setCurrentIndex(0);
 
+      const p1 = await doc.getPage(1);
+      const vp1 = p1.getViewport({ scale: 1 });
+      setPageW(vp1.width);
+      setPageH(vp1.height);
 
-  const cacheRef = useRef<Map<number, PageBmp>>(new Map());
+      requestAnimationFrame(() => {
+        void calcFitScale();
+        warmPagesAround(0);
+      });
+    })().catch(console.error);
+  }, [pdfjs, file]);
 
-// app/secure/editor/useEditorController.tsx — objectURL utils
-const urlsRef = useRef<Set<string>>(new Set());
-function registerUrl(u: string) {
-  try { urlsRef.current.add(u); } catch {}
-}
-function revokeAllUrls() {
-  try {
-    urlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} });
-    urlsRef.current.clear();
-  } catch {}
-}
-
-
-  // пошук
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [hits, setHits] = useState<SearchHit[]>([]);
-  const [activeHit, setActiveHit] = useState<number>(-1);
-  type HighlightBox = SearchBox & { hitIndex?: number };
-
-
-const [pageHighlights, setPageHighlights] = useState<Map<number, HighlightBox[]>>(
-  () => new Map()
-);
-
-
-
-  // fullscreen (десктоп)
-  const [isFs, setIsFs] = useState(false);
-
-
-  // Share hint
-  const [shareHint, setShareHint] = useState("");
-
-
-  /* ---------- pdf.js init ---------- */
-  useEffect(() => {
-    let mounted = true; let worker: Worker | null = null;
-    (async () => {
-      if (typeof window === "undefined") return;
-      const lib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      worker = new Worker(new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url), { type: "module" });
-      (lib as any).GlobalWorkerOptions.workerPort = worker;
-      if (mounted) setPdfjs(lib);
-    })();
-    return () => { mounted = false; try { worker?.terminate(); } catch {} };
-  }, []);
-
-
-/* ---------- load file ---------- */
-useEffect(() => {
-  if (!pdfjs || !file) return;
-  (async () => {
-    // новий файл → зачистити попередні objectURL та кеш
-    revokeAllUrls();
-    cacheRef.current.clear();
-
-    const res = await fetch(file);
-    if (!res.ok) return;
-    const buf = await res.arrayBuffer();
-    const task = pdfjs.getDocument({ data: buf });
-    const doc = await task.promise;
-
-    setPdfDoc(doc);
-    setCurrentIndex(0);
-
-    const p1 = await doc.getPage(1);
-    const vp1 = p1.getViewport({ scale: 1 });
-    setPageW(vp1.width);
-    setPageH(vp1.height);
-
-    requestAnimationFrame(() => {
-      void calcFitScale();
-      warmPagesAround(0);
-    });
-  })().catch(console.error);
-}, [pdfjs, file]);
 
 
   /* ---------- глобальна висота + fullscreen ---------- */
@@ -375,74 +390,198 @@ function warmPagesAround(idx0: number) {
 
 
 
-  /* ---------- search ---------- */
-  function normBox(x: number, y: number, w: number, h: number, PW: number, PH: number): SearchBox {
-    return { x: Math.max(0, x / PW), y: Math.max(0, y / PH), w: Math.max(0, w / PW), h: Math.max(0, h / PH) };
-  }
-  async function runSearch(query: string) {
-    if (!pdfDoc) return;
-    const q = query.trim();
-    setSearchQuery(q);
-    setActiveHit(-1);
-    setHits([]);
-    setPageHighlights(new Map());
-    if (!q) return;
+  /* ---------- search ---------- */
+  function normBox(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    PW: number,
+    PH: number
+  ): SearchBox {
+    return {
+      x: Math.max(0, x / PW),
+      y: Math.max(0, y / PH),
+      w: Math.max(0, w / PW),
+      h: Math.max(0, h / PH),
+    };
+  }
 
+  // разове будування словника слів із PDF (по всіх сторінках)
+  async function buildPdfDictionary() {
+    if (!pdfDoc) return;
+    if (pdfWordsRef.current) return; // уже побудовано
 
-    setSearching(true);
-    const nextHits: SearchHit[] = [];
-    const nextMap = new Map<number, HighlightBox[]>();
+    const dict = new Set<string>();
 
+    for (let p = 1; p <= pdfDoc.numPages; p++) {
+      const page = await pdfDoc.getPage(p);
+      const text = await page.getTextContent();
+      for (const item of text.items as any[]) {
+        const str: string = item.str ?? "";
+        if (!str) continue;
 
-    try {
-      const ql = q.toLowerCase();
-      for (let p = 1; p <= pdfDoc.numPages; p++) {
-        const page = await pdfDoc.getPage(p);
-        const vp = page.getViewport({ scale: 1 });
-        const text = await page.getTextContent();
-        for (const item of text.items as any[]) {
-          const str: string = item.str ?? "";
-          if (!str) continue;
-          if (str.toLowerCase().includes(ql)) {
-            const tr = item.transform as number[]; 
-const x = tr[4];                // ліва межа
-const yBaseline = tr[5];        // baseline (низ рядка в pdf.js)
-const w = item.width  ?? 0;
-const h = item.height ?? 0;
-const hitIndex = nextHits.length; // індекс хіта, який додамо зараз
-// top у пікселях від ВЕРХУ сторінки viewport:
-const yTopCssPx = vp.height - (yBaseline + h);
+        // простий спліт на слова + очистка від сміття
+        const parts = str.split(/[\s,.;:!?()"'«»[\]{}]+/);
+        for (const rawWord of parts) {
+          const cleaned = rawWord
+            .toLowerCase()
+            .replace(/[^a-zа-яёіїє0-9]/gi, "");
+          if (cleaned.length >= 3) {
+            dict.add(cleaned);
+          }
+        }
+      }
+    }
 
+    pdfWordsRef.current = dict;
+  }
 
-// нормалізований бокс для нашого оверлею
-const box = normBox(x, yTopCssPx, w, h, vp.width, vp.height);
+  // відстань Левенштейна між двома рядками
+  function levenshtein(a: string, b: string): number {
+    const m = a.length;
+    const n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
 
+    const dp: number[][] = Array.from({ length: m + 1 }, () =>
+      new Array(n + 1).fill(0)
+    );
 
-const hit: SearchHit = {
-  id: genId(),
-  page: p,
-  box,
-  snippet: str.length > 120 ? str.slice(0, 120) + "…" : str
-};
-nextHits.push(hit);
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
 
+    for (let i = 1; i <= m; i++) {
+      const ai = a[i - 1];
+      for (let j = 1; j <= n; j++) {
+        const bj = b[j - 1];
+        const cost = ai === bj ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1, // видалення
+          dp[i][j - 1] + 1, // вставка
+          dp[i - 1][j - 1] + cost // заміна
+        );
+      }
+    }
 
-if (!nextMap.has(p)) nextMap.set(p, []);
-nextMap.get(p)!.push({ ...box, hitIndex });
+    return dp[m][n];
+  }
 
+  // пошук найближчого слова в словнику PDF
+  function suggestFromPdfDict(input: string, maxDistance = 2): string | null {
+    const dict = pdfWordsRef.current;
+    if (!dict) return null;
 
-          }
-        }
-      }
-    } finally {
-      setSearching(false);
-    }
+    const q = input.toLowerCase();
+    let best: string | null = null;
+    let bestDist = Infinity;
 
+    for (const word of dict) {
+      const d = levenshtein(q, word);
+      if (d < bestDist) {
+        bestDist = d;
+        best = word;
+      }
+    }
 
-    setHits(nextHits);
-    setPageHighlights(nextMap);
-    if (nextHits.length) { setActiveHit(0); goToPage(nextHits[0].page); }
-  }
+    if (!best || bestDist > maxDistance) return null;
+    return best;
+  }
+
+  // допоміжний пошук по конкретному терміну (точний includes)
+  async function runExactSearch(
+    term: string
+  ): Promise<{ hits: SearchHit[]; map: Map<number, HighlightBox[]> }> {
+    if (!pdfDoc) return { hits: [], map: new Map() };
+
+    const ql = term.toLowerCase();
+    const nextHits: SearchHit[] = [];
+    const nextMap = new Map<number, HighlightBox[]>();
+
+    for (let p = 1; p <= pdfDoc.numPages; p++) {
+      const page = await pdfDoc.getPage(p);
+      const vp = page.getViewport({ scale: 1 });
+      const text = await page.getTextContent();
+      for (const item of text.items as any[]) {
+        const str: string = item.str ?? "";
+        if (!str) continue;
+        if (str.toLowerCase().includes(ql)) {
+          const tr = item.transform as number[];
+          const x = tr[4]; // ліва межа
+          const yBaseline = tr[5]; // baseline (низ рядка в pdf.js)
+          const w = item.width ?? 0;
+          const h = item.height ?? 0;
+
+          const hitIndex = nextHits.length;
+
+          // top у пікселях від ВЕРХУ сторінки viewport:
+          const yTopCssPx = vp.height - (yBaseline + h);
+
+          // нормалізований бокс для нашого оверлею
+          const box = normBox(x, yTopCssPx, w, h, vp.width, vp.height);
+
+          const hit: SearchHit = {
+            id: genId(),
+            page: p,
+            box,
+            snippet: str.length > 120 ? str.slice(0, 120) + "…" : str,
+          };
+          nextHits.push(hit);
+
+          if (!nextMap.has(p)) nextMap.set(p, []);
+          nextMap.get(p)!.push({ ...box, hitIndex });
+        }
+      }
+    }
+
+    return { hits: nextHits, map: nextMap };
+  }
+
+  async function runSearch(query: string) {
+    if (!pdfDoc) return;
+    const q = query.trim();
+    setSearchQuery(q);
+    setActiveHit(-1);
+    setHits([]);
+    setPageHighlights(new Map());
+    setSearchSuggestion(null);
+    if (!q) return;
+
+    setSearching(true);
+
+    try {
+      // будуємо словник слів PDF, якщо ще не готовий
+      await buildPdfDictionary();
+
+      // 1) пробуємо знайти за точним введеним словом
+      let effectiveTerm = q;
+      let { hits: nextHits, map: nextMap } = await runExactSearch(effectiveTerm);
+
+      // 2) якщо нічого не знайшли — пробуємо схоже слово
+      if (!nextHits.length) {
+        const suggestion = suggestFromPdfDict(q);
+        if (suggestion && suggestion !== q.toLowerCase()) {
+          const alt = await runExactSearch(suggestion);
+          if (alt.hits.length) {
+            nextHits = alt.hits;
+            nextMap = alt.map;
+            effectiveTerm = suggestion;
+            setSearchSuggestion(suggestion); // фактично використали це слово
+          }
+        }
+      }
+
+      setHits(nextHits);
+      setPageHighlights(nextMap);
+      if (nextHits.length) {
+        setActiveHit(0);
+        goToPage(nextHits[0].page);
+      }
+    } finally {
+      setSearching(false);
+    }
+  }
+
 
 
 /* ---------- navigation ---------- */
@@ -899,32 +1038,69 @@ async function publishMetaAndBookmarks(): Promise<{
   `;
 
 
-return {
-  // refs
-  stageRef, bookRef, localHeaderRef, toolbarRef, cacheRef,
-  // state
-  isNarrow, single, pdfDoc, currentIndex, setCurrentIndex,
-  fitScale, baseSize, totalPages,
-  searchQuery, setSearchQuery, searching, hits, activeHit, setActiveHit, pageHighlights,
-  isFs, shareHint,
-  // navigation
-  canPrev, canNext, goPrev, goNext, goToPage, goFirst, goLast,
-  pageJump, setPageJump, submitJump,
-  // search
-  runSearch,
-  // loupe
-  loupeOn, setLoupeOn, loupe, handlePageMouseMove, handlePageMouseLeave, LOUPE_SIZE, LOUPE_ZOOM,
-  // share/fs
-  toggleFullscreen, handleShare,
-  // css
-  globalCss,
-  bookmarks, setBookmarks, updateBookmark, addBookmark, removeBookmark, goToBookmark,
-  meta, setMeta, setFeatured,
-  publishMetaAndBookmarks,
-  
-  title: title || file || "",   // --- ось цей рядок!
-  
-};
+  return {
+    // refs
+    stageRef,
+    bookRef,
+    localHeaderRef,
+    toolbarRef,
+    cacheRef,
+    // state
+    isNarrow,
+    single,
+    pdfDoc,
+    currentIndex,
+    setCurrentIndex,
+    fitScale,
+    baseSize,
+    totalPages,
+    searchQuery,
+    setSearchQuery,
+    searching,
+    hits,
+    activeHit,
+    setActiveHit,
+    pageHighlights,
+    searchSuggestion, // ← НОВЕ поле з фактично використаним словом
+    isFs,
+    shareHint,
+    // navigation
+    canPrev,
+    canNext,
+    goPrev,
+    goNext,
+    goToPage,
+    goFirst,
+    goLast,
+    pageJump,
+    setPageJump,
+    submitJump,
+    // search
+    runSearch,
+    // loupe
+    loupeOn,
+    setLoupeOn,
+    loupe,
+    handlePageMouseMove,
+    handlePageMouseLeave,
+    LOUPE_SIZE,
+    LOUPE_ZOOM,
+    // share/fs
+    toggleFullscreen,
+    handleShare,
+    // css
+    globalCss,
+    bookmarks,
+    setBookmarks,
+    updateBookmark,
+    addBookmark,
+    removeBookmark,
+    goToBookmark,
+    meta,
+    setMeta,
+    setFeatured,
+    publishMetaAndBookmarks,
 
-
+    title: title || file || "", // --- ось цей рядок!
+  };
 }
