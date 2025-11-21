@@ -36,6 +36,15 @@ export default function EditorFooter(p: Props) {
     <>
       <footer ref={p.refEl as any} className="local-footer viewer-toolbar shrink-0 z-20" role="toolbar" aria-label="Flipbook controls">
         <div className="toolbar-inner">
+          {/* 🔇 Desktop mute toggle ЛІВОРУЧ (показуємо лише якщо передали toggleSound) */}
+          {!p.isNarrow && p.toggleSound && (
+            <button className={`toolbtn tool-sound ${p.soundMuted ? "muted" : ""}`} onClick={p.toggleSound}
+                    aria-pressed={!!p.soundMuted} title={p.soundMuted ? "Unmute page flip sound" : "Mute page flip sound"}
+                    aria-label={p.soundMuted ? "Unmute sound" : "Mute sound"}>
+              <IconSound muted={!!p.soundMuted} />
+            </button>
+          )}
+
           <button className={`toolbtn ${p.currentIndex === 0 ? "disabled" : ""}`} onClick={p.goFirst} disabled={p.currentIndex === 0} title="First page" aria-label="First page">
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M20 6l-9 6 9 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
@@ -72,17 +81,9 @@ export default function EditorFooter(p: Props) {
               <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
-
-          {/* 🔊 Desktop mute toggle (показуємо лише якщо передали toggleSound) */}
-          {!p.isNarrow && p.toggleSound && (
-            <button className={`toolbtn tool-sound ${p.soundMuted ? "muted" : ""}`} onClick={p.toggleSound}
-                    aria-pressed={!!p.soundMuted} title={p.soundMuted ? "Unmute page flip sound" : "Mute page flip sound"}
-                    aria-label={p.soundMuted ? "Unmute sound" : "Mute sound"}>
-              <IconSound muted={!!p.soundMuted} />
-            </button>
-          )}
         </div>
       </footer>
+
 
       {/* Loupe Portal (desktop only) */}
       <LoupePortal enabled={!p.isNarrow && p.loupeOn} state={p.loupeState} size={p.LOUPE_SIZE} zoom={p.LOUPE_ZOOM} />
