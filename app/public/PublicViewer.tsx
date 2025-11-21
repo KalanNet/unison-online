@@ -47,8 +47,20 @@ export default function PublicViewer({
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
 
+  // 🔊 один-єдиний audio-об’єкт
+  const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const playFlip = React.useCallback(() => {
+    const a = flipAudioRef.current;
+    if (!a) return;
+    try {
+      a.currentTime = 0;
+      void a.play();
+    } catch {}
+  }, []);
+
+
   // 1) ХУК КОНТРОЛЕРА — БЕЗ try/catch і setState під час рендера
-  const ctrl = useViewerController({ file, title });
+  const ctrl = useViewerController({ file, title, onFlip: playFlip });
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
@@ -328,42 +340,44 @@ React.useEffect(() => {
 
 
     return (
-  <div className="viewer-root" style={{ background: "#21353a" }}>
-            <MobileHeader
-          title={ctrl.title}
-          file={file}
-          searchQuery={q}
-          setSearchQuery={setQ}
-          runSearch={(qq: string) => setQ(qq)}
-          searching={ctrl.searching}
-          hits={ctrl.hits}
-          onGoto={(p: number) => mCtrl.goToPage(p - 1)}
-          onShare={ctrl.handleShare}
-          bookmarks={bookmarks}             // ← pass bookmarks to the drawer
-          splashActive={false}
-        />
+    <div className="viewer-root" style={{ background: "#21353a" }}>
+      {/* 🔊 звук перегортання сторінок */}
+      <audio ref={flipAudioRef} src="/flipsound.ogg" preload="auto" />
 
+      <MobileHeader
+        title={ctrl.title}
+        file={file}
+        searchQuery={q}
+        setSearchQuery={setQ}
+        runSearch={(qq: string) => setQ(qq)}
+        searching={ctrl.searching}
+        hits={ctrl.hits}
+        onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+        onShare={ctrl.handleShare}
+        bookmarks={bookmarks}
+        splashActive={false}
+      />
 
-    <MobilePager
-      ctrl={mCtrl as any}
-      file={file}
-      title={ctrl.title}
-      searchQuery={q}
-      setSearchQuery={setQ}
-      runSearch={(qq: string) => setQ(qq)}
-      searching={ctrl.searching}
-      hits={ctrl.hits}
-      onGoto={(p: number) => mCtrl.goToPage(p - 1)}
-      onShare={ctrl.handleShare}
-    />
+      <MobilePager
+        ctrl={mCtrl as any}
+        file={file}
+        title={ctrl.title}
+        searchQuery={q}
+        setSearchQuery={setQ}
+        runSearch={(qq: string) => setQ(qq)}
+        searching={ctrl.searching}
+        hits={ctrl.hits}
+        onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+        onShare={ctrl.handleShare}
+      />
 
-    <style jsx global>{`
-      html, body { height: 100svh; overflow: hidden; }
-      .viewer-root { min-height: 100svh; }
-    `}</style>
-  </div>
-);
-  }
+      <style jsx global>{`
+        html, body { height: 100svh; overflow: hidden; }
+        .viewer-root { min-height: 100svh; }
+      `}</style>
+    </div>
+  );
+}
   
 
 // прапорці для обкладинок (десктоп)
@@ -373,26 +387,26 @@ const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
 // --- ДЕСКТОП (FlipBook) ---
 return (
   <div className="viewer-root">
-      {/* Панель відкрита тільки на титулці, на всіх інших сторінках ховається */}
-      <LeftAdsPanel autoCollapsed={!isFrontCover} />
+    {/* 🔊 звук перегортання сторінок */}
+    <audio ref={flipAudioRef} src="/flipsound.ogg" preload="auto" />
 
-      <EditorHeader
-        title={ctrl.title}
-        onSearch={(term) => setQ(term)} // лише оновлюємо стан; пошук зробить useEffect
-        isSearching={(ctrl as any).searching ?? false}
-        file={file}
-        isFs={ctrl.isFs}
-        toggleFullscreen={ctrl.toggleFullscreen}
-        handleShare={ctrl.handleShare}
-        onPublish={() => {}} // прибито на публічній сторінці
-        // --- нове: керування полем пошуку ---
-        searchOpen={searchOpen}
-        onSearchToggle={setSearchOpen}
-        searchQuery={q}
-        onSearchChange={(v) => {
-          setQ(v);
-        }}
-      />
+    {/* Панель відкрита тільки на титулці, на всіх інших сторінках ховається */}
+    <LeftAdsPanel autoCollapsed={!isFrontCover} />
+
+    <EditorHeader
+      title={ctrl.title}
+      onSearch={(term) => setQ(term)}
+      isSearching={(ctrl as any).searching ?? false}
+      file={file}
+      isFs={ctrl.isFs}
+      toggleFullscreen={ctrl.toggleFullscreen}
+      handleShare={ctrl.handleShare}
+      onPublish={() => {}}
+      searchOpen={searchOpen}
+      onSearchToggle={setSearchOpen}
+      searchQuery={q}
+      onSearchChange={(v) => setQ(v)}
+    />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
         {/* резервуємо місце і пробрасываем --bm-step у CSS */}

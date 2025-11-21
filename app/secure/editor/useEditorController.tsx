@@ -63,7 +63,16 @@ function useIsNarrow(max = 600) {
   return narrow;
 }
 
-export function useViewerController({ file, title }: { file: string; title?: string }) {
+export function useViewerController({
+  file,
+  title,
+  onFlip,
+}: {
+  file: string;
+  title?: string;
+  onFlip?: () => void;
+}) {
+
   /* ---------- refs та базові стани ---------- */
   const stageRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<any>(null);
@@ -76,6 +85,19 @@ export function useViewerController({ file, title }: { file: string; title?: str
   const [pdfjs, setPdfjs] = useState<PDFJS | null>(null);
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+    const firstIndexRef = useRef(true);
+
+  // 🔊 ЄДИНА точка, де викликаємо звук
+  useEffect(() => {
+    if (!onFlip) return;          // в адмінці звуку немає
+    if (firstIndexRef.current) {  // перший рендер – без звуку
+      firstIndexRef.current = false;
+      return;
+    }
+    onFlip();
+  }, [currentIndex, onFlip]);
+
 
   const [fitScale, setFitScale] = useState(1);
   const [pageW, setPageW] = useState<number>(1000);
