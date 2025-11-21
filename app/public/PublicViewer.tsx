@@ -64,6 +64,46 @@ const ctrl = useViewerController({ file, title });
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
 
+  // --- FOOTER API WRAPPER: звук ДО переходу ---
+const footerApi = React.useMemo(() => {
+  if (!ctrl) {
+    return {
+      goFirst: () => {},
+      goPrev: () => {},
+      goNext: () => {},
+      goLast: () => {},
+      submitJump: () => {},
+    };
+  }
+  return {
+    goFirst: () => {
+      if (!ctrl.totalPages || ctrl.currentIndex === 0) return;
+      playFlip(); ctrl.goFirst();
+    },
+    goPrev: () => {
+      if (!ctrl.canPrev) return;
+      playFlip(); ctrl.goPrev();
+    },
+    goNext: () => {
+      if (!ctrl.canNext) return;
+      playFlip(); ctrl.goNext();
+    },
+    goLast: () => {
+      if (!ctrl.totalPages || ctrl.currentIndex === ctrl.totalPages - 1) return;
+      playFlip(); ctrl.goLast();
+    },
+    submitJump: () => {
+      const before = ctrl.currentIndex;
+      ctrl.submitJump();
+      setTimeout(() => {
+        if (ctrl.currentIndex !== before) playFlip();
+      }, 0);
+    },
+  };
+}, [ctrl, playFlip]);
+// --- /FOOTER API WRAPPER ---
+
+
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
   const bmSorted = React.useMemo(
     () => [...bookmarks].sort((a, b) => a.page - b.page),
@@ -398,57 +438,6 @@ React.useEffect(() => {
 // прапорці для обкладинок (десктоп)
 const isFrontCover = ctrl.currentIndex === 0;
 const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
-
-// Обгортки для футера із звуком
-const footerApi = React.useMemo(() => {
-  if (!ctrl) {
-    return {
-      goFirst: () => {},
-      goPrev: () => {},
-      goNext: () => {},
-      goLast: () => {},
-      submitJump: () => {},
-    };
-  }
-
-  return {
-    goFirst: () => {
-      if (!ctrl.totalPages || ctrl.currentIndex === 0) return;
-      playFlip();
-      ctrl.goFirst();
-    },
-    goPrev: () => {
-      if (!ctrl.canPrev) return;
-      playFlip();
-      ctrl.goPrev();
-    },
-    goNext: () => {
-      if (!ctrl.canNext) return;
-      playFlip();
-      ctrl.goNext();
-    },
-    goLast: () => {
-      if (
-        !ctrl.totalPages ||
-        ctrl.currentIndex === ctrl.totalPages - 1
-      )
-        return;
-      playFlip();
-      ctrl.goLast();
-    },
-    submitJump: () => {
-      const before = ctrl.currentIndex;
-      ctrl.submitJump();
-      // якщо реально перейшли на іншу сторінку — включаємо звук
-      setTimeout(() => {
-        if (ctrl.currentIndex !== before) {
-          playFlip();
-        }
-      }, 0);
-    },
-  };
-}, [ctrl, playFlip]);
-
 
 // --- ДЕСКТОП (FlipBook) ---
 return (
@@ -896,7 +885,6 @@ return (
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  playFlip(); // 🔊 на старті переходу
 
                   const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
                   if (ctrl.currentIndex === target) {
@@ -938,10 +926,10 @@ return (
         currentIndex={ctrl.currentIndex}
         canPrev={ctrl.canPrev}
         canNext={ctrl.canNext}
-        goFirst={footerApi.goFirst}
-        goPrev={footerApi.goPrev}
-        goNext={footerApi.goNext}
-        goLast={footerApi.goLast}
+        goFirst={ctrl.goFirst}
+        goPrev={ctrl.goPrev}
+        goNext={ctrl.goNext}
+        goLast={ctrl.goLast}
         pageJump={ctrl.pageJump}
         setPageJump={ctrl.setPageJump}
         submitJump={footerApi.submitJump}
