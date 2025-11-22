@@ -31,14 +31,12 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     ];
   }, [items]);
 
-  // Синхронізація з зовнішнім прапорцем (фліпбук перейшов у 2-сторінковий режим)
+  // Синхронізація з зовнішнім прапорцем
   React.useEffect(() => {
-    if (typeof autoCollapsed === "boolean") {
-      setCollapsed(autoCollapsed);
-    }
+    if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Автоскрол вгору по колу
+  // Автоскрол вгору по колу (швидкість/таймінг — БЕЗ змін)
   React.useEffect(() => {
     const step = 0.5; // px за тик (повільна швидкість)
     const intervalMs = 30;
@@ -46,16 +44,12 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     const id = window.setInterval(() => {
       const node = scrollRef.current;
       if (!node) return;
-      if (hoverRef.current) return; // при наведенні — пауза
-      if (node.scrollHeight <= node.clientHeight) return; // нема що крутити
+      if (hoverRef.current) return; // пауза при наведенні
+      if (node.scrollHeight <= node.clientHeight) return;
 
       const half = node.scrollHeight / 2;
-
-      if (node.scrollTop >= half) {
-        node.scrollTop = 0; // безшовний цикл
-      } else {
-        node.scrollTop = node.scrollTop + step;
-      }
+      if (node.scrollTop >= half) node.scrollTop = 0;
+      else node.scrollTop = node.scrollTop + step;
     }, intervalMs);
 
     return () => window.clearInterval(id);
@@ -71,7 +65,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
         hoverRef.current = false;
       }}
     >
-      {/* Ручка-стрілка посередині, яка згортає / розгортає панель */}
+      {/* Ручка-стрілка */}
       <button
         type="button"
         className="lh-toggle"
@@ -81,42 +75,62 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
 
       <div className="lh-leftads-inner" ref={scrollRef}>
         {/* дублюємо список, щоб зробити безкінечну карусель */}
-        {ads.concat(ads).map((ad, i) => (
-          <div key={`${ad.id}-${i}`} className="lh-ads-slot">
-            {ad.imageUrl ? (
-              ad.href ? (
-                <a href={ad.href} target="_blank" rel="noopener noreferrer">
-                  <img src={ad.imageUrl} alt={ad.label || "Ad"} />
+        {ads.concat(ads).map((ad, i) => {
+          const hasImg = !!ad.imageUrl;
+          const hasHref = !!ad.href;
+          return (
+            <div key={`${ad.id}-${i}`} className="lh-ads-slot">
+              {/* Картинка у фреймі */}
+              {hasImg ? (
+                <img
+                  className="ad-img"
+                  src={ad.imageUrl}
+                  alt={ad.label || "Ad"}
+                  loading="lazy"
+                  draggable={false}
+                />
+              ) : (
+                <span className="ad-ph">{ad.label ?? "AD"}</span>
+              )}
+
+              {/* Оверлей зверху: показуємо лейбл; якщо є href — це <a/> */}
+              {hasHref ? (
+                <a
+                  className="ad-overlay"
+                  href={ad.href as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={ad.label || "Open ad link"}
+                  title={ad.label || "Open"}
+                >
+                  {ad.label ? <span className="ad-label">{ad.label}</span> : null}
                 </a>
               ) : (
-                <img src={ad.imageUrl} alt={ad.label || "Ad"} />
-              )
-            ) : (
-              <span>{ad.label}</span>
-            )}
-          </div>
-        ))}
+                ad.label ? (
+                  <div className="ad-overlay no-link">
+                    <span className="ad-label">{ad.label}</span>
+                  </div>
+                ) : null
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <style jsx>{`
         .lh-leftads {
           position: fixed;
           left: 0;
-          /* Між хедером і футером, не перекриваємо їх */
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
-
-          width: 400px;
+          width: 400px;                    /* ширина як у шаблоні */
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           z-index: 1050;
           box-shadow: 4px 0 18px rgba(0, 0, 0, 0.32);
-          overflow: visible; /* щоб стрілка могла вилазити назовні */
+          overflow: visible;               /* щоб стрілка могла вилазити назовні */
           transition: transform 0.35s ease;
         }
-
-        /* коли згорнута — вся панель виїжджає вліво за екран,
-           у в’юпорті лишається тільки стрілка (яка висунута назовні) */
         .lh-leftads.is-collapsed {
           transform: translateX(-100%);
         }
@@ -127,12 +141,13 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           display: flex;
           flex-direction: column;
           gap: 16px;
-          overflow-y: auto; /* ручний скрол мишкою */
+          overflow-y: auto;
           overscroll-behavior: contain;
           padding-right: 6px;
         }
 
         .lh-ads-slot {
+          position: relative;              /* для оверлею */
           flex: 0 0 600px;
           border-radius: 10px;
           background: rgba(255, 255, 255, 0.02);
@@ -144,13 +159,51 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.08em;
+          overflow: hidden;                /* щоб зображення обрізалось по фрейму */
         }
 
-        .lh-ads-slot img {
+        /* Картинка заповнює фрейм, без зміни загальної геометрії панелі */
+        .ad-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
           display: block;
-          max-width: 100%;
-          height: auto;
           border-radius: 8px;
+          user-select: none;
+          pointer-events: none;            /* кліки перехоплює оверлей */
+        }
+
+        .ad-ph {
+          display: inline-block;
+          opacity: 0.7;
+        }
+
+        /* Оверлей з посиланням/лейблом */
+        .ad-overlay {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: flex-end;
+          justify-content: flex-start;
+          padding: 10px 12px;
+          text-decoration: none;
+          color: #fff;
+          background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55));
+          opacity: 0;                      /* показуємо лише на hover */
+          transition: opacity .15s ease-in-out;
+        }
+        .ad-overlay.no-link { cursor: default; }
+        .lh-ads-slot:hover .ad-overlay { opacity: 1; }
+
+        .ad-label {
+          display: inline-block;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .04em;
+          padding: 4px 8px;
+          border-radius: 6px;
+          background: rgba(0,0,0,.55);
+          backdrop-filter: blur(2px);
         }
 
         /* Ручка-стрілка */
@@ -171,7 +224,6 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           align-items: center;
           justify-content: center;
         }
-
         .lh-toggle::before {
           content: "";
           display: block;
@@ -179,15 +231,11 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           height: 18px;
           border-left: 3px solid rgba(255, 255, 255, 0.9);
           border-top: 3px solid rgba(255, 255, 255, 0.9);
-          /* За замовчуванням — стрілка вліво (закрити панель) */
-          transform: rotate(-45deg);
+          transform: rotate(-45deg); /* стрілка вліво (закрити панель) */
         }
-
-        /* Коли панель згорнута — стрілка дивиться вправо (розгорнути) */
         .lh-leftads.is-collapsed .lh-toggle::before {
-          transform: rotate(135deg);
+          transform: rotate(135deg); /* вправо (розгорнути) */
         }
-
         .lh-toggle:hover {
           background: rgba(0, 0, 0, 0.5);
         }
