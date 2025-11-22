@@ -50,7 +50,6 @@ async function getMeta(slug: string): Promise<MetaPayload | null> {
   }
 }
 
-/** Жорстка санітаризація + клон для безпечної серіалізації між SSR/CSR */
 function sanitizeBookmarks(input: unknown): Bookmark[] {
   if (!Array.isArray(input)) return [];
   const out: Bookmark[] = [];
@@ -62,33 +61,54 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
     const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
     const label = String(anyIt.label ?? "");
     const colorRaw = anyIt.color;
-    const color =
-      typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
+    const color = typeof colorRaw === "string" && colorRaw.trim() ? colorRaw : null;
     if (label.length > 0) out.push({ id, page, label, color });
   }
   return JSON.parse(JSON.stringify(out));
 }
 
-/** Санітаризація рекламних слотів (макс. 5, відсортовано по seq) */
+/** Санітаризація рекламних слотів (гнучко читаємо джерело картинки) */
 function sanitizeAds(input: unknown): AdSlot[] {
   if (!Array.isArray(input)) return [];
   const out: AdSlot[] = [];
+
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
     const anyIt = it as Record<string, unknown>;
-    const id = String(anyIt.id ?? "");
-    const imageUrl = String(anyIt.imageUrl ?? "").trim();
+
+    // 👇 підтримуємо різні назви полів від бекенду
+    const rawImg =
+      (anyIt.imageUrl as unknown) ??
+      (anyIt.url as unknown) ??
+      (anyIt.image as unknown) ??
+      (anyIt.img as unknown);
+
+    const imageUrl = String(rawImg ?? "").trim();
     if (!imageUrl) continue; // без картинки — пропускаємо
-    const hrefVal = anyIt.href == null ? null : String(anyIt.href).trim() || null;
-    const labelVal = anyIt.label == null ? null : String(anyIt.label).trim() || null;
+
+    const id =
+      String(
+        (anyIt.id as unknown) ??
+          // запасний варіант, щоб key був стабільним
+          `${(anyIt.label as string | undefined) || "ad"}-${imageUrl}`
+      );
+
+    const hrefVal =
+      anyIt.href == null ? null : (String(anyIt.href).trim() || null);
+    const labelVal =
+      anyIt.label == null ? null : (String(anyIt.label).trim() || null);
+
     const seqNum = Number(anyIt.seq);
     const seq = Number.isFinite(seqNum) ? (seqNum as number) : null;
+
     out.push({ id, imageUrl, href: hrefVal, label: labelVal, seq });
   }
+
   const sorted = out
     .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999))
     .slice(0, 5)
     .map((a, i) => ({ ...a, seq: a.seq ?? i }));
+
   return JSON.parse(JSON.stringify(sorted));
 }
 
