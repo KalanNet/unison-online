@@ -1,5 +1,6 @@
 // app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -30,12 +31,18 @@ const SOCIAL_DESC_2025 =
   "A helpful resource for seniors in Calgary to find Services and Housing all gathered in Directory Catalogue.";
 
 /* ---------- Helpers ---------- */
+async function absUrl(path: string): Promise<string> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${proto}://${host}${p}`;
+}
+
 async function getMeta(slug: string): Promise<MetaPayload | null> {
   try {
-    const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
-      cache: "no-store",
-      next: { revalidate: 0 },
-    });
+    const url = await absUrl(`/api/directory/${encodeURIComponent(slug)}`);
+    const r = await fetch(url, { cache: "no-store", next: { revalidate: 0 } });
     if (!r.ok) return null;
     return (await r.json()) as MetaPayload;
   } catch {
@@ -72,10 +79,8 @@ function sanitizeAds(input: unknown): AdSlot[] {
     const id = String(anyIt.id ?? "");
     const imageUrl = String(anyIt.imageUrl ?? "").trim();
     if (!imageUrl) continue; // без картинки — пропускаємо
-    const hrefVal =
-      anyIt.href == null ? null : String(anyIt.href).trim() || null;
-    const labelVal =
-      anyIt.label == null ? null : String(anyIt.label).trim() || null;
+    const hrefVal = anyIt.href == null ? null : String(anyIt.href).trim() || null;
+    const labelVal = anyIt.label == null ? null : String(anyIt.label).trim() || null;
     const seqNum = Number(anyIt.seq);
     const seq = Number.isFinite(seqNum) ? (seqNum as number) : null;
     out.push({ id, imageUrl, href: hrefVal, label: labelVal, seq });
@@ -135,7 +140,8 @@ export default async function Page({
         />
       );
     }
-    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
+    const ClientFallback =
+      (await import("app/(public)/directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
 
