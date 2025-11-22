@@ -20,14 +20,15 @@ type InitBookmark = {
   color?: string | null;
 };
 
-// NEW: ads
-export type InitAd = {
+// --- Ads (left carousel) ---
+type InitAd = {
   id: string;
   imageUrl: string;
   href?: string | null;
   label?: string | null;
-  seq?: number | null; // 0..4 у каруселі
+  seq?: number | null; // 0..4
 };
+
 
 type Props = {
   file: string;
@@ -498,6 +499,24 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
     s.length <= SEO.SLUG_MAX &&
     SLUG_RE.test(s);
   const imageOk = !!ctrl.meta.featuredUrl;
+
+  function normalizeAdsForPublish(list: any[]): InitAd[] {
+  return (Array.isArray(list) ? list : [])
+    .filter(a => a && typeof a.imageUrl === "string" && a.imageUrl.trim())
+    .map((a) => ({
+      id: a.id || crypto.randomUUID(),
+      imageUrl: a.imageUrl.trim(),
+      href: (typeof a.href === "string" && a.href.trim()) ? a.href.trim() : null,
+      label: (typeof a.label === "string" && a.label.trim()) ? a.label.trim() : null,
+      seq: (typeof a.seq === "number" && Number.isFinite(a.seq))
+        ? Math.max(0, Math.min(4, Math.trunc(a.seq)))
+        : null,
+    }))
+    .sort((x, y) => (x.seq ?? 999) - (y.seq ?? 999))
+    .slice(0, 5)
+    .map((a, i) => ({ ...a, seq: a.seq ?? i }));
+}
+
 
   async function handlePublish(): Promise<void> {
     if (!ctrl) return;
