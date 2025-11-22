@@ -404,6 +404,15 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
       (ctrl as any).setBookmarks?.(safe) ??
         (ctrl as any).replaceBookmarks?.(safe);
     }
+
+  // ✅ ПІДТЯГУЄМО ІСНУЮЧІ РЕКЛАМИ
+  if (Array.isArray(initialAds) && (ctrl as any).setAds) {
+    const safeAds = initialAds
+      .filter(a => a && typeof a.imageUrl === "string" && a.imageUrl.trim())
+      .map((a, i) => ({ ...a, seq: Number.isFinite(a?.seq) ? Math.max(0, Math.min(4, a.seq as number)) : i }));
+    (ctrl as any).setAds(safeAds);
+  }
+
     prefilledRef.current = true;
   }, [ctrl?.pdfDoc, initialMeta, initialBookmarks]);
 
@@ -562,6 +571,7 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
           },
           bookmarks: ctrl.bookmarks,
           file: pdfUrl,
+           ads: normalizeAdsForPublish(ctrl.ads || []),
         };
 
         if ((ctrl as any).publishedAt)
@@ -766,10 +776,13 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
 </div>
 
 
+
+
         </div>
 
         <div className="fb-panel-sec">
-          <div className="fb-sec-h">Bookmarks</div>
+  <div className="fb-sec-h">Bookmarks</div>
+  </div>
 
           {/* форма додавання: label + page (optional) */}
           <div className="fb-row fb-row-wrap">
@@ -801,81 +814,109 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
               id="fb-ad-file"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
-                if (!f) return;
+if (!f) return;
 
-                try {
-                  const prepared = await prepareAdImage(f);
+try {
+  const prepared = await prepareAdImage(f); // -> File
 
-                  const fd = new FormData();
-                  fd.append("image", prepared);
-                  if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug);
+  const fd = new FormData();
+  // image — завжди Blob/File + filename
+  fd.append(
+    "image",
+    prepared,
+    (prepared as File).name || "ad.webp"
+  );
 
-                  // НОВИЙ ендпоінт для завантаження рекламних картинок
-                  const res = await fetch("/api/upload-ad", { method: "POST", body: fd });
-                  const out = await res.json();
+  // slug — лише якщо є і це рядок
+  const slug = String(ctrl.meta.slug ?? "").trim();
+  if (slug) fd.append("slug", slug);
 
-                  if (!res.ok || !out?.url) {
-                    notify(out?.error || "Upload failed");
-                    return;
-                  }
+  // НОВИЙ ендпоінт для завантаження рекламних картинок
+  const res = await fetch("/api/upload-ad", { method: "POST", body: fd });
+  const out: { url?: string; error?: string } = await res.json().catch(() => ({} as any));
 
-                  const labelEl = document.getElementById("fb-ad-label") as HTMLInputElement | null;
-                  const linkEl = document.getElementById("fb-ad-link") as HTMLInputElement | null;
+  if (!res.ok || !out?.url) {
+    notify(out?.error || "Upload failed");
+    return;
+  }
 
-                  ctrl.addAdSlot({
-                    imageUrl: out.url,
-                    href: linkEl?.value || null,
-                    label: labelEl?.value || null,
-                  });
+  const labelEl = document.getElementById("fb-ad-label") as HTMLInputElement | null;
+  const linkEl  = document.getElementById("fb-ad-link")  as HTMLInputElement | null;
 
-                  if (labelEl) labelEl.value = "";
-                  if (linkEl) linkEl.value = "";
-                  (e.target as HTMLInputElement).value = "";
-                } catch (err: any) {
-                  console.error(err);
-                  notify(err?.message || "Image processing failed");
-                }
+  ctrl.addAdSlot({
+    imageUrl: out.url,
+    href: linkEl?.value?.trim() || null,
+    label: labelEl?.value?.trim() || null,
+  });
+
+  if (labelEl) labelEl.value = "";
+  if (linkEl)  linkEl.value  = "";
+  (e.target as HTMLInputElement).value = "";
+} catch (err: any) {
+  console.error(err);
+  notify(err?.message || "Image processing failed");
+}
+
               }}
             />
           </div>
           <div className="fb-help">Images will be optimized to WebP ~400–600px width.</div>
 
           {/* Список існуючих слотів */}
-          {ctrl.ads?.length ? (
-            <ul className="fb-list fb-list-ads">
-              {ctrl.ads.map((a: any) => (
-                <li key={a.id} className="fb-bmk">
-                  <div className="fb-ad-thumb">
-                    <img src={a.imageUrl} alt={a.label || "Ad"} />
-                  </div>
-                  <div className="fb-ad-fields">
-                    <input
-                      className="fb-inp"
-                      value={a.label || ""}
-                      placeholder="Label"
-                      onChange={(e) => ctrl.updateAdSlot(a.id, { label: e.target.value })}
-                    />
-                    <input
-                      className="fb-inp"
-                      value={a.href || ""}
-                      placeholder="Link"
-                      onChange={(e) => ctrl.updateAdSlot(a.id, { href: e.target.value })}
-                    />
-                  </div>
-                  <button
-                    className="fb-del"
-                    title="Remove ad"
-                    onClick={() => ctrl.removeAdSlot(a.id)}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="fb-help">No ads yet – add one above.</div>
-          )}
+{ctrl.ads?.length ? (
+  <ul className="fb-list fb-list-ads">
+    {ctrl.ads.map((a: any, i: number) => (
+      <li key={a.id} className="fb-bmk">
+        <div className="fb-ad-thumb">
+          <img src={a.imageUrl} alt={a.label || `Ad ${i + 1}`} />
         </div>
+
+        <div className="fb-ad-fields">
+          {/* приховані — щоб завжди були в DOM для можливого FormData */}
+          <input id={`ad-${a.id}-id`}  name="ads[][id]"  type="hidden" value={a.id} />
+          <input id={`ad-${a.id}-url`} name="ads[][url]" type="hidden" value={a.imageUrl} />
+          <input
+            id={`ad-${a.id}-seq`}
+            name="ads[][seq]"
+            type="hidden"
+            value={Number.isFinite(a?.seq) ? a.seq : i}
+          />
+
+          <label htmlFor={`ad-${a.id}-label`} className="fb-lbl">Label</label>
+          <input
+            id={`ad-${a.id}-label`}
+            name="ads[][label]"
+            className="fb-inp"
+            placeholder="Label"
+            value={a.label ?? ""}
+            onChange={(e) => ctrl.updateAdSlot(a.id, { label: e.target.value })}
+          />
+
+          <label htmlFor={`ad-${a.id}-href`} className="fb-lbl">Link</label>
+          <input
+            id={`ad-${a.id}-href`}
+            name="ads[][href]"
+            className="fb-inp"
+            placeholder="https://…"
+            value={a.href ?? ""}
+            onChange={(e) => ctrl.updateAdSlot(a.id, { href: e.target.value })}
+          />
+        </div>
+
+        <button
+          className="fb-del"
+          title="Remove ad"
+          onClick={() => ctrl.removeAdSlot(a.id)}
+        >
+          ✕
+        </button>
+      </li>
+    ))}
+  </ul>
+) : (
+  <div className="fb-help">No ads yet – add one above.</div>
+)}
+
  
 
           {/* палітра кольорів + custom (підтвердження через +) */}
