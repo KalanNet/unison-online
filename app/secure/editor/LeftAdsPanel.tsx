@@ -33,7 +33,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Автоскрол вгору по колу (без змін швидкості)
+  // Автоскрол вгору по колу
   React.useEffect(() => {
     const step = 0.5;
     const intervalMs = 30;
@@ -63,38 +63,49 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       />
 
       <div className="lh-leftads-inner" ref={scrollRef}>
-        {/* Дублюємо для безшовної каруселі */}
+        {/* Дублюємо масив для безшовної каруселі */}
         {ads.concat(ads).map((ad, i) => {
           const hasImg = !!ad.imageUrl;
           const label = ad.label ?? "";
-          const content = hasImg ? (
-            ad.href ? (
-              <a
-                className="ad-link"
-                href={ad.href}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                title={label || undefined}
-              >
-                <img className="ad-img" src={ad.imageUrl} alt={label || "Ad"} />
-              </a>
-            ) : (
-              <img className="ad-img" src={ad.imageUrl} alt={label || "Ad"} />
-            )
-          ) : (
-            <span className="ad-ph">{label || "AD"}</span>
-          );
 
           return (
             <div
               key={`${ad.id}-${i}`}
-              className="lh-ads-slot"
+              className={`lh-ads-slot${hasImg ? " has-img" : ""}`}
               data-ad-id={ad.id}
               data-has-img={hasImg ? "true" : "false"}
               data-label={label}
             >
-              {content}
-              {/* Маленький бейджик-лейбл (лише якщо треба) */}
+              {/* Фон-плейсхолдер (видимий, тільки якщо немає картинки) */}
+              <div className="ad-bg">
+                <span className="ad-ph">{label || "AD"}</span>
+              </div>
+
+              {/* Картинка + лінк, завжди поверх ad-bg */}
+              {hasImg &&
+                (ad.href ? (
+                  <a
+                    className="ad-link"
+                    href={ad.href}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    title={label || undefined}
+                  >
+                    <img
+                      className="ad-img"
+                      src={ad.imageUrl}
+                      alt={label || "Ad"}
+                    />
+                  </a>
+                ) : (
+                  <img
+                    className="ad-img"
+                    src={ad.imageUrl}
+                    alt={label || "Ad"}
+                  />
+                ))}
+
+              {/* Маленький бейджик-лейбл поверх картинки */}
               {label && hasImg && <span className="ad-label">{label}</span>}
             </div>
           );
@@ -102,121 +113,134 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       </div>
 
       <style jsx>{`
-  .lh-leftads {
-    position: fixed;
-    left: 0;
-    top: var(--hdr, 56px);
-    bottom: var(--ftr, 64px);
-    width: 400px;
-    background: linear-gradient(180deg, #23272f, #171a20);
-    padding: 18px 14px;
-    /* Ключ: власний стек + високий пріоритет */
-    isolation: isolate;
-    z-index: 4000;
-    overflow: visible;
-    transition: transform 0.35s ease;
-  }
-  .lh-leftads.is-collapsed { transform: translateX(-100%); }
+        .lh-leftads {
+          position: fixed;
+          left: 0;
+          top: var(--hdr, 56px);
+          bottom: var(--ftr, 64px);
+          width: 360px;
+          background: linear-gradient(180deg, #23272f, #171a20);
+          padding: 18px 14px;
+          z-index: 1050;
+          overflow: visible;
+          transition: transform 0.35s ease;
+        }
+        .lh-leftads.is-collapsed {
+          transform: translateX(-100%);
+        }
 
-  .lh-leftads-inner {
-    height: 100%;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 6px;
-  }
+        .lh-leftads-inner {
+          height: 100%;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          padding-right: 6px;
+        }
 
-  .lh-ads-slot {
-    position: relative;           /* свій контекст шарів */
-    contain: paint;               /* захист від зовнішніх псевдоелементів */
-    flex: 0 0 600px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.09);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #d2d7e0;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    overflow: hidden;
-  }
+        .lh-ads-slot {
+          position: relative;
+          flex: 0 0 580px;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #111821;
+        }
 
-  /* Контент слота — завжди над будь-чим усередині */
-  .lh-ads-slot .ad-link,
-  .lh-ads-slot .ad-img {
-    position: relative;
-    z-index: 3;
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .lh-ads-slot .ad-img { object-fit: cover; }
+        /* Фон + текст плейсхолдера — нижній шар */
+        .ad-bg {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.03);
+          color: #a9b3c7;
+          z-index: 1;
+        }
+        .ad-ph {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
 
-  /* Вимикаємо можливі глобальні бекдропи на лінках */
-  .lh-ads-slot .ad-link::before,
-  .lh-ads-slot .ad-link::after {
-    content: none !important;
-  }
+        /* Картинка / лінк — ОБОВʼЯЗКОВО поверх плейсхолдера */
+        .ad-link,
+        .ad-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+        }
+        .ad-link {
+          z-index: 2;
+          line-height: 0;
+          display: block;
+        }
+        .ad-img {
+          z-index: 2;
+          display: block;
+          object-fit: cover;
+        }
 
-  /* Плейсхолдер кладемо нижче і робимо абсолютним */
-  .lh-ads-slot .ad-ph {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-  }
-  .lh-ads-slot[data-has-img="true"] .ad-ph { display: none !important; }
+        /* Якщо є картинка — плейсхолдер приховуємо */
+        .lh-ads-slot.has-img .ad-bg {
+          opacity: 0;
+          pointer-events: none;
+        }
 
-  /* Лейбл поверх картинки */
-  .lh-ads-slot .ad-label {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    z-index: 4;
-    padding: 4px 6px;
-    border-radius: 6px;
-    background: rgba(0,0,0,0.45);
-    color: #fff;
-    font-size: 11px;
-    line-height: 1;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    pointer-events: none;
-  }
+        /* Лейбл у куті поверх усього */
+        .ad-label {
+          position: absolute;
+          left: 8px;
+          bottom: 8px;
+          z-index: 3;
+          padding: 4px 6px;
+          border-radius: 6px;
+          background: rgba(0, 0, 0, 0.45);
+          color: #fff;
+          font-size: 11px;
+          line-height: 1;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          pointer-events: none;
+        }
 
-  /* Кнопка-стрілка */
-  .lh-toggle {
-    position: absolute;
-    top: 50%;
-    right: -40px;
-    transform: translateY(-50%);
-    width: 40px; height: 80px;
-    border: 0; border-radius: 0 12px 12px 0;
-    background: rgba(0,0,0,0.35);
-    box-shadow: 4px 0 10px rgba(0,0,0,0.4);
-    cursor: pointer; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 5; /* над вмістом панелі */
-  }
-  .lh-toggle::before {
-    content: "";
-    width: 18px; height: 18px;
-    border-left: 3px solid rgba(255,255,255,0.9);
-    border-top: 3px solid rgba(255,255,255,0.9);
-    transform: rotate(-45deg);
-  }
-  .lh-leftads.is-collapsed .lh-toggle::before { transform: rotate(135deg); }
-  .lh-toggle:hover { background: rgba(0,0,0,0.5); }
-`}</style>
-
+        /* Ручка-стрілка */
+        .lh-toggle {
+          position: absolute;
+          top: 50%;
+          right: -40px;
+          transform: translateY(-50%);
+          width: 40px;
+          height: 80px;
+          border: 0;
+          border-radius: 0 12px 12px 0;
+          background: rgba(0, 0, 0, 0.35);
+          box-shadow: 4px 0 10px rgba(0, 0, 0, 0.4);
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .lh-toggle::before {
+          content: "";
+          display: block;
+          width: 18px;
+          height: 18px;
+          border-left: 3px solid rgba(255, 255, 255, 0.9);
+          border-top: 3px solid rgba(255, 255, 255, 0.9);
+          transform: rotate(-45deg); /* вліво */
+        }
+        .lh-leftads.is-collapsed .lh-toggle::before {
+          transform: rotate(135deg); /* вправо */
+        }
+        .lh-toggle:hover {
+          background: rgba(0, 0, 0, 0.5);
+        }
+      `}</style>
     </aside>
   );
 }
-
