@@ -24,24 +24,23 @@ type MetaPayload = {
 };
 
 /* ---------- Constants ---------- */
-
-// Та сама featured-картинка, що й на головній (лежить у public/og-featured-home.jpg)
 const DEFAULT_OG_IMAGE = "/og-featured-home.jpg";
-
-// Meta для соцмереж (дефолт для всіх директорій поки що)
 const SOCIAL_TITLE_2025 = "Services and Housing Directory 2025";
 const SOCIAL_DESC_2025 =
   "A helpful resource for seniors in Calgary to find Services and Housing all gathered in Directory Catalogue.";
 
 /* ---------- Helpers ---------- */
 async function getMeta(slug: string): Promise<MetaPayload | null> {
-  // Відносний виклик внутрішнього API (Edge/Pages friendly)
-  const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
-  if (!r.ok) return null;
-  return (await r.json()) as MetaPayload;
+  try {
+    const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
+      cache: "no-store",
+      next: { revalidate: 0 },
+    });
+    if (!r.ok) return null;
+    return (await r.json()) as MetaPayload;
+  } catch {
+    return null;
+  }
 }
 
 /** Жорстка санітаризація + клон для безпечної серіалізації між SSR/CSR */
@@ -56,10 +55,10 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
     const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
     const label = String(anyIt.label ?? "");
     const colorRaw = anyIt.color;
-    const color = typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
+    const color =
+      typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
     if (label.length > 0) out.push({ id, page, label, color });
   }
-  // structuredClone fallback: JSON roundtrip (plain-об’єкт)
   return JSON.parse(JSON.stringify(out));
 }
 
@@ -73,14 +72,19 @@ function sanitizeAds(input: unknown): AdSlot[] {
     const id = String(anyIt.id ?? "");
     const imageUrl = String(anyIt.imageUrl ?? "").trim();
     if (!imageUrl) continue; // без картинки — пропускаємо
-    const hrefVal = anyIt.href == null ? null : String(anyIt.href);
-    const labelVal = anyIt.label == null ? null : String(anyIt.label);
+    const hrefVal =
+      anyIt.href == null ? null : String(anyIt.href).trim() || null;
+    const labelVal =
+      anyIt.label == null ? null : String(anyIt.label).trim() || null;
     const seqNum = Number(anyIt.seq);
     const seq = Number.isFinite(seqNum) ? (seqNum as number) : null;
     out.push({ id, imageUrl, href: hrefVal, label: labelVal, seq });
   }
-  const sorted = out.sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999));
-  return JSON.parse(JSON.stringify(sorted.slice(0, 5)));
+  const sorted = out
+    .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999))
+    .slice(0, 5)
+    .map((a, i) => ({ ...a, seq: a.seq ?? i }));
+  return JSON.parse(JSON.stringify(sorted));
 }
 
 /* ---------- Metadata ---------- */
@@ -93,27 +97,15 @@ export async function generateMetadata({
   const slug = slugRaw ?? "";
   const data = slug ? await getMeta(slug) : null;
 
-  // 1) Базові значення: або те, що прийшло з meta.json, або дефолти
   const title = data?.meta?.title ?? SOCIAL_TITLE_2025;
   const description = data?.meta?.description ?? SOCIAL_DESC_2025;
-
-  // 2) Якщо у meta.json є featuredUrl – беремо його, інакше – дефолтний OG
   const ogImg = data?.meta?.featuredUrl || DEFAULT_OG_IMAGE;
 
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      images: [ogImg],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImg],
-    },
+    openGraph: { title, description, images: [ogImg] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImg] },
   };
 }
 
@@ -126,8 +118,6 @@ export default async function Page({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-
-  // SSR-спроба отримати meta.json через внутрішній API
   const data = slug ? await getMeta(slug) : null;
 
   // Фолбек: якщо meta немає — дозволяємо прямий перегляд через ?file=
@@ -135,28 +125,29 @@ export default async function Page({
     const fileParam = typeof searchParams.file === "string" ? searchParams.file : "";
     if (fileParam) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
-      const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
-      const safeAds = sanitizeAds((data as any)?.ads);
       const title = data?.meta?.title || slug || "Preview";
       return (
         <PublicViewer
           file={fileParam}
           title={title}
-          bookmarks={safeBookmarks}
-          ads={safeAds}
+          bookmarks={sanitizeBookmarks(data?.bookmarks)}
+          ads={sanitizeAds((data as any)?.ads)}
         />
       );
     }
-    // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
     const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
 
-  // Основний рендер публічного в’ювера
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title ?? slug;
-  const safeBookmarks = sanitizeBookmarks(data.bookmarks);
-  const safeAds = sanitizeAds(data.ads);
 
-  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} ads={safeAds} />;
+  return (
+    <PublicViewer
+      file={data.file}
+      title={title}
+      bookmarks={sanitizeBookmarks(data.bookmarks)}
+      ads={sanitizeAds(data.ads)}
+    />
+  );
 }
