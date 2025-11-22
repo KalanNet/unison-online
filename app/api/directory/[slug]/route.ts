@@ -1,11 +1,10 @@
-// app/api/directory/[slug]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-/* ---------- R2 config (як у upload-featured) ---------- */
+/* ---------- R2 config (однаково з upload-featured) ---------- */
 const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 const R2_BUCKET = process.env.R2_BUCKET || "unison-catalog";
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -20,13 +19,12 @@ const s3 = new S3Client({
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
-
-export type AdSlot = {
+type AdSlot = {
   id: string;
   imageUrl: string;
   href?: string | null;
   label?: string | null;
-  order?: number; // 0..4, зліва направо
+  seq?: number | null; // 0..4
 };
 
 type MetaJson = {
@@ -54,7 +52,7 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   const out: Bookmark[] = [];
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
-    const any = it as Record<string, unknown>;
+    const any = it as any;
     const id = String(any.id ?? crypto.randomUUID());
     const pageNum = Number(any.page);
     const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
@@ -65,31 +63,35 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return out;
 }
 
+/** seq → ціле 0..4; максимум 5 елементів; сортування по seq */
 function sanitizeAds(input: unknown): AdSlot[] {
   if (!Array.isArray(input)) return [];
-  const cleaned: AdSlot[] = [];
+  const tmp: AdSlot[] = [];
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
-    const any = it as Record<string, unknown>;
+    const any = it as any;
     const imageUrl = String(any.imageUrl ?? "").trim();
     if (!imageUrl) continue;
-    const id = String(any.id ?? crypto.randomUUID());
-    const href = typeof any.href === "string" && any.href.trim() ? any.href.trim() : null;
+
+    const id    = String(any.id ?? crypto.randomUUID());
+    const href  = typeof any.href === "string" && any.href.trim() ? any.href.trim() : null;
     const label = typeof any.label === "string" && any.label.trim() ? any.label.trim() : null;
-    let order: number | undefined = undefined;
-    if (typeof any.order === "number" && Number.isFinite(any.order)) {
-      order = Math.max(0, Math.min(4, Math.trunc(any.order)));
+
+    let seq: number | null = null;
+    if (any.seq !== undefined && any.seq !== null && !Number.isNaN(+any.seq)) {
+      seq = Math.max(0, Math.min(4, Math.trunc(+any.seq)));
     }
-    cleaned.push({ id, imageUrl, href, label, order });
+
+    tmp.push({ id, imageUrl, href, label, seq });
   }
 
-  // нормалізуємо порядок: 0..4 у межах перших 5 елементів
-  const top5 = cleaned
-    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+  // впорядковуємо та добиваємо дефолтами, щоб були 0..N
+  const sorted = tmp
+    .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999))
     .slice(0, 5)
-    .map((a, i) => ({ ...a, order: i }));
+    .map((a, i) => ({ ...a, seq: a.seq ?? i }));
 
-  return top5;
+  return sorted;
 }
 
 /* ---------- GET ---------- */
@@ -112,18 +114,6 @@ export async function GET(
 }
 
 /* ---------- POST (Publish) ---------- */
-/**
- * Очікує JSON тіло:
- * {
- *   meta?: { title?, description?, featuredUrl? },
- *   bookmarks?: Bookmark[],
- *   ads?: AdSlot[],            // <-- НОВЕ
- *   file?: string,
- *   publishedAt?: string
- * }
- *
- * Якщо якесь поле не передано — лишається попереднє значення з meta.json.
- */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
   if (!slug) return err("Missing slug", 422);
@@ -137,7 +127,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       publishedAt?: string;
     };
 
-    // 1) підтягнути попередню версію
+    // 1) попередня версія
     const prev = await readPrev(slug);
     if (!prev) return err("Not found", 404);
 
@@ -147,7 +137,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     const nextAds =
       typeof body.ads === "undefined" ? (prev.ads ?? []) : sanitizeAds(body.ads);
 
-    // 3) зібрати next-мету
+    // 3) мердж
     const next: MetaJson = {
       meta: {
         title: (body.meta?.title ?? prev.meta.title).trim(),
@@ -173,7 +163,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       CacheControl: "no-cache",
     }));
 
-    // 5) підштовхнути оновлення індексу (як і раніше)
+    // 5) оновити індекс (як у тебе)
     const origin = new URL(req.url).origin;
     await fetch(`${origin}/api/directory/list-published`, {
       method: "POST",
@@ -188,7 +178,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
         file: next.file,
         publishedAt: next.publishedAt,
         bookmarks: next.bookmarks,
-        ads: next.ads, // для інфо
+        ads: next.ads,
         prev,
       }),
     }).catch(() => null);
