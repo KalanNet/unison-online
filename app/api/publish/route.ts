@@ -24,8 +24,12 @@ const s3 = new S3Client({
   },
 });
 
-function ok(data: unknown, code = 200) { return NextResponse.json(data, { status: code }); }
-function err(error: string, code = 400) { return NextResponse.json({ error }, { status: code }); }
+function ok(data: unknown, code = 200) {
+  return NextResponse.json(data, { status: code });
+}
+function err(error: string, code = 400) {
+  return NextResponse.json({ error }, { status: code });
+}
 
 function slugify(input: string): string {
   const base = (input || "")
@@ -52,25 +56,54 @@ export async function POST(req: NextRequest) {
   try {
     const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "ua_sid";
     const cookieHeader = req.headers.get("cookie") || "";
-    const authed = cookieHeader.split(/;\s*/).some((c) => c.startsWith(`${COOKIE_NAME}=`));
+    const authed = cookieHeader
+      .split(/;\s*/)
+      .some((c) => c.startsWith(`${COOKIE_NAME}=`));
     if (!authed) return err("Unauthorized", 401);
 
     const ctype = req.headers.get("content-type") || "";
     let file = "";
-    let meta: { title?: string; description?: string; featuredUrl?: string | null; slug?: string } = {};
-    let bookmarks: Array<{ id: string; page: number; label: string; color?: string | null }> = [];
+    let meta: {
+      title?: string;
+      description?: string;
+      featuredUrl?: string | null;
+      slug?: string;
+    } = {};
+    let bookmarks: Array<{
+      id: string;
+      page: number;
+      label: string;
+      color?: string | null;
+    }> = [];
     let featuredFile: File | null = null;
+    let ads: AdItem[] = [];
 
     if (ctype.includes("application/json")) {
-      const body = await req.json().catch(() => ({} as any));
+      const body = (await req.json().catch(() => ({} as any))) as any;
       file = body?.file || body?.pdfUrl || "";
       meta = body?.meta || {};
       bookmarks = Array.isArray(body?.bookmarks) ? body.bookmarks : [];
+      ads = Array.isArray(body?.ads) ? body.ads : [];
     } else if (ctype.includes("multipart/form-data")) {
       const fd = await req.formData();
       file = String(fd.get("file") || fd.get("pdfUrl") || "");
-      try { meta = fd.get("meta") ? JSON.parse(String(fd.get("meta"))) : {}; } catch { meta = {}; }
-      try { bookmarks = fd.get("bookmarks") ? JSON.parse(String(fd.get("bookmarks"))) : []; } catch { bookmarks = []; }
+      try {
+        meta = fd.get("meta") ? JSON.parse(String(fd.get("meta"))) : {};
+      } catch {
+        meta = {};
+      }
+      try {
+        bookmarks = fd.get("bookmarks")
+          ? JSON.parse(String(fd.get("bookmarks")))
+          : [];
+      } catch {
+        bookmarks = [];
+      }
+      try {
+        ads = fd.get("ads") ? JSON.parse(String(fd.get("ads"))) : [];
+      } catch {
+        ads = [];
+      }
       featuredFile = (fd.get("featured") as File) || null;
     } else {
       return err("Unsupported content-type", 415);
@@ -91,12 +124,15 @@ export async function POST(req: NextRequest) {
       const ext = inferExtFromMime(featuredFile.type);
       const featuredKey = `${basePrefix}/featured${ext}`;
       const arr = await featuredFile.arrayBuffer();
-      await s3.send(new PutObjectCommand({
-        Bucket: R2_BUCKET, Key: featuredKey,
-        Body: new Uint8Array(arr),
-        ContentType: featuredFile.type || "image/png",
-        CacheControl: "public, max-age=31536000, immutable",
-      }));
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: featuredKey,
+          Body: new Uint8Array(arr),
+          ContentType: featuredFile.type || "image/png",
+          CacheControl: "public, max-age=31536000, immutable",
+        }),
+      );
       featuredPublicUrl = `${R2_PUBLIC_URL}/${featuredKey}`;
     }
 
@@ -111,21 +147,35 @@ export async function POST(req: NextRequest) {
         ? bookmarks.map((b) => ({
             id: String(b.id || ""),
             page: Number.isFinite(Number(b.page)) ? Number(b.page) : 1,
-            label: String(b.label || "").trim() || `Page ${Number(b.page || 1)}`,
+            label:
+              String(b.label || "").trim() ||
+              `Page ${Number(b.page || 1)}`,
             color: b.color ?? null,
+          }))
+        : [],
+      ads: Array.isArray(ads)
+        ? ads.map((a, i) => ({
+            id: String(a.id || `ad-${i}`),
+            key: String(a.key || ""),
+            url: String(a.url || ""),
+            label: a.label ?? null,
+            href: a.href ?? null,
+            seq: Number.isFinite(Number(a.seq)) ? Number(a.seq) : i,
           }))
         : [],
       file,
       publishedAt: new Date().toISOString(),
     };
 
-    await s3.send(new PutObjectCommand({
-      Bucket: R2_BUCKET,
-      Key: metaJsonKey,
-      Body: JSON.stringify(metaPayload, null, 2),
-      ContentType: "application/json; charset=utf-8",
-      CacheControl: "no-cache",
-    }));
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: metaJsonKey,
+        Body: JSON.stringify(metaPayload, null, 2),
+        ContentType: "application/json; charset=utf-8",
+        CacheControl: "no-cache",
+      }),
+    );
 
     /* --- оновити directory/index.json (Edge-safe) --- */
     try {
@@ -146,28 +196,49 @@ export async function POST(req: NextRequest) {
           // prev можна додати у майбутньому для точнішого diff закладок
         }),
       }).catch(() => null);
-    } catch { /* не ламаємо публікацію, якщо індекс не оновився */ }
+    } catch {
+      /* не ламаємо публікацію, якщо індекс не оновився */
+    }
 
     return ok({
-  ok: true,
-  stored: {
-    slug: finalSlug,
-    metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
-    featuredUrl: featuredPublicUrl,
-  },
-  urlPath: `/directory/${finalSlug}`,
-  publicUrl: `${SITE_URL}/directory/${finalSlug}`,
-});
-
+      ok: true,
+      stored: {
+        slug: finalSlug,
+        metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
+        featuredUrl: featuredPublicUrl,
+      },
+      urlPath: `/directory/${finalSlug}`,
+      publicUrl: `${SITE_URL}/directory/${finalSlug}`,
+    });
   } catch (e: any) {
     return err(String(e?.message || e), 500);
   }
 }
 
 /* локальні типи */
+type AdItem = {
+  id: string;
+  key: string;
+  url: string;
+  label: string | null;
+  href: string | null;
+  seq: number | null;
+};
+
 type MetaJson = {
-  meta: { title: string; description: string; featuredUrl?: string | null; slug: string };
-  bookmarks?: Array<{ id: string; page: number; label: string; color?: string | null }>;
+  meta: {
+    title: string;
+    description: string;
+    featuredUrl?: string | null;
+    slug: string;
+  };
+  bookmarks?: Array<{
+    id: string;
+    page: number;
+    label: string;
+    color?: string | null;
+  }>;
+  ads?: AdItem[];
   file: string;
   publishedAt: string;
 };
