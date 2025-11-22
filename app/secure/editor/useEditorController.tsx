@@ -850,9 +850,16 @@ function submitJump() {
 /* ---------- bookmarks & meta ---------- */
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
 
+type AdSlot = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+};
 
 const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 
+const [ads, setAds] = useState<AdSlot[]>([]);
 
 const [meta, setMetaState] = useState<{
   title: string;
@@ -874,6 +881,20 @@ function setMeta(next: Partial<typeof meta>) {
 function setFeatured(url?: string | null) {
   setMetaState((m) => ({ ...m, featuredUrl: url ?? null }));
 }
+
+function addAdSlot(input: { imageUrl: string; href?: string | null; label?: string | null }) {
+  const id = genId();
+  setAds(list => [...list, { id, ...input }]);
+}
+
+function updateAdSlot(id: string, patch: Partial<Omit<AdSlot, "id">>) {
+  setAds(list => list.map(a => (a.id === id ? { ...a, ...patch } : a)));
+}
+
+function removeAdSlot(id: string) {
+  setAds(list => list.filter(a => a.id !== id));
+}
+
 
 
 function addBookmark(
@@ -945,21 +966,32 @@ async function publishMetaAndBookmarks(): Promise<{
   metaJsonUrl?: string;
 }> {
   // готуємо тіло запиту — як і раніше, але тепер чекаємо відповідь
-  const payload = {
-    file,
-    meta: {
-      title: meta.title || title || "",
-      description: meta.description || "",
-      featuredUrl: meta.featuredUrl || null,
-      slug: meta.slug || (title || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-"),
-    },
-    bookmarks: bookmarks.map((b) => ({
-      id: b.id,
-      page: b.page,
-      label: b.label,
-      color: b.color ?? null,
-    })),
-  };
+  const payload = {
+    file,
+    meta: {
+      title: meta.title || title || "",
+      description: meta.description || "",
+      featuredUrl: meta.featuredUrl || null,
+      slug: meta.slug || (title || "")
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-"),
+    },
+    bookmarks: bookmarks.map((b) => ({
+      id: b.id,
+      page: b.page,
+      label: b.label,
+      color: b.color ?? null,
+    })),
+    ads: ads.map(a => ({
+      id: a.id,
+      imageUrl: a.imageUrl,
+      href: a.href ?? null,
+      label: a.label ?? null,
+    })),
+  };
+
 
 
   const res = await fetch("/api/publish", {
@@ -1099,17 +1131,12 @@ async function publishMetaAndBookmarks(): Promise<{
     handleShare,
     // css
     globalCss,
-    bookmarks,
-    setBookmarks,
-    updateBookmark,
-    addBookmark,
-    removeBookmark,
-    goToBookmark,
-    meta,
-    setMeta,
-    setFeatured,
-    publishMetaAndBookmarks,
+    bookmarks, setBookmarks, updateBookmark, addBookmark, removeBookmark, goToBookmark,
+  meta, setMeta, setFeatured,
+  ads, setAds, addAdSlot, updateAdSlot, removeAdSlot,
+  publishMetaAndBookmarks,
 
-    title: title || file || "", // --- ось цей рядок!
+  title: title || file || "",
+
   };
 }

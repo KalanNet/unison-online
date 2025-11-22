@@ -7,14 +7,15 @@ import EditorHeader from "../secure/editor/EditorHeader";
 import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
-import LeftAdsPanel from "../secure/editor/LeftAdsPanel"; // ⬅️ ДОДАТИ ЦЕ
-
+import LeftAdsPanel from "../secure/editor/LeftAdsPanel";
 
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
 /* --- тип закладки --- */
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
+
+type AdSlot = { id: string; imageUrl: string; href?: string | null; label?: string | null };
 
 /** Хук для брейкпоінта 980px */
 function useIsMobile(bp = 980) {
@@ -35,10 +36,12 @@ export default function PublicViewer({
   file,
   title,
   bookmarks = [],
+  ads = [],
 }: {
   file: string;
   title?: string;
-  bookmarks?: { id: string; page: number; label: string; color?: string | null }[];
+  bookmarks?: Bookmark[];
+  ads?: AdSlot[];
 }) {
   // --- Search UI state (for header) ---
   const [searchOpen, setSearchOpen] = useState(false);
@@ -48,67 +51,69 @@ export default function PublicViewer({
   const suppressNavRef = React.useRef<boolean>(false);
 
   // 🔇 локальний мут
-const [soundMuted, setSoundMuted] = React.useState(false);
-const toggleSound = React.useCallback(() => setSoundMuted(v => !v), []);
+  const [soundMuted, setSoundMuted] = React.useState(false);
+  const toggleSound = React.useCallback(() => setSoundMuted((v) => !v), []);
 
+  // 🔊 один-єдиний audio-об’єкт
+  const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const playFlip = React.useCallback(() => {
+    if (soundMuted) return;
+    const a = flipAudioRef.current;
+    if (!a) return;
+    try {
+      a.currentTime = 0;
+      void a.play();
+    } catch {}
+  }, [soundMuted]);
 
-// 🔊 один-єдиний audio-об’єкт
-const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
-const playFlip = React.useCallback(() => {
-  if (soundMuted) return;           // ⬅️ якщо вимкнено — не граємо
-  const a = flipAudioRef.current;
-  if (!a) return;
-  try {
-    a.currentTime = 0;
-    void a.play();
-  } catch {}
-}, [soundMuted]);
-
-// 1) ХУК КОНТРОЛЕРА — без onFlip, звук вмикаємо самі
-const ctrl = useViewerController({ file, title });
+  // 1) ХУК КОНТРОЛЕРА
+  const ctrl = useViewerController({ file, title });
 
   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
   const isMobile = useIsMobile(980);
 
   // --- FOOTER API WRAPPER: звук ДО переходу ---
-const footerApi = React.useMemo(() => {
-  if (!ctrl) {
+  const footerApi = React.useMemo(() => {
+    if (!ctrl) {
+      return {
+        goFirst: () => {},
+        goPrev: () => {},
+        goNext: () => {},
+        goLast: () => {},
+        submitJump: () => {},
+      };
+    }
     return {
-      goFirst: () => {},
-      goPrev: () => {},
-      goNext: () => {},
-      goLast: () => {},
-      submitJump: () => {},
+      goFirst: () => {
+        if (!ctrl.totalPages || ctrl.currentIndex === 0) return;
+        playFlip();
+        ctrl.goFirst();
+      },
+      goPrev: () => {
+        if (!ctrl.canPrev) return;
+        playFlip();
+        ctrl.goPrev();
+      },
+      goNext: () => {
+        if (!ctrl.canNext) return;
+        playFlip();
+        ctrl.goNext();
+      },
+      goLast: () => {
+        if (!ctrl.totalPages || ctrl.currentIndex === ctrl.totalPages - 1) return;
+        playFlip();
+        ctrl.goLast();
+      },
+      submitJump: () => {
+        const before = ctrl.currentIndex;
+        ctrl.submitJump();
+        setTimeout(() => {
+          if (ctrl.currentIndex !== before) playFlip();
+        }, 0);
+      },
     };
-  }
-  return {
-    goFirst: () => {
-      if (!ctrl.totalPages || ctrl.currentIndex === 0) return;
-      playFlip(); ctrl.goFirst();
-    },
-    goPrev: () => {
-      if (!ctrl.canPrev) return;
-      playFlip(); ctrl.goPrev();
-    },
-    goNext: () => {
-      if (!ctrl.canNext) return;
-      playFlip(); ctrl.goNext();
-    },
-    goLast: () => {
-      if (!ctrl.totalPages || ctrl.currentIndex === ctrl.totalPages - 1) return;
-      playFlip(); ctrl.goLast();
-    },
-    submitJump: () => {
-      const before = ctrl.currentIndex;
-      ctrl.submitJump();
-      setTimeout(() => {
-        if (ctrl.currentIndex !== before) playFlip();
-      }, 0);
-    },
-  };
-}, [ctrl, playFlip]);
-// --- /FOOTER API WRAPPER ---
-
+  }, [ctrl, playFlip]);
+  // --- /FOOTER API WRAPPER ---
 
   // --- закладки: відсортовані, глобальний індекс, коефіцієнт перекриття ---
   const bmSorted = React.useMemo(
@@ -122,67 +127,56 @@ const footerApi = React.useMemo(() => {
     [bmSorted]
   );
 
-  // Коефіцієнт кроку між закладками (1 = повний рознос, 0.5 = ~50% перекриття)
+  // Коефіцієнт кроку між закладками
   const bmStep = React.useMemo(() => {
     const total = bmSorted.length;
     if (total <= 1) return 1;
 
-    const bookHeight = Math.round((ctrl.baseSize?.h ?? 0) * (ctrl.fitScale ?? 1));
+    const bookHeight = Math.round((ctrl?.baseSize?.h ?? 0) * (ctrl?.fitScale ?? 1));
     if (!bookHeight || !Number.isFinite(bookHeight)) return 1;
 
     const TAB_LEN = 140; // відповідає --tabLength
-    const TOP = 36; // відповідає --tabTop
-    const BOTTOM = 36; // СИМЕТРИЧНИЙ відступ знизу
+    const TOP = 36; // --tabTop
+    const BOTTOM = 36;
 
-    // висота, яка лишається на стиснення МІЖ першою і останньою вкладкою
     const usable = bookHeight - TOP - BOTTOM - TAB_LEN;
     if (usable <= 0) return 1;
 
-    const denom = (total - 1) * TAB_LEN; // сумарна висота проміжків
-    if (usable >= denom) return 1; // місця достатньо, вкладки не перекриваються
+    const denom = (total - 1) * TAB_LEN;
+    if (usable >= denom) return 1;
 
-    const step = usable / denom; // наскільки стискаємо
-    return Math.max(0.25, step); // мінімум 25%
-  }, [bmSorted.length, ctrl.baseSize?.h, ctrl.fitScale]);
+    const step = usable / denom;
+    return Math.max(0.25, step);
+  }, [bmSorted.length, ctrl?.baseSize?.h, ctrl?.fitScale]);
 
   /* ---------- ВИПРАВЛЕНИЙ jumpToPdfPage ---------- */
   const jumpToPdfPage = React.useCallback(
-  (page1: number) => {
-    if (!ctrl) return;
+    (page1: number) => {
+      if (!ctrl) return;
 
-    // 🔊 звук на старті стрибка
-    playFlip();
+      // 🔊 звук на старті стрибка
+      playFlip();
 
-    const total = ctrl.totalPages || 0;
-    const safePage =
-      total > 0
-        ? Math.max(1, Math.min(total, page1 || 1))
-        : Math.max(1, page1 || 1);
+      const total = ctrl.totalPages || 0;
+      const safePage =
+        total > 0
+          ? Math.max(1, Math.min(total, page1 || 1))
+          : Math.max(1, page1 || 1);
 
-      // поточний розворот у PDF-номерах (1-based)
       const curr = ctrl.currentIndex + 1;
-      const leftNow = ctrl.single
-        ? curr
-        : curr % 2 === 0
-        ? curr
-        : curr - 1;
+      const leftNow = ctrl.single ? curr : curr % 2 === 0 ? curr : curr - 1;
       const rightNow = Math.min(leftNow + 1, total || leftNow);
 
-      // якщо потрібна сторінка вже у поточному розвороті (зліва або справа),
-      // нічого не робимо — не міняємо currentIndex і не чіпаємо FlipBook.
       if (safePage === leftNow || safePage === rightNow) {
         return;
       }
 
-      // page1 — 1-based (як у PDF), а FlipBook працює з 0-based
       const target = Math.max(0, safePage - 1);
 
       if (ctrl.currentIndex === target) return;
 
-      // спочатку оновлюємо state контролера
       ctrl.setCurrentIndex(target);
 
-      // у наступний кадр даємо команду самому FlipBook
       setTimeout(() => {
         const api = (ctrl.bookRef.current as any)?.pageFlip?.();
         if (api?.turnToPage) {
@@ -194,89 +188,84 @@ const footerApi = React.useMemo(() => {
         }
       }, 0);
     },
-    [ctrl]
+    [ctrl, playFlip]
   );
   /* ---------- /jumpToPdfPage ---------- */
 
   // 3) Зафіксувати стартову сторінку (один раз)
   if (ctrl && initPageRef.current === null) {
-    initPageRef.current = ctrl.currentIndex; // зафіксувати стартову сторінку лише раз
+    initPageRef.current = ctrl.currentIndex;
   }
 
   // === AUTO-SEARCH (1: запуск пошуку) ===
-const lastSearchSigRef = React.useRef<string>("");
-const lastJumpSigRef = React.useRef<string>("");
+  const lastSearchSigRef = React.useRef<string>("");
+  const lastJumpSigRef = React.useRef<string>("");
 
-React.useEffect(() => {
-  if (!ctrl) return;
-  const qTrim = q.trim();
-  const sig = `${file}::${qTrim}`;
+  React.useEffect(() => {
+    if (!ctrl) return;
+    const qTrim = q.trim();
+    const sig = `${file}::${qTrim}`;
 
-  // якщо рядок точно не змінився — не перезапускаємо пошук
-  if (lastSearchSigRef.current === sig) return;
-  lastSearchSigRef.current = sig;
+    if (lastSearchSigRef.current === sig) return;
+    lastSearchSigRef.current = sig;
 
-  const t = setTimeout(() => {
-    // легка затримка тільки на сам пошук (щоб не молотити API на кожен символ)
-    ctrl.runSearch(qTrim);
-    // як тільки користувач почав друкувати інший запит — скинемо прапор автопереходу
-    lastJumpSigRef.current = "";
-  }, 400);
+    const t = setTimeout(() => {
+      ctrl.runSearch(qTrim);
+      lastJumpSigRef.current = "";
+    }, 400);
 
-  return () => clearTimeout(t);
-}, [q, file, !!ctrl]);
+    return () => clearTimeout(t);
+  }, [q, file, ctrl]);
 
-// === AUTO-JUMP (2: автоперехід до першого результату через 1.2 c) ===
-React.useEffect(() => {
-  if (!ctrl) return;
+  // === AUTO-JUMP (2: автоперехід до першого результату через 1.2 c) ===
+  React.useEffect(() => {
+    if (!ctrl) return;
 
-  const qTrim = q.trim();
-  if (!qTrim) return;
-  if (!ctrl.hits || ctrl.hits.length === 0) return;
+    const qTrim = q.trim();
+    if (!qTrim) return;
+    if (!ctrl.hits || ctrl.hits.length === 0) return;
 
-  const sig = `${file}::${qTrim}`;
+    const sig = `${file}::${qTrim}`;
+    if (lastJumpSigRef.current === sig) return;
 
-  // якщо вже стрибали за цим самим запитом — не повторюємо
-  if (lastJumpSigRef.current === sig) return;
+    const t = setTimeout(() => {
+      const nowSig = `${file}::${q.trim()}`;
+      if (nowSig !== sig) return;
 
-  const t = setTimeout(() => {
-    // перевіряємо, що користувач не змінив запит за ці 1.2 c
-    const nowSig = `${file}::${q.trim()}`;
-    if (nowSig !== sig) return;
+      lastJumpSigRef.current = sig;
 
-    lastJumpSigRef.current = sig;
+      const first = ctrl.hits[0];
+      if (!first?.page) return;
 
-    const first = ctrl.hits[0];
-    if (!first?.page) return;
+      const target = Math.max(0, first.page - 1);
 
-    const target = Math.max(0, first.page - 1); // 0-based
+      if (ctrl.currentIndex === target) return;
 
-    if (ctrl.currentIndex === target) return;
+      (ctrl as any).setActiveHit?.(0);
+      ctrl.setCurrentIndex(target);
 
-    // підсвітити перший результат
-    (ctrl as any).setActiveHit?.(0);
-    ctrl.setCurrentIndex(target);
+      setTimeout(() => {
+        const api = (ctrl.bookRef.current as any)?.pageFlip?.();
+        if (api?.turnToPage) {
+          api.turnToPage(target);
+        } else if (typeof (ctrl as any).goToPage === "function") {
+          (ctrl as any).goToPage(target);
+        } else if (api?.flip) {
+          api.flip(target);
+        }
+      }, 0);
+    }, 1200);
 
-    // синхронізувати FlipBook
-    setTimeout(() => {
-      const api = (ctrl.bookRef.current as any)?.pageFlip?.();
-      if (api?.turnToPage) {
-        api.turnToPage(target);
-      } else if (typeof (ctrl as any).goToPage === "function") {
-        (ctrl as any).goToPage(target);
-      } else if (api?.flip) {
-        api.flip(target);
-      }
-    }, 0);
-  }, 1200); // 1.2 c «на роздуми»
-
-  return () => clearTimeout(t);
-}, [q, file, !!ctrl, ctrl.hits]);
-
+    return () => clearTimeout(t);
+  }, [q, file, ctrl, ctrl?.hits]);
   // === /AUTO-SEARCH ===
 
   // ---- РАННІ ВАЛІДАЦІЇ ----
-  if (!file || typeof file !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)) {
+  if (
+    !file ||
+    typeof file !== "string" ||
+    !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(file)
+  ) {
     return (
       <div
         style={{
@@ -308,18 +297,18 @@ React.useEffect(() => {
           textAlign: "center",
         }}
       >
-        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Loading…</h2>
+        <h2
+          style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}
+        >
+          Loading…
+        </h2>
       </div>
     );
   }
 
   // --- МОБІЛЬНИЙ РЕНДЕР на ≤980px ---
   if (isMobile) {
-    // Адаптер: примусово даємо мобільні версії переходів БЕЗ FlipBook
-    // локальні хелпери підвантаження сторінок (щоб не було TS-помилок)
     const ensureRendered = (idx: number) => {
-      // якщо ваш контролер має власний метод — викличеться він;
-      // інакше пробуємо типові варіанти (1-based API)
       try {
         (ctrl as any).ensureRendered?.(idx);
       } catch {}
@@ -337,137 +326,140 @@ React.useEffect(() => {
       });
     };
 
-        const mCtrl = {
-  ...ctrl,
-  goToPage: (idx: number) => {
-    const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
-    if (safe === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(safe);
-    ensureRendered(safe);
-    warmPagesAround(safe);
-  },
-  goNext: () => {
-    if (!ctrl.canNext) return;
-    const next = ctrl.currentIndex + 1;
-    const safe = Math.min(next, ctrl.totalPages - 1);
-    if (safe === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(safe);
-    ensureRendered(safe);
-    warmPagesAround(safe);
-  },
-  goPrev: () => {
-    if (!ctrl.canPrev) return;
-    const prev = ctrl.currentIndex - 1;
-    const safe = Math.max(prev, 0);
-    if (safe === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(safe);
-    ensureRendered(safe);
-    warmPagesAround(safe);
-  },
-  goFirst: () => {
-    if (!ctrl.totalPages) return;
-    const idx = 0;
-    if (idx === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(idx);
-    ensureRendered(idx);
-    warmPagesAround(idx);
-  },
-  goLast: () => {
-    if (!ctrl.totalPages) return;
-    const idx = ctrl.totalPages - 1;
-    if (idx === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(idx);
-    ensureRendered(idx);
-    warmPagesAround(idx);
-  },
-  submitJump: () => {
-    const n = parseInt(String(ctrl.pageJump), 10);
-    if (!Number.isFinite(n)) return;
-    const target = Math.max(1, Math.min(n, ctrl.totalPages)) - 1;
-    const safe = Math.max(0, Math.min(target, ctrl.totalPages - 1));
-    if (safe === ctrl.currentIndex) return;
-    playFlip(); // 🔊
-    ctrl.setCurrentIndex(safe);
-    ensureRendered(safe);
-    warmPagesAround(safe);
-  },
-};
-
-
+    const mCtrl = {
+      ...ctrl,
+      goToPage: (idx: number) => {
+        const safe = Math.max(0, Math.min(idx, ctrl.totalPages - 1));
+        if (safe === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
+      },
+      goNext: () => {
+        if (!ctrl.canNext) return;
+        const next = ctrl.currentIndex + 1;
+        const safe = Math.min(next, ctrl.totalPages - 1);
+        if (safe === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
+      },
+      goPrev: () => {
+        if (!ctrl.canPrev) return;
+        const prev = ctrl.currentIndex - 1;
+        const safe = Math.max(prev, 0);
+        if (safe === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
+      },
+      goFirst: () => {
+        if (!ctrl.totalPages) return;
+        const idx = 0;
+        if (idx === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(idx);
+        ensureRendered(idx);
+        warmPagesAround(idx);
+      },
+      goLast: () => {
+        if (!ctrl.totalPages) return;
+        const idx = ctrl.totalPages - 1;
+        if (idx === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(idx);
+        ensureRendered(idx);
+        warmPagesAround(idx);
+      },
+      submitJump: () => {
+        const n = parseInt(String(ctrl.pageJump), 10);
+        if (!Number.isFinite(n)) return;
+        const target = Math.max(1, Math.min(n, ctrl.totalPages)) - 1;
+        const safe = Math.max(0, Math.min(target, ctrl.totalPages - 1));
+        if (safe === ctrl.currentIndex) return;
+        playFlip();
+        ctrl.setCurrentIndex(safe);
+        ensureRendered(safe);
+        warmPagesAround(safe);
+      },
+    };
 
     return (
-    <div className="viewer-root" style={{ background: "#21353a" }}>
+      <div className="viewer-root" style={{ background: "#21353a" }}>
+        {/* 🔊 звук перегортання сторінок */}
+        <audio ref={flipAudioRef} src="/flipsound.ogg" preload="auto" />
+
+        <MobileHeader
+          title={ctrl.title}
+          file={file}
+          searchQuery={q}
+          setSearchQuery={setQ}
+          runSearch={(qq: string) => setQ(qq)}
+          searching={ctrl.searching}
+          hits={ctrl.hits}
+          onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+          onShare={ctrl.handleShare}
+          bookmarks={bookmarks}
+          splashActive={false}
+        />
+
+        <MobilePager
+          ctrl={mCtrl as any}
+          file={file}
+          title={ctrl.title}
+          searchQuery={q}
+          setSearchQuery={setQ}
+          runSearch={(qq: string) => setQ(qq)}
+          searching={ctrl.searching}
+          hits={ctrl.hits}
+          onGoto={(p: number) => mCtrl.goToPage(p - 1)}
+          onShare={ctrl.handleShare}
+        />
+
+        <style jsx global>{`
+          html,
+          body {
+            height: 100svh;
+            overflow: hidden;
+          }
+          .viewer-root {
+            min-height: 100svh;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // прапорці для обкладинок (десктоп)
+  const isFrontCover = ctrl.currentIndex === 0;
+  const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
+
+  // --- ДЕСКТОП (FlipBook) ---
+  return (
+    <div className="viewer-root">
       {/* 🔊 звук перегортання сторінок */}
       <audio ref={flipAudioRef} src="/flipsound.ogg" preload="auto" />
 
-      <MobileHeader
+      {/* Панель: видима на титулці, ховається на інших сторінках */}
+      <LeftAdsPanel autoCollapsed={!isFrontCover} items={ads} />
+
+      <EditorHeader
         title={ctrl.title}
+        onSearch={(term) => setQ(term)}
+        isSearching={(ctrl as any).searching ?? false}
         file={file}
+        isFs={ctrl.isFs}
+        toggleFullscreen={ctrl.toggleFullscreen}
+        handleShare={ctrl.handleShare}
+        onPublish={() => {}}
+        searchOpen={searchOpen}
+        onSearchToggle={setSearchOpen}
         searchQuery={q}
-        setSearchQuery={setQ}
-        runSearch={(qq: string) => setQ(qq)}
-        searching={ctrl.searching}
-        hits={ctrl.hits}
-        onGoto={(p: number) => mCtrl.goToPage(p - 1)}
-        onShare={ctrl.handleShare}
-        bookmarks={bookmarks}
-        splashActive={false}
+        onSearchChange={(v) => setQ(v)}
       />
-
-      <MobilePager
-        ctrl={mCtrl as any}
-        file={file}
-        title={ctrl.title}
-        searchQuery={q}
-        setSearchQuery={setQ}
-        runSearch={(qq: string) => setQ(qq)}
-        searching={ctrl.searching}
-        hits={ctrl.hits}
-        onGoto={(p: number) => mCtrl.goToPage(p - 1)}
-        onShare={ctrl.handleShare}
-      />
-
-      <style jsx global>{`
-        html, body { height: 100svh; overflow: hidden; }
-        .viewer-root { min-height: 100svh; }
-      `}</style>
-    </div>
-  );
-}
-  
-
-// прапорці для обкладинок (десктоп)
-const isFrontCover = ctrl.currentIndex === 0;
-const isBackCover = ctrl.currentIndex === ctrl.totalPages - 1;
-
-// --- ДЕСКТОП (FlipBook) ---
-return (
-  <div className="viewer-root">
-    {/* 🔊 звук перегортання сторінок */}
-    <audio ref={flipAudioRef} src="/flipsound.ogg" preload="auto" />
-
-    {/* Панель відкрита тільки на титулці, на всіх інших сторінках ховається */}
-    <LeftAdsPanel autoCollapsed={!isFrontCover} />
-
-    <EditorHeader
-      title={ctrl.title}
-      onSearch={(term) => setQ(term)}
-      isSearching={(ctrl as any).searching ?? false}
-      file={file}
-      isFs={ctrl.isFs}
-      toggleFullscreen={ctrl.toggleFullscreen}
-      handleShare={ctrl.handleShare}
-      onPublish={() => {}}
-      searchOpen={searchOpen}
-      onSearchToggle={setSearchOpen}
-      searchQuery={q}
-      onSearchChange={(v) => setQ(v)}
-    />
 
       <section ref={ctrl.stageRef} className="viewer-stage">
         {/* резервуємо місце і пробрасываем --bm-step у CSS */}
@@ -510,7 +502,9 @@ return (
               useMouseEvents={false}
               clickEventForward
               startPage={(initPageRef.current ?? 0) as number}
-              onFlip={(e: { data: number }) => ctrl!.setCurrentIndex(e.data)}
+              onFlip={(e: { data: number }) =>
+                ctrl!.setCurrentIndex(e.data)
+              }
               style={{
                 width: "100%",
                 height: "100%",
@@ -522,14 +516,16 @@ return (
               {Array.from({ length: ctrl.totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const bmp = ctrl!.cacheRef.current.get(pageNum);
-                const links: Array<{
-                  x: number;
-                  y: number;
-                  w: number;
-                  h: number;
-                  href?: string;
-                  dest?: any;
-                }> = (bmp?.links as any) ?? [];
+                const links:
+                  | Array<{
+                      x: number;
+                      y: number;
+                      w: number;
+                      h: number;
+                      href?: string;
+                      dest?: any;
+                    }>
+                  | [] = (bmp?.links as any) ?? [];
 
                 return (
                   <div
@@ -540,7 +536,9 @@ return (
                       background: "#fff",
                       position: "relative",
                     }}
-                    onMouseMove={(e) => ctrl!.handlePageMouseMove(e, pageNum)}
+                    onMouseMove={(e) =>
+                      ctrl!.handlePageMouseMove(e, pageNum)
+                    }
                     onMouseLeave={ctrl!.handlePageMouseLeave}
                   >
                     {bmp ? (
@@ -563,46 +561,55 @@ return (
 
                         {/* === HIGHLIGHTS LAYER === */}
                         <div className="hl-layer" aria-hidden>
-                          {(((ctrl as any).pageHighlights?.get?.(pageNum)) ?? []).map(
-                            (r: any, j: number) => {
-                              const isActive =
-                                typeof r.hitIndex === "number" &&
-                                r.hitIndex === (ctrl as any).activeHit;
-                              return (
-                                <div
-                                  key={j}
-                                  className={`hl${isActive ? " is-active" : ""}`}
-                                  style={{
-                                    position: "absolute",
-                                    left: `${r.x * 100}%`,
-                                    top: `${r.y * 100}%`,
-                                    width: `${r.w * 100}%`,
-                                    height: `${r.h * 100}%`,
-                                  }}
-                                />
-                              );
-                            }
-                          )}
+                          {(((ctrl as any).pageHighlights?.get?.(
+                            pageNum
+                          )) ?? []
+                          ).map((r: any, j: number) => {
+                            const isActive =
+                              typeof r.hitIndex === "number" &&
+                              r.hitIndex === (ctrl as any).activeHit;
+                            return (
+                              <div
+                                key={j}
+                                className={`hl${
+                                  isActive ? " is-active" : ""
+                                }`}
+                                style={{
+                                  position: "absolute",
+                                  left: `${r.x * 100}%`,
+                                  top: `${r.y * 100}%`,
+                                  width: `${r.w * 100}%`,
+                                  height: `${r.h * 100}%`,
+                                }}
+                              />
+                            );
+                          })}
                         </div>
                         {/* === /HIGHLIGHTS LAYER === */}
+
                         {/* === BOOKMARK TABS (ONLY for current spread pages) === */}
                         {bmSorted
                           .filter((b) => b.page === pageNum)
                           .map((bm) => {
                             const i = bmIndex.get(bm.id) ?? 0;
 
-                            const curr = ctrl.currentIndex + 1; // 1-based
+                            const curr = ctrl.currentIndex + 1;
                             const leftNow = ctrl.single
                               ? curr
                               : curr % 2 === 0
                               ? curr
                               : curr - 1;
-                            const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                            const rightNow = Math.min(
+                              leftNow + 1,
+                              ctrl.totalPages
+                            );
 
                             const isCurrentLeft = pageNum === leftNow;
                             const isCurrentRight = pageNum === rightNow;
 
-                            const sideIsLeft = ctrl.single ? bm.page < curr : bm.page <= leftNow;
+                            const sideIsLeft = ctrl.single
+                              ? bm.page < curr
+                              : bm.page <= leftNow;
 
                             const shouldAttach =
                               (isCurrentLeft && sideIsLeft) ||
@@ -610,7 +617,7 @@ return (
 
                             if (!shouldAttach) return null;
 
-                            const ACTIVE_SCALE = 1.14; // наскільки «товстішає» активна вкладка
+                            const ACTIVE_SCALE = 1.14;
 
                             const style: React.CSSProperties = {
                               position: "absolute",
@@ -622,7 +629,7 @@ return (
                               alignItems: "center",
                               justifyContent: "center",
                               color: "#fff",
-                              fontSize: 16, // активна — 16px
+                              fontSize: 16,
                               fontWeight: 500,
                               lineHeight: 1,
                               border: "1px solid rgba(0,0,0,.18)",
@@ -634,8 +641,6 @@ return (
                                 ? {
                                     left: 0,
                                     transformOrigin: "right center",
-                                    // внутрішній (правий) край «приліплений» до сторінки,
-                                    // масштаб росте лише назовні (вліво)
                                     transform:
                                       "translateZ(0.01px) translateX(var(--tabInset,-35px)) scaleX(" +
                                       ACTIVE_SCALE +
@@ -645,8 +650,6 @@ return (
                                 : {
                                     right: 0,
                                     transformOrigin: "left center",
-                                    // внутрішній (лівий) край «приліплений» до сторінки,
-                                    // масштаб росте лише назовні (вправо)
                                     transform:
                                       "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px))) scaleX(" +
                                       ACTIVE_SCALE +
@@ -658,7 +661,9 @@ return (
                             return (
                               <button
                                 key={bm.id}
-                                className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+                                className={`bm-tab ${
+                                  sideIsLeft ? "left" : "right"
+                                } active`}
                                 title={`${bm.label} (p.${bm.page})`}
                                 style={style}
                                 onClick={(e) => {
@@ -667,7 +672,9 @@ return (
                                   jumpToPdfPage(bm.page ?? 1);
                                 }}
                               >
-                                <span className="bm-tab__label">{bm.label}</span>
+                                <span className="bm-tab__label">
+                                  {bm.label}
+                                </span>
                               </button>
                             );
                           })}
@@ -698,7 +705,9 @@ return (
                                   className="pdf-link"
                                   title="Go to"
                                   onClick={() =>
-                                    L.dest ? (ctrl as any).goToDest?.(L.dest) : null
+                                    L.dest
+                                      ? (ctrl as any).goToDest?.(L.dest)
+                                      : null
                                   }
                                   style={{
                                     position: "absolute",
@@ -731,7 +740,7 @@ return (
             {/* === ALWAYS-VISIBLE RAILS === */}
             {bmSorted.length > 0 && (
               <div className="bm-rails" aria-hidden={false}>
-                {/* ліва рейка: усі сторінки ДО поточної лівої */}
+                {/* ліва рейка */}
                 <div className="bm-rail left">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
@@ -741,10 +750,12 @@ return (
                       ? curr
                       : curr - 1;
 
-                    const leftBookmarks = bmSorted.filter((bm) => bm.page < leftNow);
+                    const leftBookmarks = bmSorted.filter(
+                      (bm) => bm.page < leftNow
+                    );
 
                     return leftBookmarks.map((bm, idx) => {
-                      const pos = bmIndex.get(bm.id) ?? idx;// локальний порядок тільки по «лівих» сторінках
+                      const pos = bmIndex.get(bm.id) ?? idx;
 
                       return (
                         <button
@@ -771,7 +782,7 @@ return (
                   })()}
                 </div>
 
-                {/* права рейка: усі сторінки ПІСЛЯ поточної правої */}
+                {/* права рейка */}
                 <div className="bm-rail right">
                   {(() => {
                     const curr = ctrl.currentIndex + 1;
@@ -780,9 +791,14 @@ return (
                       : curr % 2 === 0
                       ? curr
                       : curr - 1;
-                    const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                    const rightNow = Math.min(
+                      leftNow + 1,
+                      ctrl.totalPages
+                    );
 
-                    const rightBookmarks = bmSorted.filter((bm) => bm.page > rightNow);
+                    const rightBookmarks = bmSorted.filter(
+                      (bm) => bm.page > rightNow
+                    );
 
                     return rightBookmarks.map((bm, idx) => {
                       const pos = bmIndex.get(bm.id) ?? idx;
@@ -815,42 +831,40 @@ return (
             )}
             {/* === /ALWAYS-VISIBLE RAILS === */}
 
-            {/* Кутові хендли для гортання */}
+            {/* Кутові хендли */}
             <div className="flip-handles" aria-hidden>
-              {/* Ліві кути — попередня сторінка */}
               <button
-  className="fh tl"
-  onMouseDown={(e) => {
-    e.preventDefault();
-    playFlip(); // 🔊
-    (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-  }}
-/>
-<button
-  className="fh bl"
-  onMouseDown={(e) => {
-    e.preventDefault();
-    playFlip(); // 🔊
-    (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
-  }}
-/>
-<button
-  className="fh tr"
-  onMouseDown={(e) => {
-    e.preventDefault();
-    playFlip(); // 🔊
-    (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-  }}
-/>
-<button
-  className="fh br"
-  onMouseDown={(e) => {
-    e.preventDefault();
-    playFlip(); // 🔊
-    (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
-  }}
-/>
-
+                className="fh tl"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  playFlip();
+                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
+                }}
+              />
+              <button
+                className="fh bl"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  playFlip();
+                  (ctrl.bookRef.current as any)?.pageFlip?.().flipPrev();
+                }}
+              />
+              <button
+                className="fh tr"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  playFlip();
+                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
+                }}
+              />
+              <button
+                className="fh br"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  playFlip();
+                  (ctrl.bookRef.current as any)?.pageFlip?.().flipNext();
+                }}
+              />
             </div>
           </div>
         </div>
@@ -858,7 +872,11 @@ return (
 
       {/* === RIGHT SEARCH FLYOUT === */}
       {q.trim().length > 0 && (
-        <aside className="search-flyout" role="region" aria-label="Search results">
+        <aside
+          className="search-flyout"
+          role="region"
+          aria-label="Search results"
+        >
           <div className="sf-hd">
             <strong>Search</strong>
             <span className="sf-meta">
@@ -887,27 +905,27 @@ return (
               <button
                 key={h.id}
                 type="button"
-                className={`sf-item${i === ctrl.activeHit ? " is-active" : ""}`}
+                className={`sf-item${
+                  i === ctrl.activeHit ? " is-active" : ""
+                }`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  playFlip(); // 🔊 звук ДО переходу
+                  playFlip();
 
-                  const target = Math.max(0, (h.page ?? 1) - 1); // 0-based
+                  const target = Math.max(0, (h.page ?? 1) - 1);
                   if (ctrl.currentIndex === target) {
                     ctrl.setActiveHit(i);
                     return;
                   }
 
-                  // 1) спочатку синхронізуємо наш state
                   ctrl.setActiveHit(i);
                   ctrl.setCurrentIndex(target);
 
-                  // 2) у наступний кадр — командуємо FlipBook
                   setTimeout(() => {
                     const api = (ctrl.bookRef.current as any)?.pageFlip?.();
                     if (api?.turnToPage) {
-                      api.turnToPage(target); // абсолютний перехід
+                      api.turnToPage(target);
                     } else if (typeof ctrl.goToPage === "function") {
                       ctrl.goToPage(target);
                     } else if (api?.flip) {
@@ -927,31 +945,27 @@ return (
       {/* === /RIGHT SEARCH FLYOUT === */}
 
       <ViewerFooter
-  refEl={ctrl.toolbarRef}
-  isNarrow={ctrl.isNarrow}
-  numPages={ctrl.totalPages}
-  currentIndex={ctrl.currentIndex}
-  canPrev={ctrl.canPrev}
-  canNext={ctrl.canNext}
-  /* звук ДО переходу — обгорнуті методи */
-  goFirst={footerApi.goFirst}
-  goPrev={footerApi.goPrev}
-  goNext={footerApi.goNext}
-  goLast={footerApi.goLast}
-  pageJump={ctrl.pageJump}
-  setPageJump={ctrl.setPageJump}
-  submitJump={footerApi.submitJump}
-  loupeOn={ctrl.loupeOn}
-  setLoupeOn={ctrl.setLoupeOn}
-  loupeState={ctrl.loupe}
-  LOUPE_SIZE={ctrl.LOUPE_SIZE}
-  LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
-
-  /* ⬇️ ось тут було помилково з ctrl */
-  soundMuted={soundMuted}
-  toggleSound={toggleSound}
-/>
-
+        refEl={ctrl.toolbarRef}
+        isNarrow={ctrl.isNarrow}
+        numPages={ctrl.totalPages}
+        currentIndex={ctrl.currentIndex}
+        canPrev={ctrl.canPrev}
+        canNext={ctrl.canNext}
+        goFirst={footerApi.goFirst}
+        goPrev={footerApi.goPrev}
+        goNext={footerApi.goNext}
+        goLast={footerApi.goLast}
+        pageJump={ctrl.pageJump}
+        setPageJump={ctrl.setPageJump}
+        submitJump={footerApi.submitJump}
+        loupeOn={ctrl.loupeOn}
+        setLoupeOn={ctrl.setLoupeOn}
+        loupeState={ctrl.loupe}
+        LOUPE_SIZE={ctrl.LOUPE_SIZE}
+        LOUPE_ZOOM={ctrl.LOUPE_ZOOM}
+        soundMuted={soundMuted}
+        toggleSound={toggleSound}
+      />
 
 
       <style jsx global>{`

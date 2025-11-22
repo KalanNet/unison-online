@@ -3,15 +3,33 @@
 
 import React from "react";
 
+type AdSlotView = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+};
+
 type LeftAdsPanelProps = {
   /** Зовнішній прапорець: чи має панель бути згорнута */
   autoCollapsed?: boolean;
+  /** Рекламні слоти, які приходять з опублікованих метаданих */
+  items?: AdSlotView[];
 };
 
-export default function LeftAdsPanel({ autoCollapsed }: LeftAdsPanelProps) {
+export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
+
+  const ads: AdSlotView[] = React.useMemo(() => {
+    if (items && items.length > 0) return items;
+    // Фолбек, якщо немає жодної реклами
+    return [
+      { id: "placeholder-1", imageUrl: "", href: null, label: "AD 1" },
+      { id: "placeholder-2", imageUrl: "", href: null, label: "AD 2" },
+    ];
+  }, [items]);
 
   // Синхронізація з зовнішнім прапорцем (фліпбук перейшов у 2-сторінковий режим)
   React.useEffect(() => {
@@ -43,8 +61,6 @@ export default function LeftAdsPanel({ autoCollapsed }: LeftAdsPanelProps) {
     return () => window.clearInterval(id);
   }, []);
 
-  const ads = [...Array(5)].map((_, i) => `Ad ${i + 1}`);
-
   return (
     <aside
       className={`lh-leftads${collapsed ? " is-collapsed" : ""}`}
@@ -65,9 +81,19 @@ export default function LeftAdsPanel({ autoCollapsed }: LeftAdsPanelProps) {
 
       <div className="lh-leftads-inner" ref={scrollRef}>
         {/* дублюємо список, щоб зробити безкінечну карусель */}
-        {ads.concat(ads).map((label, i) => (
-          <div key={i} className="lh-ads-slot">
-            <span>{label}</span>
+        {ads.concat(ads).map((ad, i) => (
+          <div key={`${ad.id}-${i}`} className="lh-ads-slot">
+            {ad.imageUrl ? (
+              ad.href ? (
+                <a href={ad.href} target="_blank" rel="noopener noreferrer">
+                  <img src={ad.imageUrl} alt={ad.label || "Ad"} />
+                </a>
+              ) : (
+                <img src={ad.imageUrl} alt={ad.label || "Ad"} />
+              )
+            ) : (
+              <span>{ad.label}</span>
+            )}
           </div>
         ))}
       </div>
@@ -118,6 +144,13 @@ export default function LeftAdsPanel({ autoCollapsed }: LeftAdsPanelProps) {
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.08em;
+        }
+
+        .lh-ads-slot img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
         }
 
         /* Ручка-стрілка */

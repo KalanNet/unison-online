@@ -1,4 +1,3 @@
-// app/components/Viewer.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -6,22 +5,34 @@ import dynamic from "next/dynamic";
 import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
+import { prepareWebP200k } from "app/lib/imageWebp";
 
-type InitMeta = { title: string; description: string; slug: string; featuredUrl: string | null };
-type InitBookmark = { id: string; page: number; label: string; color?: string | null };
-
+type InitMeta = {
+  title: string;
+  description: string;
+  slug: string;
+  featuredUrl: string | null;
+};
+type InitBookmark = {
+  id: string;
+  page: number;
+  label: string;
+  color?: string | null;
+};
 
 /* --- SEO limits (golden standards) --- */
 const SEO = {
-  TITLE_MAX: 60,   // title ~50–60 chars
-  DESC_MAX: 155,   // meta description ~155–160 chars
-  SLUG_MAX: 60,    // короткі й чисті урли
-  LABEL_MAX: 10,   // вимога користувача
+  TITLE_MAX: 60,
+  DESC_MAX: 155,
+  SLUG_MAX: 60,
+  LABEL_MAX: 10,
 };
 const SLUG_RE = /^[a-z0-9-]+$/;
 
 /* просте сповіщення */
-const notify = (msg: string) => { if (typeof window !== "undefined") alert(msg); };
+const notify = (msg: string) => {
+  if (typeof window !== "undefined") alert(msg);
+};
 
 /* підготовка featured-картинки: ≤200KB, max width 1080, збереження пропорцій */
 async function prepareFeaturedUnder200KB(file: File): Promise<File> {
@@ -40,7 +51,8 @@ async function prepareFeaturedUnder200KB(file: File): Promise<File> {
   const targetH = Math.max(1, Math.round(bmp.height * scale));
 
   const c = document.createElement("canvas");
-  c.width = targetW; c.height = targetH;
+  c.width = targetW;
+  c.height = targetH;
   const ctx = c.getContext("2d")!;
   ctx.drawImage(bmp, 0, 0, targetW, targetH);
 
@@ -49,28 +61,51 @@ async function prepareFeaturedUnder200KB(file: File): Promise<File> {
   async function tryQualities(): Promise<Blob | null> {
     let cand: Blob | null = null;
     for (const q of qualities) {
-      const b = await new Promise<Blob | null>(r => c.toBlob(r, "image/webp", q));
+      const b = await new Promise<Blob | null>((r) =>
+        c.toBlob(r, "image/webp", q)
+      );
       if (!b) continue;
       cand = b;
       if (b.size <= 200 * 1024) return b;
     }
-    return cand; // може бути >200KB — далі спробуємо даунскейл
+    return cand;
   }
 
   let blob = await tryQualities();
-  let w = targetW, h = targetH;
+  let w = targetW,
+    h = targetH;
 
   while (blob && blob.size > 200 * 1024 && w > 360 && h > 360) {
-    w = Math.round(w * 0.9); h = Math.round(h * 0.9);
-    c.width = w; c.height = h;
+    w = Math.round(w * 0.9);
+    h = Math.round(h * 0.9);
+    c.width = w;
+    c.height = h;
     ctx.drawImage(bmp, 0, 0, w, h);
     blob = await tryQualities();
   }
 
   if (!blob) throw new Error("Failed to convert to WebP.");
-  return new File([blob], file.name.replace(/\.\w+$/i, ".webp"), { type: "image/webp" });
+  return new File(
+    [blob],
+    file.name.replace(/\.\w+$/i, ".webp"),
+    { type: "image/webp" }
+  );
 }
 
+/** WEBP для рекламних слотів: орієнтир під контейнер ~400–600 px ширини */
+async function prepareAdImage(file: File): Promise<File> {
+  // Ліміт той самий 2MB як і для featured
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error("Image must be ≤ 2MB.");
+  }
+
+  // Використовуємо універсальний хелпер з можливістю задати maxWidth
+  return prepareWebP200k(file, {
+    maxBytes: 200 * 1024,
+    maxWidth: 600,
+    minWidth: 400,
+  });
+}
 
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 
@@ -78,13 +113,11 @@ const SITE_URL =
   (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "") ||
   (typeof window !== "undefined" ? window.location.origin : "");
 
-
 /* ---------- slug helpers (Unicode-safe) ---------- */
-
-
 function _normalizeDashesSpaces(s: string) {
-  const dashAll = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;           // усі юнікод-дефіси
-  const spacesAll = /[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g; // усі типи пробілів
+  const dashAll = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;
+  const spacesAll =
+    /[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g;
   return s.replace(dashAll, "-").replace(spacesAll, "-");
 }
 
@@ -94,34 +127,66 @@ function _asciiFold(s: string) {
 
 function _cyrillicToLatin(s: string) {
   const map: Record<string, string> = {
-    а:"a", б:"b", в:"v", г:"h", ґ:"g", д:"d", е:"e", є:"ie", ж:"zh", з:"z", и:"y", і:"i", ї:"i", й:"i",
-    к:"k", л:"l", м:"m", н:"n", о:"o", п:"p", р:"r", с:"s", т:"t", у:"u", ф:"f", х:"kh", ц:"ts", ч:"ch",
-    ш:"sh", щ:"shch", ь:"", ю:"iu", я:"ia", ъ:"", ы:"y", э:"e",
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "h",
+    ґ: "g",
+    д: "d",
+    е: "e",
+    є: "ie",
+    ж: "zh",
+    з: "z",
+    и: "y",
+    і: "i",
+    ї: "i",
+    й: "i",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "kh",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "shch",
+    ь: "",
+    ю: "iu",
+    я: "ia",
+    ъ: "",
+    ы: "y",
+    э: "e",
   };
-  return s.replace(/[а-яёіїєґъыэ]/g, ch => map[ch] ?? "");
+  return s.replace(/[а-яёіїєґъыэ]/g, (ch) => map[ch] ?? "");
 }
 
-/** Використовується під час набору: мінімальна нормалізація, нічого не “блокує” */
+/** Використовується під час набору */
 function slugLive(value: string): string {
   let s = value.toLowerCase();
   s = _normalizeDashesSpaces(s);
-  s = s.replace(/&/g, " and ");           // & → and (щоб не “з’їдалося” при фінальному фільтрі)
+  s = s.replace(/&/g, " and ");
   s = _cyrillicToLatin(s);
   s = _asciiFold(s);
-  // дозвіл тимчасово на будь-що — далі лише прибираємо подвійні дефіси і тримаємо форму
-  s = s.replace(/[^a-z0-9-]+/g, "-");     // інше → дефіс (але не забороняє вводити “-”)
+  s = s.replace(/[^a-z0-9-]+/g, "-");
   s = s.replace(/-+/g, "-");
   return s;
 }
 
-/** Фінальна очистка (onBlur): прибирає крайні дефіси, порожнечу */
+/** Фінальна очистка */
 function slugFinal(value: string): string {
   let s = slugLive(value);
   s = s.replace(/^-+|-+$/g, "");
   return s;
 }
 
-/** Автогенерація зі Title (коли користувач ще не редагував slug вручну) */
+/** Автогенерація зі Title */
 function autoFromTitle(title?: string): string {
   if (!title) return "";
   return slugFinal(title);
@@ -129,7 +194,7 @@ function autoFromTitle(title?: string): string {
 
 /* --- Стислий статус-індикатор поля --- */
 function FieldStatus({ ok, msg }: { ok: boolean; msg?: string }) {
-  const tip = ok ? "OK" : (msg || "Invalid");
+  const tip = ok ? "OK" : msg || "Invalid";
   return (
     <span
       className={`fb-status ${ok ? "ok" : "bad"}`}
@@ -143,7 +208,7 @@ function FieldStatus({ ok, msg }: { ok: boolean; msg?: string }) {
 
 const Req = () => <span className="fb-req" aria-hidden="true">*</span>;
 
-/* --- Коротка назва файлу: перші 10 символів + … + розширення --- */
+/* --- Коротка назва файлу --- */
 function shortFileName(name: string) {
   const base = name.split(/[/\\]/).pop() || name;
   const dot = base.lastIndexOf(".");
@@ -165,12 +230,12 @@ function SlugInput({
   maxLen?: number;
 }) {
   const [slugInput, setSlugInput] = React.useState<string>(value || "");
-  const dirtyRef = React.useRef(false); // true — коли юзер редагував slug вручну і він НЕ порожній
+  const dirtyRef = React.useRef(false);
 
-  // синхронізація ззовні
-  React.useEffect(() => { setSlugInput(value || ""); }, [value]);
+  React.useEffect(() => {
+    setSlugInput(value || "");
+  }, [value]);
 
-  // ВАЖЛИВО: якщо slug порожній — знову дозволяємо автогенерацію з title
   React.useEffect(() => {
     const shouldAuto = !dirtyRef.current || slugInput.length === 0;
     if (shouldAuto) {
@@ -182,14 +247,13 @@ function SlugInput({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, maxLen, slugInput]); // slugInput у deps — безкінечного циклу не буде через перевірку
+  }, [title, maxLen, slugInput]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let live = slugLive(e.target.value);
     if (live.length > maxLen) live = live.slice(0, maxLen);
     setSlugInput(live);
     onChange(live);
-    // dirty = лише коли є хоч один символ; якщо стерли все — знову не dirty
     dirtyRef.current = live.length > 0;
   };
 
@@ -201,7 +265,8 @@ function SlugInput({
   };
 
   const len = slugInput.length;
-  const bad = len > maxLen || (len > 0 && !SLUG_RE.test(slugInput));
+  const bad =
+    len > maxLen || (len > 0 && !SLUG_RE.test(slugInput));
 
   return (
     <div>
@@ -217,14 +282,19 @@ function SlugInput({
         inputMode="text"
         maxLength={maxLen}
       />
-      <div className={`fb-help ${bad ? "err" : ""}`}>{len}/{maxLen}</div>
-      {bad && <div className="fb-help err">Only a–z, 0–9 and “-” are allowed</div>}
+      <div className={`fb-help ${bad ? "err" : ""}`}>
+        {len}/{maxLen}
+      </div>
+      {bad && (
+        <div className="fb-help err">
+          Only a–z, 0–9 and “-” are allowed
+        </div>
+      )}
     </div>
   );
 }
 
 // app/components/Viewer.tsx
-
 export default function Viewer({
   file,
   title,
@@ -237,113 +307,110 @@ export default function Viewer({
   initialBookmarks?: InitBookmark[];
 }) {
   const [error, setError] = useState<string | null>(null);
-
-  // NEW: pending color для кастомної палітри (лише попередній вибір)
   const [customColor, setCustomColor] = useState<string>("#ffffff");
-
-  // NEW: стан для модалки після успішної публікації
   const [pub, setPub] = useState<{ url: string } | null>(null);
-  const [copyOk, setCopyOk] = useState(false);        // ← 👈 ДОДАЛИ ЦЕ
-
-  // Локальна назва завантаженого файлу (для відображення короткої назви)
+  const [copyOk, setCopyOk] = useState(false);
   const [featuredName, setFeaturedName] = useState<string | null>(null);
-
-
   const [pdfUrl, setPdfUrl] = useState<string>(file);
-  // Ініціалізація контролера з безпечним catch (без setState у рендері)
+
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   let initErr: string | null = null;
   try {
     ctrl = useViewerController({ file: pdfUrl, title });
   } catch (err: any) {
-    initErr = typeof err === "string" ? err : err?.message || "Viewer component error";
+    initErr =
+      typeof err === "string"
+        ? err
+        : err?.message || "Viewer component error";
   }
 
-  // ⬇️⬇️ ВСТАВИТИ ФУНКЦІЮ ОДРАЗУ ПІСЛЯ try/catch ⬇️⬇️
   async function handleReplacePdf(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
 
     if (f.type !== "application/pdf") {
       notify("Only PDF allowed");
-      e.currentTarget.value = ""; // дозволяє одразу вибрати той самий файл знову
+      e.currentTarget.value = "";
       return;
     }
 
     try {
       const fd = new FormData();
       fd.append("pdf", f);
-      // (опційно) якщо хочеш, щоб бек знав для якого слугу кладеш:
       if (ctrl?.meta?.slug) fd.append("slug", ctrl.meta.slug);
 
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
       const out = await res.json().catch(() => ({} as any));
-      if (!res.ok || !out?.url) throw new Error(out?.error || "Upload failed");
+      if (!res.ok || !out?.url)
+        throw new Error(out?.error || "Upload failed");
 
-      // підміняємо активний PDF → контролер підтягне новий документ
       setPdfUrl(out.url);
     } catch (err: any) {
       notify(err?.message || "Replace failed");
     } finally {
-      e.currentTarget.value = ""; // скинути інпут
+      e.currentTarget.value = "";
     }
   }
 
-const prefilledRef = React.useRef(false);
-// --- EDIT MODE: preload meta + bookmarks (після готовності PDF) ---
-useEffect(() => {
-  if (!ctrl || !ctrl.pdfDoc || prefilledRef.current) return;
+  const prefilledRef = React.useRef(false);
+  // --- EDIT MODE preload meta + bookmarks ---
+  useEffect(() => {
+    if (!ctrl || !ctrl.pdfDoc || prefilledRef.current) return;
 
-  // 1) META
-  if (initialMeta) {
-    ctrl.setMeta({
-      title:       initialMeta.title,
-      description: initialMeta.description,
-      slug:        initialMeta.slug,
-      featuredUrl: initialMeta.featuredUrl,
-    });
-  }
+    if (initialMeta) {
+      ctrl.setMeta({
+        title: initialMeta.title,
+        description: initialMeta.description,
+        slug: initialMeta.slug,
+        featuredUrl: initialMeta.featuredUrl,
+      });
+    }
 
-  // 2) BOOKMARKS (з санітизацією номерів сторінок під діапазон PDF)
-  if (Array.isArray(initialBookmarks)) {
-    const max = ctrl.pdfDoc.numPages;
-    const safe = initialBookmarks.map((b) => ({
-      ...b,
-      page: Math.max(1, Math.min(max, Number(b.page) || 1)),
-    }));
+    if (Array.isArray(initialBookmarks)) {
+      const max = ctrl.pdfDoc.numPages;
+      const safe = initialBookmarks.map((b) => ({
+        ...b,
+        page: Math.max(1, Math.min(max, Number(b.page) || 1)),
+      }));
 
-    // Використовуємо setBookmarks, якщо експортнутий з контролера; інакше fallback на replaceBookmarks
-    (ctrl as any).setBookmarks?.(safe) ?? (ctrl as any).replaceBookmarks?.(safe);
-  }
-  prefilledRef.current = true;
-}, [ctrl?.pdfDoc, initialMeta, initialBookmarks]);
+      (ctrl as any).setBookmarks?.(safe) ??
+        (ctrl as any).replaceBookmarks?.(safe);
+    }
+    prefilledRef.current = true;
+  }, [ctrl?.pdfDoc, initialMeta, initialBookmarks]);
 
-// Режим редагування: є initialMeta.slug → slug фіксований (read-only у UI)
-const isEdit = !!initialMeta?.slug;
+  const isEdit = !!initialMeta?.slug;
 
-// Валідація джерела PDF — залишаємо як було
-if (!pdfUrl || typeof pdfUrl !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(pdfUrl)) {
-  return (
-    <div
-      style={{
-        background: "#21353a",
-        minHeight: "100vh",
-        color: "#fff",
-        padding: "80px 12px",
-        textAlign: "center",
-      }}
-    >
-      <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
-        Файл не знайдено або неправильний формат!
-      </h2>
-      <div style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}>
-        Передай коректний PDF через upload або URL.
+  if (
+    !pdfUrl ||
+    typeof pdfUrl !== "string" ||
+    !/^https?:\/\/.+\.pdf(\?.*)?$/i.test(pdfUrl)
+  ) {
+    return (
+      <div
+        style={{
+          background: "#21353a",
+          minHeight: "100vh",
+          color: "#fff",
+          padding: "80px 12px",
+          textAlign: "center",
+        }}
+      >
+        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
+          Файл не знайдено або неправильний формат!
+        </h2>
+        <div
+          style={{ color: "#aaa", marginTop: 12, fontSize: 16 }}
+        >
+          Передай коректний PDF через upload або URL.
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-  // Помилка ініціалізації/роботи компонента
   if (initErr || error) {
     return (
       <div
@@ -355,13 +422,16 @@ if (!pdfUrl || typeof pdfUrl !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.tes
           textAlign: "center",
         }}
       >
-        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>Помилка перегляду PDF!</h2>
-        <div style={{ color: "#aaa", marginTop: 12 }}>{initErr || error}</div>
+        <h2 style={{ color: "#e54", fontWeight: 900, fontSize: 22 }}>
+          Помилка перегляду PDF!
+        </h2>
+        <div style={{ color: "#aaa", marginTop: 12 }}>
+          {initErr || error}
+        </div>
       </div>
     );
   }
 
-  // Очікуємо ініціалізацію контролера/документа
   if (!ctrl || !ctrl.pdfDoc) {
     return (
       <div
@@ -373,12 +443,15 @@ if (!pdfUrl || typeof pdfUrl !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.tes
           textAlign: "center",
         }}
       >
-        <h2 style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}>Loading Flipbook…</h2>
+        <h2
+          style={{ color: "#f4ce69", fontWeight: 900, fontSize: 22 }}
+        >
+          Loading Flipbook…
+        </h2>
       </div>
     );
   }
 
-  /* брендова палітра для закладок */
   const brandColors = [
     "#f47e20",
     "#00647b",
@@ -390,97 +463,114 @@ if (!pdfUrl || typeof pdfUrl !== "string" || !/^https?:\/\/.+\.pdf(\?.*)?$/i.tes
     "#7e2c42",
   ];
 
-// --- Валідації для статус-індикаторів (іконки лише для Title і Meta description) ---
-const t = (ctrl.meta.title || "").trim();
-const d = (ctrl.meta.description || "").trim();
-const s = (ctrl.meta.slug || "").trim();
+  const t = (ctrl.meta.title || "").trim();
+  const d = (ctrl.meta.description || "").trim();
+  const s = (ctrl.meta.slug || "").trim();
 
-const titleOk = t.length >= 10 && t.length <= SEO.TITLE_MAX;
-const descOk  = d.length >= 80 && d.length <= SEO.DESC_MAX;
-const slugOk  = s.length >= 1 && s.length <= SEO.SLUG_MAX && SLUG_RE.test(s);
-const imageOk = !!ctrl.meta.featuredUrl;
+  const titleOk = t.length >= 10 && t.length <= SEO.TITLE_MAX;
+  const descOk = d.length >= 80 && d.length <= SEO.DESC_MAX;
+  const slugOk =
+    s.length >= 1 &&
+    s.length <= SEO.SLUG_MAX &&
+    SLUG_RE.test(s);
+  const imageOk = !!ctrl.meta.featuredUrl;
 
-// === handlePublish (inline у компоненті) ===
-async function handlePublish(): Promise<void> {
-  if (!ctrl) return;
+  async function handlePublish(): Promise<void> {
+    if (!ctrl) return;
 
-  const title = (ctrl.meta.title || "").trim();
-  const desc  = (ctrl.meta.description || "").trim();
-  const slug  = (ctrl.meta.slug || "").trim();
+    const title = (ctrl.meta.title || "").trim();
+    const desc = (ctrl.meta.description || "").trim();
+    const slug = (ctrl.meta.slug || "").trim();
 
-  const errs: string[] = [];
-  if (!title) errs.push("Title is required");
-  if (title.length < 10) errs.push("Title must be at least 10 characters");
-  if (title.length > SEO.TITLE_MAX) errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
+    const errs: string[] = [];
+    if (!title) errs.push("Title is required");
+    if (title.length < 10)
+      errs.push("Title must be at least 10 characters");
+    if (title.length > SEO.TITLE_MAX)
+      errs.push(`Title exceeds ${SEO.TITLE_MAX} characters`);
 
-  if (!desc) errs.push("Meta description is required");
-  if (desc.length < 80) errs.push("Meta description must be at least 80 characters");
-  if (desc.length > SEO.DESC_MAX) errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
+    if (!desc) errs.push("Meta description is required");
+    if (desc.length < 80)
+      errs.push("Meta description must be at least 80 characters");
+    if (desc.length > SEO.DESC_MAX)
+      errs.push(`Meta description exceeds ${SEO.DESC_MAX} characters`);
 
-  if (!slug) errs.push("Slug is required");
-  if (slug.length > SEO.SLUG_MAX) errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
-  if (!SLUG_RE.test(slug)) errs.push("Slug may contain only a–z, 0–9 and '-'");
+    if (!slug) errs.push("Slug is required");
+    if (slug.length > SEO.SLUG_MAX)
+      errs.push(`Slug exceeds ${SEO.SLUG_MAX} characters`);
+    if (!SLUG_RE.test(slug))
+      errs.push("Slug may contain only a–z, 0–9 and '-'");
 
-  if (!ctrl.meta.featuredUrl) errs.push("Featured image is required");
+    if (!ctrl.meta.featuredUrl)
+      errs.push("Featured image is required");
 
-  if (errs.length) { notify(errs.join("\n")); return; }
+    if (errs.length) {
+      notify(errs.join("\n"));
+      return;
+    }
 
-  try {
-    // EDIT: оновлення існуючої сторінки
-if (initialMeta?.slug) {
-  const body: any = {
-    meta: {
-      title: ctrl.meta.title,
-      description: ctrl.meta.description,
-      featuredUrl: ctrl.meta.featuredUrl ?? null,
-    },
-    bookmarks: ctrl.bookmarks,
-    file: pdfUrl, // ← новий/поточний PDF
-  };
+    try {
+      if (initialMeta?.slug) {
+        const body: any = {
+          meta: {
+            title: ctrl.meta.title,
+            description: ctrl.meta.description,
+            featuredUrl: ctrl.meta.featuredUrl ?? null,
+          },
+          bookmarks: ctrl.bookmarks,
+          file: pdfUrl,
+        };
 
-  if ((ctrl as any).publishedAt) body.publishedAt = (ctrl as any).publishedAt;
+        if ((ctrl as any).publishedAt)
+          body.publishedAt = (ctrl as any).publishedAt;
 
-  const res = await fetch(`/api/directory/${encodeURIComponent(initialMeta.slug)}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j?.error || "Update failed");
+        const res = await fetch(
+          `/api/directory/${encodeURIComponent(
+            initialMeta.slug
+          )}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        );
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j?.error || "Update failed");
 
-  const full =
-    j?.publicUrl ||
-    (j?.urlPath ? `${SITE_URL}${j.urlPath}` : `${SITE_URL}/directory/${initialMeta.slug}`);
-  if (full) setPub({ url: full });
-  return;
-}
+        const full =
+          j?.publicUrl ||
+          (j?.urlPath
+            ? `${SITE_URL}${j.urlPath}`
+            : `${SITE_URL}/directory/${initialMeta.slug}`);
+        if (full) setPub({ url: full });
+        return;
+      }
 
-
-    // NEW: публікація нового запису
-const r = await ctrl.publishMetaAndBookmarks();
-const full = r?.publicUrl || (r?.urlPath ? `${SITE_URL}${r.urlPath}` : "");
-if (full) setPub({ url: full });
-
-  } catch (e: any) {
-    console.error(e);
-    notify(e?.message || "Publish failed");
+      const r = await ctrl.publishMetaAndBookmarks();
+      const full =
+        r?.publicUrl ||
+        (r?.urlPath ? `${SITE_URL}${r.urlPath}` : "");
+      if (full) setPub({ url: full });
+    } catch (e: any) {
+      console.error(e);
+      notify(e?.message || "Publish failed");
+    }
   }
-}
-// === /handlePublish ===
-
 
   return (
     <div className="viewer-root">
       <EditorHeader
-  title={ctrl.title}
-  onSearch={ctrl.runSearch}
-  isSearching={(ctrl as any).searching ?? false}
-  file={pdfUrl}
-  isFs={ctrl.isFs}
-  toggleFullscreen={ctrl.toggleFullscreen}
-  handleShare={ctrl.handleShare}
-  onPublish={() => { void handlePublish(); }}
-/>
+        title={ctrl.title}
+        onSearch={ctrl.runSearch}
+        isSearching={(ctrl as any).searching ?? false}
+        file={pdfUrl}
+        isFs={ctrl.isFs}
+        toggleFullscreen={ctrl.toggleFullscreen}
+        handleShare={ctrl.handleShare}
+        onPublish={() => {
+          void handlePublish();
+        }}
+      />
 
 
 
@@ -643,6 +733,107 @@ if (full) setPub({ url: full });
             <input className="fb-inp" placeholder="Label" id="fb-bmk-label" />
             <input className="fb-inp fb-inp-narrow" placeholder={`Page#`} id="fb-bmk-page" inputMode="numeric" pattern="[0-9]*" />
           </div>
+
+                 <div className="fb-panel-sec">
+          <div className="fb-sec-h">Ads (left carousel)</div>
+
+          {/* Форма додавання нового рекламного слота */}
+          <div className="fb-row fb-row-wrap">
+            <input
+              className="fb-inp"
+              placeholder="Label (optional)"
+              id="fb-ad-label"
+            />
+            <input
+              className="fb-inp"
+              placeholder="Link (optional)"
+              id="fb-ad-link"
+            />
+          </div>
+
+          <div className="fb-row">
+            <input
+              type="file"
+              accept="image/*"
+              id="fb-ad-file"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+
+                try {
+                  const prepared = await prepareAdImage(f);
+
+                  const fd = new FormData();
+                  fd.append("image", prepared);
+                  if (ctrl.meta.slug) fd.append("slug", ctrl.meta.slug);
+
+                  // НОВИЙ ендпоінт для завантаження рекламних картинок
+                  const res = await fetch("/api/upload-ad", { method: "POST", body: fd });
+                  const out = await res.json();
+
+                  if (!res.ok || !out?.url) {
+                    notify(out?.error || "Upload failed");
+                    return;
+                  }
+
+                  const labelEl = document.getElementById("fb-ad-label") as HTMLInputElement | null;
+                  const linkEl = document.getElementById("fb-ad-link") as HTMLInputElement | null;
+
+                  ctrl.addAdSlot({
+                    imageUrl: out.url,
+                    href: linkEl?.value || null,
+                    label: labelEl?.value || null,
+                  });
+
+                  if (labelEl) labelEl.value = "";
+                  if (linkEl) linkEl.value = "";
+                  (e.target as HTMLInputElement).value = "";
+                } catch (err: any) {
+                  console.error(err);
+                  notify(err?.message || "Image processing failed");
+                }
+              }}
+            />
+          </div>
+          <div className="fb-help">Images will be optimized to WebP ~400–600px width.</div>
+
+          {/* Список існуючих слотів */}
+          {ctrl.ads?.length ? (
+            <ul className="fb-list fb-list-ads">
+              {ctrl.ads.map((a: any) => (
+                <li key={a.id} className="fb-bmk">
+                  <div className="fb-ad-thumb">
+                    <img src={a.imageUrl} alt={a.label || "Ad"} />
+                  </div>
+                  <div className="fb-ad-fields">
+                    <input
+                      className="fb-inp"
+                      value={a.label || ""}
+                      placeholder="Label"
+                      onChange={(e) => ctrl.updateAdSlot(a.id, { label: e.target.value })}
+                    />
+                    <input
+                      className="fb-inp"
+                      value={a.href || ""}
+                      placeholder="Link"
+                      onChange={(e) => ctrl.updateAdSlot(a.id, { href: e.target.value })}
+                    />
+                  </div>
+                  <button
+                    className="fb-del"
+                    title="Remove ad"
+                    onClick={() => ctrl.removeAdSlot(a.id)}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="fb-help">No ads yet – add one above.</div>
+          )}
+        </div>
+ 
 
           {/* палітра кольорів + custom (підтвердження через +) */}
 <div className="fb-row fb-colors">
