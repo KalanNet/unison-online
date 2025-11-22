@@ -9,6 +9,7 @@ import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
 import LeftAdsPanel from "../secure/editor/LeftAdsPanel";
 
+
 // той самий FlipBook
 const FlipBook = dynamic(() => import("react-pageflip"), { ssr: false }) as any;
 

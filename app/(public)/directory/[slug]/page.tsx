@@ -7,11 +7,20 @@ export const dynamic = "force-dynamic";
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
 
+type AdSlot = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+  seq?: number | null;
+};
+
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   file?: string;
   publishedAt?: string;
   bookmarks?: Bookmark[];
+  ads?: AdSlot[];
 };
 
 /* ---------- Constants ---------- */
@@ -54,6 +63,26 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
   return JSON.parse(JSON.stringify(out));
 }
 
+/** Санітаризація рекламних слотів (макс. 5, відсортовано по seq) */
+function sanitizeAds(input: unknown): AdSlot[] {
+  if (!Array.isArray(input)) return [];
+  const out: AdSlot[] = [];
+  for (const it of input) {
+    if (!it || typeof it !== "object") continue;
+    const anyIt = it as Record<string, unknown>;
+    const id = String(anyIt.id ?? "");
+    const imageUrl = String(anyIt.imageUrl ?? "").trim();
+    if (!imageUrl) continue; // без картинки — пропускаємо
+    const hrefVal = anyIt.href == null ? null : String(anyIt.href);
+    const labelVal = anyIt.label == null ? null : String(anyIt.label);
+    const seqNum = Number(anyIt.seq);
+    const seq = Number.isFinite(seqNum) ? (seqNum as number) : null;
+    out.push({ id, imageUrl, href: hrefVal, label: labelVal, seq });
+  }
+  const sorted = out.sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999));
+  return JSON.parse(JSON.stringify(sorted.slice(0, 5)));
+}
+
 /* ---------- Metadata ---------- */
 export async function generateMetadata({
   params,
@@ -64,7 +93,7 @@ export async function generateMetadata({
   const slug = slugRaw ?? "";
   const data = slug ? await getMeta(slug) : null;
 
-  // 1) Базові значення: або те, що прийшло з meta.json, або ТВОЇ нові дефолти
+  // 1) Базові значення: або те, що прийшло з meta.json, або дефолти
   const title = data?.meta?.title ?? SOCIAL_TITLE_2025;
   const description = data?.meta?.description ?? SOCIAL_DESC_2025;
 
@@ -103,17 +132,23 @@ export default async function Page({
 
   // Фолбек: якщо meta немає — дозволяємо прямий перегляд через ?file=
   if (!data?.file) {
-    if (typeof searchParams.file === "string" && searchParams.file) {
+    const fileParam = typeof searchParams.file === "string" ? searchParams.file : "";
+    if (fileParam) {
       const PublicViewer = (await import("app/public/PublicViewer")).default;
       const safeBookmarks = sanitizeBookmarks(data?.bookmarks);
+      const safeAds = sanitizeAds((data as any)?.ads);
       const title = data?.meta?.title || slug || "Preview";
       return (
-        <PublicViewer file={searchParams.file} title={title} bookmarks={safeBookmarks} />
+        <PublicViewer
+          file={fileParam}
+          title={title}
+          bookmarks={safeBookmarks}
+          ads={safeAds}
+        />
       );
     }
     // Клієнтський "слухач" підтягне slug із URL та спробує ще раз
-    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback"))
-      .default;
+    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
 
@@ -121,6 +156,7 @@ export default async function Page({
   const PublicViewer = (await import("app/public/PublicViewer")).default;
   const title = data.meta?.title ?? slug;
   const safeBookmarks = sanitizeBookmarks(data.bookmarks);
+  const safeAds = sanitizeAds(data.ads);
 
-  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} />;
+  return <PublicViewer file={data.file} title={title} bookmarks={safeBookmarks} ads={safeAds} />;
 }

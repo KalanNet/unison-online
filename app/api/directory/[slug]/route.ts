@@ -1,3 +1,4 @@
+// app/api/directory/[slug]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
@@ -17,9 +18,22 @@ const s3 = new S3Client({
 });
 
 type Bookmark = { id: string; page: number; label: string; color?: string | null };
+
+/** Рекламний слот у meta.json */
+type AdSlot = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+  /** Порядок у каруселі (0..4) */
+  order: number;
+};
+
 type MetaJson = {
   meta: { title: string; description: string; slug: string; featuredUrl?: string | null };
   bookmarks?: Bookmark[];
+  /** НОВЕ: масив рекламних слотів (до 5) */
+  ads?: AdSlot[];
   file: string;
   publishedAt: string;
 };
@@ -55,6 +69,30 @@ export async function GET(
   }
 }
 
+/** Санітизація та нормалізація масиву ads: ≤5 елементів, order у діапазоні 0..4, стабільне сортування і
+ *  повна ресеквенція 0..N-1, щоб карусель отримувала валідні індекси.
+ */
+function normalizeAds(input: any): AdSlot[] {
+  const raw = Array.isArray(input) ? input : [];
+  const items = raw
+    .filter(a => a && typeof a.imageUrl === "string" && a.imageUrl.trim() !== "")
+    .slice(0, 5)
+    .map((a: any, i: number) => {
+      const id = (typeof a.id === "string" && a.id.trim()) ? a.id.trim() : `ad-${i + 1}`;
+      const href = (typeof a.href === "string" && a.href.trim()) ? a.href.trim() : null;
+      const label = (typeof a.label === "string" && a.label.trim()) ? a.label.trim() : null;
+      const orderNum =
+        typeof a.order === "number" && Number.isFinite(a.order)
+          ? Math.max(0, Math.min(4, Math.floor(a.order)))
+          : i;
+      return { id, imageUrl: a.imageUrl, href, label, order: orderNum } as AdSlot;
+    });
+
+  // Сортуємо за order і робимо щільну послідовність 0..N-1
+  items.sort((a, b) => a.order - b.order);
+  for (let i = 0; i < items.length; i++) items[i].order = i;
+  return items;
+}
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
@@ -64,33 +102,43 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   const body = (await req.json().catch(() => ({}))) as {
     meta?: { title?: string; description?: string; featuredUrl?: string | null };
     bookmarks?: Bookmark[];
+    /** НОВЕ: масив рекламних слотів, який прилітає з редактора */
+    ads?: AdSlot[];
     file?: string;
     publishedAt?: string; // опційно збережемо оригінал
   };
 
-  
   // 1) підтягуємо попередню версію, щоб нічого не втратити
   const prev = await readPrev(slug);
   if (!prev) return err("Not found", 404);
 
-  // 2) мерджимо все, що прийшло, з тим що вже є
+  // 2) підготуємо ads (нові або лишаємо попередні як є)
+  const nextAds: AdSlot[] =
+    typeof body.ads !== "undefined" ? normalizeAds(body.ads) : normalizeAds(prev.ads);
+
+  // 3) мерджимо все, що прийшло, з тим що вже є
   const next: MetaJson = {
     meta: {
       title: (body.meta?.title ?? prev.meta.title).trim(),
       description: (body.meta?.description ?? prev.meta.description).trim(),
       slug,
       // якщо картинку поміняли — у тілі буде новий URL (інше ім’я файлу => кеш-лейк не заважає)
-      featuredUrl: typeof body.meta?.featuredUrl === "undefined" ? (prev.meta.featuredUrl ?? null) : (body.meta?.featuredUrl ?? null),
+      featuredUrl:
+        typeof body.meta?.featuredUrl === "undefined"
+          ? (prev.meta.featuredUrl ?? null)
+          : (body.meta?.featuredUrl ?? null),
     },
     // закладки нікуди не зникають: якщо не передали — лишаємо як було
     bookmarks: Array.isArray(body.bookmarks) ? body.bookmarks : (prev.bookmarks ?? []),
+    // НОВЕ: реклама (нормалізована, не більше 5)
+    ads: nextAds,
     // файл теж можна замінити, інакше — попередній
     file: (body.file ?? prev.file).trim(),
     // зберігаємо первісну дату публікації якщо не передали нову
     publishedAt: body.publishedAt || prev.publishedAt,
   };
 
-  // 3) записуємо оновлений meta.json у R2
+  // 4) записуємо оновлений meta.json у R2
   await s3.send(new PutObjectCommand({
     Bucket: R2_BUCKET,
     Key: `directory/${encodeURIComponent(slug)}/meta.json`,
@@ -99,7 +147,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     CacheControl: "no-cache",
   }));
 
-  // 4) синхронізуємо directory/index.json через вже наявний роут
+  // 5) синхронізуємо directory/index.json через вже наявний роут
   await fetch(`${origin}/api/directory/list-published`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -113,6 +161,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       file: next.file,
       publishedAt: next.publishedAt,
       bookmarks: next.bookmarks,
+      // ads у загальний індекс не обов’язково; якщо потрібно — додай:
+      // ads: next.ads,
       prev, // для change-log у твоєму існуючому коді
     }),
   }).catch(() => null);
