@@ -1,18 +1,25 @@
 // app/(public)/directory/[slug]/ClientFallback.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
-// Динамічно підтягуємо публічний в’ювер (жодних require)
-const PublicViewer = dynamic(() => import("app/public/PublicViewer"), { ssr: false });
+// Динамічно підтягуємо публічний в’ювер
+const PublicViewer = dynamic(() => import("app/public/PublicViewer"), {
+  ssr: false,
+});
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
 
 type MetaPayload = {
-  meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
+  meta?: {
+    title?: string;
+    description?: string;
+    featuredUrl?: string | null;
+    slug?: string;
+  };
   file?: string;
   publishedAt?: string;
   bookmarks?: Bookmark[];
@@ -30,7 +37,10 @@ function sanitizeBookmarks(input: unknown): Bookmark[] {
     const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
     const label = String(anyIt.label ?? "");
     const colorRaw = anyIt.color;
-    const color = typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
+    const color =
+      typeof colorRaw === "string" && colorRaw.trim().length > 0
+        ? colorRaw
+        : null;
     if (label.length > 0) out.push({ id, page, label, color });
   }
   // гарантуємо серіалізованість
@@ -67,7 +77,10 @@ export default function ClientFallback() {
     (async () => {
       try {
         // 1) Пробуємо отримати метадані
-        const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
+        const r = await fetch(
+          `/api/directory/${encodeURIComponent(slug)}`,
+          { cache: "no-store" }
+        );
         let meta: MetaPayload | null = null;
         if (r.ok) meta = (await r.json()) as MetaPayload;
 
@@ -77,11 +90,13 @@ export default function ClientFallback() {
         const file = (fileFromMeta || fileFromQuery || "").trim();
 
         if (!file) {
-          if (!cancelled) setErr(`Expected meta at /api/directory/${slug} or ?file= param.`);
+          if (!cancelled)
+            setErr(`Expected meta at /api/directory/${slug} or ?file= param.`);
           return;
         }
         if (!PDF_URL_RE.test(file)) {
-          if (!cancelled) setErr("Invalid PDF url. Expected public https://…/*.pdf");
+          if (!cancelled)
+            setErr("Invalid PDF url. Expected public https://…/*.pdf");
           return;
         }
 
@@ -98,7 +113,8 @@ export default function ClientFallback() {
     return () => {
       cancelled = true;
     };
-  }, [slug, sp]);
+    // `sp` нестабільний як об’єкт — прив’язуємось до його string-подання
+  }, [slug, sp?.toString()]);
 
   if (ready) {
     return (
