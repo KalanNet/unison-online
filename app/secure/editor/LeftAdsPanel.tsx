@@ -22,27 +22,25 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
 
-  // 1) Беремо реальні items; якщо порожньо — короткий плейсхолдер
+  // Використовуємо передані items; якщо їх немає — лише скромний плейсхолдер
   const ads: AdSlotView[] = React.useMemo(() => {
-    if (Array.isArray(items) && items.length) return items;
-    return [
-      { id: "placeholder-1", imageUrl: "", href: null, label: "AD 1" },
-      { id: "placeholder-2", imageUrl: "", href: null, label: "AD 2" },
-    ];
+    if (items && items.length > 0) return items;
+    return [{ id: "placeholder-1", imageUrl: "", href: null, label: "AD 1" }];
   }, [items]);
 
-  // 2) Синхронізація згортання із зовнішнім прапорцем
+  // Синхронізація стану згортання від зовнішнього прапорця
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // 3) Автоскрол вгору по колу (як було)
+  // Автоскрол вгору по колу (без змін швидкості)
   React.useEffect(() => {
     const step = 0.5;
     const intervalMs = 30;
     const id = window.setInterval(() => {
       const node = scrollRef.current;
-      if (!node || hoverRef.current) return;
+      if (!node) return;
+      if (hoverRef.current) return;
       if (node.scrollHeight <= node.clientHeight) return;
       const half = node.scrollHeight / 2;
       node.scrollTop = node.scrollTop >= half ? 0 : node.scrollTop + step;
@@ -56,46 +54,48 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       onMouseEnter={() => (hoverRef.current = true)}
       onMouseLeave={() => (hoverRef.current = false)}
     >
-      {/* Ручка-стрілка (без змін) */}
+      {/* Ручка-стрілка */}
       <button
         type="button"
         className="lh-toggle"
         aria-label={collapsed ? "Expand ads panel" : "Collapse ads panel"}
-        title={collapsed ? "Expand ads panel" : "Collapse ads panel"}
         onClick={() => setCollapsed((v) => !v)}
       />
 
-      <div className="lh-leftads-inner" ref={scrollRef} data-ads-count={ads.length} data-valid-ads={ads.filter(a=>a.imageUrl).length}>
-        {/* дублюємо список, щоб зробити безкінечну карусель */}
+      <div className="lh-leftads-inner" ref={scrollRef}>
+        {/* Дублюємо для безшовної каруселі */}
         {ads.concat(ads).map((ad, i) => {
-          const hasImg = typeof ad.imageUrl === "string" && ad.imageUrl.trim() !== "";
+          const hasImg = !!ad.imageUrl;
+          const label = ad.label ?? "";
+          const content = hasImg ? (
+            ad.href ? (
+              <a
+                className="ad-link"
+                href={ad.href}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                title={label || undefined}
+              >
+                <img className="ad-img" src={ad.imageUrl} alt={label || "Ad"} />
+              </a>
+            ) : (
+              <img className="ad-img" src={ad.imageUrl} alt={label || "Ad"} />
+            )
+          ) : (
+            <span className="ad-ph">{label || "AD"}</span>
+          );
+
           return (
             <div
               key={`${ad.id}-${i}`}
               className="lh-ads-slot"
               data-ad-id={ad.id}
               data-has-img={hasImg ? "true" : "false"}
+              data-label={label}
             >
-              {hasImg ? (
-                ad.href ? (
-                  <a
-                    href={ad.href!}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                    title={ad.label ?? undefined}
-                    className="ad-link"
-                  >
-                    <img src={ad.imageUrl} alt={ad.label || "Advertisement"} />
-                  </a>
-                ) : (
-                  <img src={ad.imageUrl} alt={ad.label || "Advertisement"} />
-                )
-              ) : (
-                <span className="ad-ph">{ad.label ?? "AD"}</span>
-              )}
-
-              {/* Лейбл тільки як плейсхолдер; якщо є зображення — ховаємо через CSS */}
-              <span className="ad-label">{ad.label ?? ""}</span>
+              {content}
+              {/* Маленький бейджик-лейбл (лише якщо треба) */}
+              {label && hasImg && <span className="ad-label">{label}</span>}
             </div>
           );
         })}
@@ -111,9 +111,9 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           z-index: 1050;
-          box-shadow: 4px 0 18px rgba(0, 0, 0, 0.32);
           overflow: visible;
           transition: transform 0.35s ease;
+          /* критично: не дозволяємо ніяким ::before/::after перекривати контент */
         }
         .lh-leftads.is-collapsed {
           transform: translateX(-100%);
@@ -131,7 +131,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
         }
 
         .lh-ads-slot {
-          position: relative;             /* важливо для коректного шару лейбла */
+          position: relative;          /* створюємо власний контекст шарів */
           flex: 0 0 600px;
           border-radius: 10px;
           background: rgba(255, 255, 255, 0.02);
@@ -143,45 +143,56 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.08em;
-          overflow: hidden;               /* щоб картинка не виходила за радіус */
+          overflow: hidden;            /* обрізаємо, але не перекриваємо картинку */
         }
 
-        .lh-ads-slot img {
+        /* Картинка завжди над фоном слоту */
+        .lh-ads-slot .ad-img {
           display: block;
-          max-width: 100%;
-          height: auto;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;           /* заповнює слот без спотворень */
+          z-index: 1;
+          position: relative;
           border-radius: 8px;
+          pointer-events: auto;
         }
 
-        /* Плейсхолдер по центру */
-        .lh-ads-slot .ad-ph {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.6;
+        /* Клік-зона посилання не додає власних фонів */
+        .lh-ads-slot .ad-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+          line-height: 0;
         }
 
-        /* Допоміжний елемент-лейбл: ховаємо, якщо є зображення */
+        /* Плейсхолдер показуємо лише коли немає зображення */
+        .lh-ads-slot[data-has-img="true"] .ad-ph {
+          display: none !important;
+        }
+
+        /* Маленький підпис у куті поверх картинки */
         .lh-ads-slot .ad-label {
           position: absolute;
           left: 8px;
           bottom: 8px;
-          font-size: 10px;
-          opacity: 0.7;
+          z-index: 3;
+          padding: 4px 6px;
+          border-radius: 6px;
+          background: rgba(0, 0, 0, 0.45);
+          color: #fff;
+          font-size: 11px;
+          line-height: 1;
+          font-weight: 600;
+          letter-spacing: 0.02em;
           pointer-events: none;
-        }
-        .lh-ads-slot[data-has-img="true"] .ad-ph,
-        .lh-ads-slot[data-has-img="true"] .ad-label {
-          display: none !important;       /* ← не перекриваємо зображення */
         }
 
         /* Ручка-стрілка */
         .lh-toggle {
           position: absolute;
           top: 50%;
-          right: -40px;
+          right: -40px; /* трохи назовні панелі */
           transform: translateY(-50%);
           width: 40px;
           height: 80px;
@@ -202,10 +213,10 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           height: 18px;
           border-left: 3px solid rgba(255, 255, 255, 0.9);
           border-top: 3px solid rgba(255, 255, 255, 0.9);
-          transform: rotate(-45deg);
+          transform: rotate(-45deg); /* вліво */
         }
         .lh-leftads.is-collapsed .lh-toggle::before {
-          transform: rotate(135deg);
+          transform: rotate(135deg); /* вправо */
         }
         .lh-toggle:hover {
           background: rgba(0, 0, 0, 0.5);
@@ -214,3 +225,4 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     </aside>
   );
 }
+
