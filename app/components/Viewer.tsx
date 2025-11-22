@@ -20,6 +20,24 @@ type InitBookmark = {
   color?: string | null;
 };
 
+// NEW: ads
+export type InitAd = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+  seq?: number | null; // 0..4 у каруселі
+};
+
+type Props = {
+  file: string;
+  title?: string;
+  initialMeta?: InitMeta;
+  initialBookmarks?: InitBookmark[];
+  /** NEW: початкові дані реклами з ClientEditor */
+  initialAds?: InitAd[];
+};
+
 /* --- SEO limits (golden standards) --- */
 const SEO = {
   TITLE_MAX: 60,
@@ -300,18 +318,24 @@ export default function Viewer({
   title,
   initialMeta,
   initialBookmarks = [],
+  initialAds = [],
 }: {
   file: string;
   title?: string;
   initialMeta?: InitMeta;
   initialBookmarks?: InitBookmark[];
+  initialAds?: InitAd[];
 }) {
+
   const [error, setError] = useState<string | null>(null);
   const [customColor, setCustomColor] = useState<string>("#ffffff");
   const [pub, setPub] = useState<{ url: string } | null>(null);
   const [copyOk, setCopyOk] = useState(false);
   const [featuredName, setFeaturedName] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string>(file);
+  // NEW: локальний стан реклами
+const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
+
 
   let ctrl: ReturnType<typeof useViewerController> | null = null;
   let initErr: string | null = null;

@@ -25,6 +25,15 @@ type InitMeta = {
 };
 type InitBookmark = { id: string; page: number; label: string; color?: string | null };
 
+/* ---------- NEW: ads types for initial load ---------- */
+type InitAd = {
+  id: string;
+  imageUrl: string;
+  href?: string | null;
+  label?: string | null;
+  seq?: number | null; // 0..4
+};
+
 export default function ClientEditor() {
   const sp = useSearchParams();
   const slug = sp.get("slug") || undefined;
@@ -36,6 +45,9 @@ export default function ClientEditor() {
   // ---- initial meta/bookmarks for edit-mode ----
   const [initialMeta, setInitialMeta] = useState<InitMeta | null>(null);
   const [initialBookmarks, setInitialBookmarks] = useState<InitBookmark[]>([]);
+
+  // ---- NEW: initial ads for edit-mode ----
+  const [initialAds, setInitialAds] = useState<InitAd[]>([]);
 
   // ---- published links ----
   const [links, setLinks] = useState<string[]>([]);
@@ -68,6 +80,7 @@ export default function ClientEditor() {
       setFileUrl(null);
       setInitialMeta(null);
       setInitialBookmarks([]);
+      setInitialAds([]); // NEW
       setError(null);
       return;
     }
@@ -76,6 +89,7 @@ export default function ClientEditor() {
     setFileUrl(null); // clear while loading!
     setInitialMeta(null);
     setInitialBookmarks([]);
+    setInitialAds([]); // NEW
     setError(null);
 
     let alive = true;
@@ -101,6 +115,8 @@ export default function ClientEditor() {
           featuredUrl: j?.meta?.featuredUrl ?? null,
         });
         setInitialBookmarks(Array.isArray(j?.bookmarks) ? j.bookmarks : []);
+        // NEW: preload ads if present
+        setInitialAds(Array.isArray(j?.ads) ? j.ads : []);
       } catch {
         if (!alive) return;
         setError("Cannot load meta or file.");
@@ -117,6 +133,7 @@ export default function ClientEditor() {
     // Скидаємо весь стан EDIT-режиму:
     setInitialMeta(null);
     setInitialBookmarks([]);
+    setInitialAds([]); // NEW
     setFileUrl(null);
 
     const f = e.target.files?.[0];
@@ -272,5 +289,13 @@ export default function ClientEditor() {
   }
 
   // In edit-mode or after fresh upload → render Viewer
-  return <Viewer file={fileUrl} initialMeta={initialMeta || undefined} initialBookmarks={initialBookmarks} />;
+  return (
+    <Viewer
+      file={fileUrl}
+      initialMeta={initialMeta || undefined}
+      initialBookmarks={initialBookmarks}
+      /* ---------- NEW: pass initial ads to the Viewer ---------- */
+      initialAds={initialAds}
+    />
+  );
 }
