@@ -154,14 +154,31 @@ export async function POST(req: NextRequest) {
           }))
         : [],
       ads: Array.isArray(ads)
-        ? ads.map((a, i) => ({
-            id: String(a.id || `ad-${i}`),
-            key: String(a.key || ""),
-            url: String(a.url || ""),
-            label: a.label ?? null,
-            href: a.href ?? null,
-            seq: Number.isFinite(Number(a.seq)) ? Number(a.seq) : i,
-          }))
+        ? ads.map((a, i) => {
+            const rawUrl =
+              (a as any).url ||
+              (a as any).imageUrl ||
+              "";
+
+            // якщо key не прийшов — пробуємо вирізати з CDN-URL
+            let key = (a as any).key || "";
+            if (!key && typeof rawUrl === "string" && rawUrl.startsWith(R2_PUBLIC_URL + "/")) {
+              key = rawUrl.slice(R2_PUBLIC_URL.length + 1);
+            }
+
+            const seqRaw = (a as any).seq;
+            const seq =
+              Number.isFinite(Number(seqRaw)) ? Number(seqRaw) : i;
+
+            return {
+              id: String((a as any).id || `ad-${i}`),
+              key: String(key),
+              url: String(rawUrl),
+              label: (a as any).label ?? null,
+              href: (a as any).href ?? null,
+              seq,
+            };
+          })
         : [],
       file,
       publishedAt: new Date().toISOString(),
@@ -217,12 +234,13 @@ export async function POST(req: NextRequest) {
 
 /* локальні типи */
 type AdItem = {
-  id: string;
-  key: string;
-  url: string;
-  label: string | null;
-  href: string | null;
-  seq: number | null;
+  id?: string;
+  key?: string;
+  url?: string;
+  imageUrl?: string;
+  label?: string | null;
+  href?: string | null;
+  seq?: number | null;
 };
 
 type MetaJson = {
@@ -238,7 +256,14 @@ type MetaJson = {
     label: string;
     color?: string | null;
   }>;
-  ads?: AdItem[];
+  ads?: Array<{
+    id: string;
+    key: string;
+    url: string;
+    label: string | null;
+    href: string | null;
+    seq: number | null;
+  }>;
   file: string;
   publishedAt: string;
 };
