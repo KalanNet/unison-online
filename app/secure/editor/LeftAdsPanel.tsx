@@ -8,10 +8,14 @@ type AdSlotView = {
   imageUrl: string;
   href?: string | null;
   label?: string | null;
+  /** може прилітати з API — не обов’язкове */
+  seq?: number | null;
 };
 
 type LeftAdsPanelProps = {
+  /** Зовнішній прапорець: чи має панель бути згорнута */
   autoCollapsed?: boolean;
+  /** Рекламні слоти з опублікованих метаданих */
   items?: AdSlotView[];
 };
 
@@ -20,20 +24,28 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
 
-  const ads: AdSlotView[] = React.useMemo(() => {
-    if (items && items.length > 0) return items;
+  // 1) Використовуємо ТІЛЬКИ те, що прийшло ззовні; сортуємо за seq якщо є
+  const data: AdSlotView[] = React.useMemo(() => {
+    const list = Array.isArray(items) ? items.slice() : [];
+    if (list.length > 0) {
+      list.sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999));
+      return list;
+    }
+    // 2) Плейсхолдери — лише якщо даних немає зовсім
     return [
-      { id: "placeholder-1", imageUrl: "", href: null, label: "AD 1" },
-      { id: "placeholder-2", imageUrl: "", href: null, label: "AD 2" },
+      { id: "ph-1", imageUrl: "", href: null, label: "AD 1" },
+      { id: "ph-2", imageUrl: "", href: null, label: "AD 2" },
     ];
   }, [items]);
 
+  // Синхронізація з зовнішнім прапорцем
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
+  // Безкінечний повільний автоскрол (швидкість НЕ змінюю)
   React.useEffect(() => {
-    const step = 0.5;
+    const step = 0.5; // px
     const intervalMs = 30;
     const id = window.setInterval(() => {
       const node = scrollRef.current;
@@ -52,6 +64,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       onMouseEnter={() => (hoverRef.current = true)}
       onMouseLeave={() => (hoverRef.current = false)}
     >
+      {/* Ручка-стрілка — без змін */}
       <button
         type="button"
         className="lh-toggle"
@@ -60,38 +73,25 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       />
 
       <div className="lh-leftads-inner" ref={scrollRef}>
-        {ads.concat(ads).map((ad, i) => {
-          const key = `${ad.id}-${i}`;
-          const label = ad.label || "";
-          const Overlay: React.FC<{ children: React.ReactNode }> = ({ children }) =>
-            ad.href ? (
-              <a
-                href={ad.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ad-overlay"
-                aria-label={label || "Open sponsor link"}
-                title={label || undefined}
-              >
-                {children}
-              </a>
-            ) : (
-              <div className="ad-overlay no-link" title={label || undefined}>
-                {children}
-              </div>
-            );
+        {/* дублюємо рівно той самий масив для безшовного циклу */}
+        {data.concat(data).map((ad, i) => {
+          const key = `${ad.id || "ad"}-${i}`;
+          const alt = ad.label || "Ad";
+          const hasImg = typeof ad.imageUrl === "string" && ad.imageUrl.trim().length > 0;
+          const hasHref = typeof ad.href === "string" && ad.href.trim().length > 0;
 
           return (
             <div key={key} className="lh-ads-slot">
-              {ad.imageUrl ? (
-                <>
-                  <img src={ad.imageUrl} alt={label || "Ad"} />
-                  <Overlay>
-                    {label ? <span className="ad-label">{label}</span> : null}
-                  </Overlay>
-                </>
+              {hasImg ? (
+                hasHref ? (
+                  <a href={ad.href!} target="_blank" rel="noopener noreferrer">
+                    <img src={ad.imageUrl} alt={alt} />
+                  </a>
+                ) : (
+                  <img src={ad.imageUrl} alt={alt} />
+                )
               ) : (
-                <span className="ad-ph">{label || `AD ${i + 1}`}</span>
+                <span>{alt}</span>
               )}
             </div>
           );
@@ -112,8 +112,9 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           overflow: visible;
           transition: transform 0.35s ease;
         }
-        .lh-leftads.is-collapsed { transform: translateX(-100%); }
-
+        .lh-leftads.is-collapsed {
+          transform: translateX(-100%);
+        }
         .lh-leftads-inner {
           height: 100%;
           width: 100%;
@@ -124,9 +125,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           overscroll-behavior: contain;
           padding-right: 6px;
         }
-
         .lh-ads-slot {
-          position: relative;             /* потрібно для оверлею */
           flex: 0 0 600px;
           border-radius: 10px;
           background: rgba(255, 255, 255, 0.02);
@@ -138,46 +137,13 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.08em;
-          overflow: hidden;               /* щоб оверлей не вилазив */
         }
-
         .lh-ads-slot img {
           display: block;
           max-width: 100%;
           height: auto;
           border-radius: 8px;
         }
-
-        /* прозорий шар поверх картинки — для лейблу/лінку на ховері */
-        .ad-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(0,0,0,0.0);
-          color: #fff;
-          text-decoration: none;
-          opacity: 0;
-          transition: opacity .18s ease, background .18s ease;
-        }
-        .lh-ads-slot:hover .ad-overlay {
-          opacity: 1;
-          background: rgba(0,0,0,0.25);
-        }
-        .ad-overlay.no-link { cursor: default; }
-
-        .ad-label {
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: rgba(0,0,0,0.55);
-          font-size: 13px;
-          font-weight: 600;
-          letter-spacing: .02em;
-        }
-
-        .ad-ph { opacity: .7; }
-
         .lh-toggle {
           position: absolute;
           top: 50%;
@@ -204,8 +170,12 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           border-top: 3px solid rgba(255, 255, 255, 0.9);
           transform: rotate(-45deg);
         }
-        .lh-leftads.is-collapsed .lh-toggle::before { transform: rotate(135deg); }
-        .lh-toggle:hover { background: rgba(0, 0, 0, 0.5); }
+        .lh-leftads.is-collapsed .lh-toggle::before {
+          transform: rotate(135deg);
+        }
+        .lh-toggle:hover {
+          background: rgba(0, 0, 0, 0.5);
+        }
       `}</style>
     </aside>
   );
