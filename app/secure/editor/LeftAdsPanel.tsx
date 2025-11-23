@@ -23,7 +23,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
 
-  /** 1) Нормалізація вхідних слотів з API */
+  /** 1) Нормалізація вхідних слотів */
   const apiAds = React.useMemo<AdSlotView[]>(() => {
     if (!Array.isArray(items)) return [];
     return items
@@ -34,14 +34,11 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
         label: a?.label ? String(a.label).trim() : null,
         seq: Number.isFinite(a?.seq as any) ? (a!.seq as number) : null,
       }))
-      .filter((a) => a.imageUrl.length > 0)            // тільки з валідною картинкою
-      .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999)); // послідовність
+      .filter((a) => a.imageUrl.length > 0)
+      .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999));
   }, [items]);
 
-  /** 2) Джерело даних для відмальовки:
-   *    - якщо є валідні apiAds — показуємо їх
-   *    - якщо немає — короткий фолбек з 2 плейсхолдерів
-   */
+  /** 2) Джерело для відмальовки (без дублювання) */
   const ads: AdSlotView[] = React.useMemo(() => {
     if (apiAds.length > 0) return apiAds;
     return [
@@ -50,32 +47,44 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     ];
   }, [apiAds]);
 
-  /** 3) Синхронізація стану згортання ззовні */
+  /** 3) Синхронізація згортання */
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  /** 4) Автоскрол (як було) */
+  /** 4) Автоскрол без дублювання: переставляємо перший елемент у кінець */
   React.useEffect(() => {
-    const step = 0.5;      // не змінюю швидкість
-    const intervalMs = 30; // не змінюю інтервал
+    const step = 0.5;      // та сама швидкість
+    const intervalMs = 30; // той самий інтервал
+
     const id = window.setInterval(() => {
       const node = scrollRef.current;
       if (!node) return;
       if (hoverRef.current) return;
       if (node.scrollHeight <= node.clientHeight) return;
-      const half = node.scrollHeight / 2;
-      node.scrollTop = node.scrollTop >= half ? 0 : node.scrollTop + step;
-    }, intervalMs);
-    return () => window.clearInterval(id);
-  }, []);
 
-  /** 5) (опційно) Консоль для швидкої перевірки реальних даних */
-  React.useEffect(() => {
-    // прибери якщо зайве
-    // console.log("[LeftAdsPanel] items →", items);
-    // console.log("[LeftAdsPanel] apiAds →", apiAds);
-  }, [items, apiAds]);
+      // рухаємо вгору
+      node.scrollTop += step;
+
+      // якщо перший слот проскролився повністю — переносимо його в кінець
+      const first = node.firstElementChild as HTMLElement | null;
+      if (!first) return;
+
+      // враховуємо vertical gap між картками
+      const cs = getComputedStyle(node);
+      const gapY =
+        parseFloat((cs as any).rowGap || (cs as any).gap || "0") || 0;
+
+      const threshold = first.getBoundingClientRect().height + gapY;
+
+      if (node.scrollTop >= threshold - 0.5 /* невеликий допуск */) {
+        node.appendChild(first);
+        node.scrollTop -= threshold; // без ривка
+      }
+    }, intervalMs);
+
+    return () => window.clearInterval(id);
+  }, [ads.length]);
 
   return (
     <aside
@@ -94,14 +103,11 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       />
 
       <div className="lh-leftads-inner" ref={scrollRef}>
-        {/* дублюємо список для безкінечного скролу, як і було */}
-        {ads.concat(ads).map((ad, i) => {
-          const key = `${ad.id}-${i}`;
+        {ads.map((ad) => {
           const img = ad.imageUrl;
-
           return (
             <div
-              key={key}
+              key={ad.id}
               className="lh-ads-slot"
               data-ad-id={ad.id}
               data-has-img={Boolean(img)}
@@ -154,10 +160,22 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           overflow-y: auto;
           overscroll-behavior: contain;
           padding-right: 6px;
+
+          /* тонкий скролбар */
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,.28) transparent;
         }
+        .lh-leftads-inner::-webkit-scrollbar { width: 8px; }
+        .lh-leftads-inner::-webkit-scrollbar-track { background: transparent; }
+        .lh-leftads-inner::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,.22);
+          border-radius: 8px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        .lh-leftads-inner:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,.32); }
 
         .lh-ads-slot {
-          flex: 0 0 0px;
           border-radius: 10px;
           background: rgba(255,255,255,.02);
           border: 1px solid rgba(255,255,255,.09);
@@ -168,10 +186,12 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: .08em;
+          /* висота слота формується контентом (зображенням) або зафіксуй тут 600px, якщо треба строго */
+          /* height: 600px; */
         }
         .lh-ads-slot img {
           display: block;
-          max-width: 100%;
+          width: 100%;
           height: auto;
           border-radius: 8px;
         }
