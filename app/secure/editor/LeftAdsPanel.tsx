@@ -157,7 +157,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
         }
 
         .lh-ads-slot {
-          flex: 0 0 600px;
+          flex: 0 0 0px;
           border-radius: 10px;
           background: rgba(255,255,255,.02);
           border: 1px solid rgba(255,255,255,.09);
