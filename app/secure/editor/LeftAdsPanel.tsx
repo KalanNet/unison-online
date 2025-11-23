@@ -118,7 +118,7 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           left: 0;
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
-          width: 360px;
+          width: 400px; /* було 360px — повернули 400 */
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           z-index: 1050;
@@ -137,12 +137,32 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           gap: 16px;
           overflow-y: auto;
           overscroll-behavior: contain;
-          padding-right: 6px;
+          padding-right: 4px;
+
+          /* тонкий скролбар для Firefox */
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+        }
+        /* тонкий скролбар для WebKit (Chrome/Edge/Safari) */
+        .lh-leftads-inner::-webkit-scrollbar {
+          width: 8px; /* вужча полоса прокрутки */
+        }
+        .lh-leftads-inner::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .lh-leftads-inner::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.22);
+          border-radius: 8px;
+          border: 2px solid transparent; /* тонший вигляд */
+          background-clip: padding-box;
+        }
+        .lh-leftads-inner:hover::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.32);
         }
 
         .lh-ads-slot {
           position: relative;
-          flex: 0 0 580px;
+          flex: 0 0 600px; /* було 580px — повернули висоту фрейму 600 */
           border-radius: 12px;
           overflow: hidden;
           background: #111821;
