@@ -157,7 +157,12 @@ export default async function Page({
           title={title}
           bookmarks={sanitizeBookmarks(data?.bookmarks)}
           ads={sanitizeAds((data as any)?.ads)}
-        />
+        content={[
+    { id: "t1", label: "About Unison", page: 2,  isSection: true },
+    { id: "t2", label: "Services",     page: 6 },
+    { id: "t3", label: "Housing",      page: 38, isSection: true },
+  ]}
+/>
       );
     }
     const ClientFallback =
@@ -174,6 +179,11 @@ export default async function Page({
       title={title}
       bookmarks={sanitizeBookmarks(data.bookmarks)}
       ads={sanitizeAds(data.ads)}
-    />
+      content={[
+    { id: "t1", label: "About Unison", page: 2,  isSection: true },
+    { id: "t2", label: "Services",     page: 6 },
+    { id: "t3", label: "Housing",      page: 38, isSection: true },
+  ]}
+/>
   );
 }

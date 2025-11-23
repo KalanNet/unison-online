@@ -8,6 +8,7 @@ import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
 import LeftAdsPanel from "../secure/editor/LeftAdsPanel";
+import RightContentPanel, { TocItem } from "../secure/editor/RightContentPanel";
 
 
 // той самий FlipBook
@@ -38,11 +39,13 @@ export default function PublicViewer({
   title,
   bookmarks = [],
   ads = [],
+  content = [],              // ← НОВЕ
 }: {
   file: string;
   title?: string;
   bookmarks?: Bookmark[];
   ads?: AdSlot[];
+  content?: TocItem[];       // ← НОВЕ
 }) {
   // --- Search UI state (for header) ---
   const [searchOpen, setSearchOpen] = useState(false);
@@ -446,6 +449,13 @@ export default function PublicViewer({
 
       {/* Панель: видима на титулці, ховається на інших сторінках */}
       <LeftAdsPanel autoCollapsed={!isFrontCover} items={ads} />
+
+      {/* НОВА ПРАВА ПАНЕЛЬ ЗМІСТУ */}
+<RightContentPanel
+  autoCollapsed={!isFrontCover}
+  items={content}
+  onGotoPage={(p) => ctrl.goToPage(p)}
+/>
 
       <EditorHeader
         title={ctrl.title}

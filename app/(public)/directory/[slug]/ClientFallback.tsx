@@ -118,7 +118,12 @@ export default function ClientFallback() {
         title={ready.title}
         bookmarks={ready.bookmarks}
         ads={ready.ads}
-      />
+        content={[
+    { id: "t1", label: "About Unison", page: 2,  isSection: true },
+    { id: "t2", label: "Services",     page: 6 },
+    { id: "t3", label: "Housing",      page: 38, isSection: true },
+  ]}
+/>
     );
   }
 
