@@ -8,7 +8,7 @@ import ViewerFooter from "../secure/editor/EditorFooter";
 import MobileHeader from "./MobileHeader";
 import MobilePager from "./MobilePager";
 import LeftAdsPanel from "../secure/editor/LeftAdsPanel";
-import RightContentPanel, { TocItem } from "../secure/editor/RightContentPanel";
+import RightContentPanel, { type TocItem } from "../secure/editor/RightContentPanel";
 
 
 // той самий FlipBook
@@ -454,7 +454,7 @@ export default function PublicViewer({
 <RightContentPanel
   autoCollapsed={!isFrontCover}
   items={content}
-  onGotoPage={(p) => ctrl.goToPage(p)}
+  onGotoPage={jumpToPdfPage}
 />
 
       <EditorHeader
