@@ -8,13 +8,14 @@ type AdSlotView = {
   imageUrl: string;
   href?: string | null;
   label?: string | null;
+  seq?: number | null;
 };
 
 type LeftAdsPanelProps = {
   /** Зовнішній прапорець: чи має панель бути згорнута */
   autoCollapsed?: boolean;
-  /** Рекламні слоти, які приходять з опублікованих метаданих */
-  items?: AdSlotView[];
+  /** Рекламні слоти, що приходять із meta.json */
+  items?: AdSlotView[] | null | undefined;
 };
 
 export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps) {
@@ -22,21 +23,42 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
   const hoverRef = React.useRef(false);
   const [collapsed, setCollapsed] = React.useState(false);
 
-  // Використовуємо передані items; якщо їх немає — лише скромний плейсхолдер
-  const ads: AdSlotView[] = React.useMemo(() => {
-    if (items && items.length > 0) return items;
-    return [{ id: "placeholder-1", imageUrl: "", href: null, label: "AD 1" }];
+  /** 1) Нормалізація вхідних слотів з API */
+  const apiAds = React.useMemo<AdSlotView[]>(() => {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((a) => ({
+        id: String(a?.id ?? ""),
+        imageUrl: String(a?.imageUrl ?? "").trim(),
+        href: a?.href ? String(a.href).trim() : null,
+        label: a?.label ? String(a.label).trim() : null,
+        seq: Number.isFinite(a?.seq as any) ? (a!.seq as number) : null,
+      }))
+      .filter((a) => a.imageUrl.length > 0)            // тільки з валідною картинкою
+      .sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999)); // послідовність
   }, [items]);
 
-  // Синхронізація стану згортання від зовнішнього прапорця
+  /** 2) Джерело даних для відмальовки:
+   *    - якщо є валідні apiAds — показуємо їх
+   *    - якщо немає — короткий фолбек з 2 плейсхолдерів
+   */
+  const ads: AdSlotView[] = React.useMemo(() => {
+    if (apiAds.length > 0) return apiAds;
+    return [
+      { id: "ph-1", imageUrl: "", href: null, label: "AD 1" },
+      { id: "ph-2", imageUrl: "", href: null, label: "AD 2" },
+    ];
+  }, [apiAds]);
+
+  /** 3) Синхронізація стану згортання ззовні */
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Автоскрол вгору по колу
+  /** 4) Автоскрол (як було) */
   React.useEffect(() => {
-    const step = 0.5;
-    const intervalMs = 30;
+    const step = 0.5;      // не змінюю швидкість
+    const intervalMs = 30; // не змінюю інтервал
     const id = window.setInterval(() => {
       const node = scrollRef.current;
       if (!node) return;
@@ -48,11 +70,20 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
     return () => window.clearInterval(id);
   }, []);
 
+  /** 5) (опційно) Консоль для швидкої перевірки реальних даних */
+  React.useEffect(() => {
+    // прибери якщо зайве
+    // console.log("[LeftAdsPanel] items →", items);
+    // console.log("[LeftAdsPanel] apiAds →", apiAds);
+  }, [items, apiAds]);
+
   return (
     <aside
       className={`lh-leftads${collapsed ? " is-collapsed" : ""}`}
-      onMouseEnter={() => (hoverRef.current = true)}
-      onMouseLeave={() => (hoverRef.current = false)}
+      onMouseEnter={() => { hoverRef.current = true; }}
+      onMouseLeave={() => { hoverRef.current = false; }}
+      data-ads-count={ads.length}
+      data-valid-ads={apiAds.length}
     >
       {/* Ручка-стрілка */}
       <button
@@ -63,50 +94,36 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
       />
 
       <div className="lh-leftads-inner" ref={scrollRef}>
-        {/* Дублюємо масив для безшовної каруселі */}
+        {/* дублюємо список для безкінечного скролу, як і було */}
         {ads.concat(ads).map((ad, i) => {
-          const hasImg = !!ad.imageUrl;
-          const label = ad.label ?? "";
+          const key = `${ad.id}-${i}`;
+          const img = ad.imageUrl;
 
           return (
             <div
-              key={`${ad.id}-${i}`}
-              className={`lh-ads-slot${hasImg ? " has-img" : ""}`}
+              key={key}
+              className="lh-ads-slot"
               data-ad-id={ad.id}
-              data-has-img={hasImg ? "true" : "false"}
-              data-label={label}
+              data-has-img={Boolean(img)}
             >
-              {/* Фон-плейсхолдер (видимий, тільки якщо немає картинки) */}
-              <div className="ad-bg">
-                <span className="ad-ph">{label || "AD"}</span>
-              </div>
-
-              {/* Картинка + лінк, завжди поверх ad-bg */}
-              {hasImg &&
-                (ad.href ? (
+              {img ? (
+                ad.href ? (
                   <a
-                    className="ad-link"
                     href={ad.href}
                     target="_blank"
-                    rel="noopener noreferrer nofollow"
-                    title={label || undefined}
+                    rel="noopener noreferrer"
+                    className="ad-link"
+                    title={ad.label || undefined}
                   >
-                    <img
-                      className="ad-img"
-                      src={ad.imageUrl}
-                      alt={label || "Ad"}
-                    />
+                    <img src={img} alt={ad.label || "Ad"} />
+                    {ad.label ? <span className="sr-only">{ad.label}</span> : null}
                   </a>
                 ) : (
-                  <img
-                    className="ad-img"
-                    src={ad.imageUrl}
-                    alt={label || "Ad"}
-                  />
-                ))}
-
-              {/* Маленький бейджик-лейбл поверх картинки */}
-              {label && hasImg && <span className="ad-label">{label}</span>}
+                  <img src={img} alt={ad.label || "Ad"} />
+                )
+              ) : (
+                <span className="ad-ph">{ad.label || "AD"}</span>
+              )}
             </div>
           );
         })}
@@ -118,16 +135,15 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           left: 0;
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
-          width: 400px; /* було 360px — повернули 400 */
+          width: 400px;
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           z-index: 1050;
+          box-shadow: 4px 0 18px rgba(0,0,0,.32);
           overflow: visible;
-          transition: transform 0.35s ease;
+          transition: transform .35s ease;
         }
-        .lh-leftads.is-collapsed {
-          transform: translateX(-100%);
-        }
+        .lh-leftads.is-collapsed { transform: translateX(-100%); }
 
         .lh-leftads-inner {
           height: 100%;
@@ -137,97 +153,29 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           gap: 16px;
           overflow-y: auto;
           overscroll-behavior: contain;
-          padding-right: 4px;
-
-          /* тонкий скролбар для Firefox */
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
-        }
-        /* тонкий скролбар для WebKit (Chrome/Edge/Safari) */
-        .lh-leftads-inner::-webkit-scrollbar {
-          width: 8px; /* вужча полоса прокрутки */
-        }
-        .lh-leftads-inner::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .lh-leftads-inner::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.22);
-          border-radius: 8px;
-          border: 2px solid transparent; /* тонший вигляд */
-          background-clip: padding-box;
-        }
-        .lh-leftads-inner:hover::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.32);
+          padding-right: 6px;
         }
 
         .lh-ads-slot {
-          position: relative;
-          flex: 0 0 600px; /* було 580px — повернули висоту фрейму 600 */
-          border-radius: 12px;
-          overflow: hidden;
-          background: #111821;
-        }
-
-        /* Фон + текст плейсхолдера — нижній шар */
-        .ad-bg {
-          position: absolute;
-          inset: 0;
+          flex: 0 0 600px;
+          border-radius: 10px;
+          background: rgba(255,255,255,.02);
+          border: 1px solid rgba(255,255,255,.09);
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255, 255, 255, 0.03);
-          color: #a9b3c7;
-          z-index: 1;
-        }
-        .ad-ph {
+          color: #d2d7e0;
           font-size: 11px;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: .08em;
         }
-
-        /* Картинка / лінк — ОБОВʼЯЗКОВО поверх плейсхолдера */
-        .ad-link,
-        .ad-img {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-        }
-        .ad-link {
-          z-index: 2;
-          line-height: 0;
+        .lh-ads-slot img {
           display: block;
-        }
-        .ad-img {
-          z-index: 2;
-          display: block;
-          object-fit: cover;
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
         }
 
-        /* Якщо є картинка — плейсхолдер приховуємо */
-        .lh-ads-slot.has-img .ad-bg {
-          opacity: 0;
-          pointer-events: none;
-        }
-
-        /* Лейбл у куті поверх усього */
-        .ad-label {
-          position: absolute;
-          left: 8px;
-          bottom: 8px;
-          z-index: 3;
-          padding: 4px 6px;
-          border-radius: 6px;
-          background: rgba(0, 0, 0, 0.45);
-          color: #fff;
-          font-size: 11px;
-          line-height: 1;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          pointer-events: none;
-        }
-
-        /* Ручка-стрілка */
         .lh-toggle {
           position: absolute;
           top: 50%;
@@ -237,8 +185,8 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           height: 80px;
           border: 0;
           border-radius: 0 12px 12px 0;
-          background: rgba(0, 0, 0, 0.35);
-          box-shadow: 4px 0 10px rgba(0, 0, 0, 0.4);
+          background: rgba(0,0,0,.35);
+          box-shadow: 4px 0 10px rgba(0,0,0,.4);
           cursor: pointer;
           padding: 0;
           display: flex;
@@ -250,15 +198,18 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           display: block;
           width: 18px;
           height: 18px;
-          border-left: 3px solid rgba(255, 255, 255, 0.9);
-          border-top: 3px solid rgba(255, 255, 255, 0.9);
-          transform: rotate(-45deg); /* вліво */
+          border-left: 3px solid rgba(255,255,255,.9);
+          border-top: 3px solid rgba(255,255,255,.9);
+          transform: rotate(-45deg);
         }
-        .lh-leftads.is-collapsed .lh-toggle::before {
-          transform: rotate(135deg); /* вправо */
-        }
-        .lh-toggle:hover {
-          background: rgba(0, 0, 0, 0.5);
+        .lh-leftads.is-collapsed .lh-toggle::before { transform: rotate(135deg); }
+
+        .ad-link { display: block; line-height: 0; }
+        .ad-ph   { opacity: .7; }
+        .sr-only {
+          position: absolute;
+          width: 1px; height: 1px; padding: 0; margin: -1px;
+          overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
         }
       `}</style>
     </aside>
