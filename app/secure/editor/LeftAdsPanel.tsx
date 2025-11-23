@@ -157,23 +157,18 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           display: flex;
           flex-direction: column;
           gap: 16px;
-          overflow-y: auto;
+          overflow-y: auto;            /* скрол працює, але смуги не видно */
           overscroll-behavior: contain;
-          padding-right: 6px;
+          padding-right: 0;            /* нічого не «з’їдає» з правого краю */
 
-          /* тонкий скролбар */
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,.28) transparent;
+          /* повне приховування скролбарів у всіх браузерах */
+          -ms-overflow-style: none;    /* IE/Edge legacy */
+          scrollbar-width: none;       /* Firefox */
         }
-        .lh-leftads-inner::-webkit-scrollbar { width: 8px; }
-        .lh-leftads-inner::-webkit-scrollbar-track { background: transparent; }
-        .lh-leftads-inner::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,.22);
-          border-radius: 8px;
-          border: 2px solid transparent;
-          background-clip: padding-box;
+        .lh-leftads-inner::-webkit-scrollbar {
+          width: 0; height: 0;         /* Chrome/Safari/Opera */
+          display: none;
         }
-        .lh-leftads-inner:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,.32); }
 
         .lh-ads-slot {
           border-radius: 10px;
@@ -186,8 +181,8 @@ export default function LeftAdsPanel({ autoCollapsed, items }: LeftAdsPanelProps
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: .08em;
-          /* висота слота формується контентом (зображенням) або зафіксуй тут 600px, якщо треба строго */
-          /* height: 600px; */
+          /* якщо потрібно строго 600px:
+             height: 600px; */
         }
         .lh-ads-slot img {
           display: block;
