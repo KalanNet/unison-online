@@ -192,9 +192,9 @@ export default function LeftRailPanel({ autoCollapsed, items }: LeftRailProps) {
         .lh-toggle {
           position: absolute;
           top: 50%;
-          right: -40px;
+          right: -20px;
           transform: translateY(-50%);
-          width: 40px;
+          width: 30px;
           height: 80px;
           border: 0;
           border-radius: 0 12px 12px 0;
