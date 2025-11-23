@@ -6,8 +6,8 @@ import React from "react";
 export type TocItem = {
   id: string;
   label: string;
-  page: number;         // 1-based
-  isSection?: boolean;  // лише для стилю (розділ)
+  page: number;        // 1-based
+  isSection?: boolean; // лише для стилю (розділ)
 };
 
 type Props = {
@@ -48,7 +48,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Навігація стрілками всередині списку
+  // Клавіатурна навігація по списку
   const onKeyList = (e: React.KeyboardEvent) => {
     const root = listRef.current;
     if (!root) return;
@@ -68,7 +68,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
       className={`rc-rightpanel${collapsed ? " is-collapsed" : ""}`}
       aria-label="Contents"
     >
-      {/* Ручка-стрілка (з правого краю, стрілка назовні) */}
+      {/* Ручка-стрілка (праворуч, стрілка назовні) */}
       <button
         type="button"
         className="rc-toggle"
@@ -85,24 +85,30 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
       >
         <div className="rc-title" aria-hidden>Contents</div>
 
-        {toc.map((it) => (
-          <button
-            key={it.id}
-            type="button"
-            role="listitem"
-            className={`rc-item${it.isSection ? " is-section" : ""}`}
-            onClick={() => onGotoPage?.(it.page)}
-            aria-label={`${it.label}, page ${it.page}`}
-            title={`${it.label} — page ${it.page}`}
-          >
-            {/* маркер (розділ/звичайний) */}
-            <span className="rc-dot" aria-hidden />
-            {/* підпис: ховається у «спокійному» стані, показується на hover/focus */}
-            <span className="rc-label">{it.label}</span>
-            {/* номер сторінки завжди видимий */}
-            <span className="rc-page">p.{it.page}</span>
-          </button>
-        ))}
+        {toc.map((it, i) => {
+          const isSection = !!it.isSection;
+          return (
+            <button
+              key={it.id}
+              type="button"
+              role="listitem"
+              className={`rc-item${isSection ? " is-section" : " is-page"}`}
+              onClick={() => onGotoPage?.(it.page)}
+              aria-label={`${it.label}, page ${it.page}`}
+              title={`${it.label} — page ${it.page}`}
+            >
+              {/* маркер */}
+              <span className="rc-dot" aria-hidden />
+              {/* підпис */}
+              <span className="rc-label">{it.label}</span>
+              {/* номер сторінки */}
+              <span className="rc-page">p.{it.page}</span>
+
+              {/* м’який дільник між рядками (не показуємо перед першим) */}
+              {i > 0 ? <span className="rc-sep" aria-hidden /> : null}
+            </button>
+          );
+        })}
       </div>
 
       <style jsx>{`
@@ -111,7 +117,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           right: 0;
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
-          width: 340px;
+          width: 360px;
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 16px 14px;
           z-index: 1050;
@@ -154,8 +160,10 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 0; /* дільники малюєм окремо */
           outline: none;
+
+          /* ховаємо смуги прокрутки */
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
@@ -164,76 +172,103 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         .rc-title {
           color: #e9f0e4;
           font-weight: 800;
-          margin: 4px 6px 12px;
+          margin: 4px 8px 12px;
           letter-spacing: .02em;
           text-transform: uppercase;
           opacity: .9;
         }
 
-        /* ——— Item ——— */
+        /* ====== ITEM (без контурів за замовчуванням) ====== */
         .rc-item {
+          position: relative;
           display: grid;
           grid-template-columns: 18px 1fr auto;
           align-items: center;
-          gap: 10px;
-          padding: 10px 12px;
-          background: rgba(255,255,255,.03);
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 12px;
+          column-gap: 10px;
+
+          /* базові відступи */
+          padding: 10px 12px 10px 8px;
+          background: transparent;
+          border: 0;
           color: #d2d7e0;
           text-align: left;
           cursor: pointer;
-          transition: background .18s ease, border-color .18s ease, transform .06s ease;
+
+          transition: background .16s ease, transform .06s ease, box-shadow .16s ease;
+          border-radius: 12px; /* стане помітним лише на hover/focus */
         }
+
+        /* Плавний hover/focus — тільки підсвічуємо фон */
         .rc-item:hover,
         .rc-item:focus-visible {
           background: rgba(255,255,255,.06);
-          border-color: rgba(255,255,255,.18);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
         }
         .rc-item:active { transform: translateY(1px); }
+
+        /* Дільник між пунктами (тонкий) */
+        .rc-sep {
+          position: absolute;
+          left: 8px;
+          right: 8px;
+          bottom: -1px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+          pointer-events: none;
+        }
+
+        /* ====== РОЗДІЛ ====== */
+        .rc-item.is-section {
+          grid-template-columns: 18px 1fr auto;
+          padding-left: 8px; /* повна ширина (без додаткового відступу) */
+        }
+        .rc-item.is-section .rc-label {
+          font-weight: 800;
+          font-size: 15px;
+          letter-spacing: .01em;
+        }
+        .rc-item.is-section .rc-dot {
+          background: #f4ce69;
+          box-shadow: 0 0 0 3px rgba(244, 206, 105, .15);
+        }
+
+        /* ====== ЗВИЧАЙНА СТОРІНКА (відступ вправо, правило абзацу) ====== */
+        .rc-item.is-page {
+          padding-left: 28px; /* індентація */
+        }
+        .rc-item.is-page .rc-dot {
+          background: #9aa4b2;
+          opacity: .9;
+        }
 
         /* Маркер */
         .rc-dot {
           width: 10px;
           height: 10px;
           border-radius: 50%;
-          background: #9aa4b2; /* звичайний */
-          opacity: .9;
-        }
-        .rc-item.is-section .rc-dot {
-          background: #f4ce69; /* акцент для розділів */
-          box-shadow: 0 0 0 2px rgba(244, 206, 105, .18);
         }
 
-        /* Лейбл – прихований у «спокої», показується на hover/focus контейнера або айтема */
+        /* Підпис */
         .rc-label {
           font-size: 14px;
-          line-height: 1.2;
-          letter-spacing: .01em;
+          line-height: 1.25;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
-          transition: max-width .18s ease, opacity .18s ease, transform .18s ease;
-        }
-        /* стан спокою: текст прихований, залишається лише крапка + номер сторінки */
-        .rc-rightpanel:not(:hover):not(:focus-within) .rc-label {
-          opacity: 0;
-          transform: translateX(-6px);
-          max-width: 0;
         }
 
+        /* Номер сторінки — завжди видимий акцент */
         .rc-page {
-          font-weight: 800;
+          font-weight: 900;
           font-size: 12px;
           color: #f4ce69;
+          letter-spacing: .02em;
         }
 
         /* Менше анімацій, якщо користувач цього бажає */
         @media (prefers-reduced-motion: reduce) {
-          .rc-rightpanel,
-          .rc-item,
-          .rc-label { transition: none !important; }
+          .rc-rightpanel, .rc-item { transition: none !important; }
         }
       `}</style>
     </aside>
