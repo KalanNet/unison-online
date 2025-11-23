@@ -83,7 +83,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         ref={listRef}
         onKeyDown={onKeyList}
       >
-        <div className="rc-title" aria-hidden>Contents</div>
+        <div className="rc-title" aria-hidden>Content Table</div>
 
         {toc.map((it, i) => {
           const isSection = !!it.isSection;
