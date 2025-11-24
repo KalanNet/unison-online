@@ -1,4 +1,3 @@
-// app/secure/editor/RightContentEditorPanel.tsx
 "use client";
 
 import React from "react";
@@ -30,26 +29,37 @@ export default function RightContentEditorPanel({
 }: Props) {
   const [saving, setSaving] = React.useState(false);
 
-  // === НОВЕ: локально глушимо глобальні хоткеї фліпбука/документа,
-  // щоб пробіл/стрілки не перехоплювались поза інпутом ===
-  const stopHotkeys: React.KeyboardEventHandler = (e) => {
-    const t = e.target as HTMLElement | null;
-    const tag = t?.tagName?.toLowerCase();
-    const editable =
-      tag === "input" || tag === "textarea" || t?.getAttribute("contenteditable") === "true";
-    if (!editable) return;
+  // === ВАЖЛИВО ===
+  // Перехоплюємо натискання клавіш усередині панелі на capture-фазі
+  // і блокуємо подальше спливання (щоб глобальні шорткати не заважали набирати текст).
+  const trapKeysInsidePanel = React.useCallback((e: React.KeyboardEvent) => {
+    const el = e.target as HTMLElement | null;
+    const tag = el?.tagName;
+    const isEditable =
+      !!el &&
+      (el.isContentEditable ||
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        !!el.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="textbox"]'));
+
+    if (!isEditable) return;
 
     const k = e.key;
+    // даємо працювати дефолту (вставка пробілу тощо),
+    // але зупиняємо *спливання*, щоб не спрацювали глобальні обробники
     if (
       k === " " || k === "Space" || k === "Spacebar" ||
-      k === "ArrowLeft" || k === "ArrowRight" ||
+      k.startsWith("Arrow") ||
+      k === "Home" || k === "End" ||
       k === "PageUp" || k === "PageDown" ||
-      k === "Home" || k === "End"
+      k === "Enter" || k === "Tab"
     ) {
-      // не заважаємо вводу символів — лише зупиняємо розповсюдження
       e.stopPropagation();
+      // @ts-ignore – nativeEvent існує у React SyntheticEvent
+      e.nativeEvent?.stopImmediatePropagation?.();
     }
-  };
+  }, []);
 
   async function handleSave() {
     if (!onSave || !canSave) return;
@@ -65,11 +75,8 @@ export default function RightContentEditorPanel({
     <aside
       className="rce"
       aria-label="Content editor"
-      // важливо: блокуємо як на capture, так і на bubble
-      onKeyDownCapture={stopHotkeys}
-      onKeyDown={stopHotkeys}
-      onKeyUp={stopHotkeys}
-      onKeyPress={stopHotkeys as any}
+      // <-- КЛЮЧОВЕ: перехоплюємо клавіші ще до глобальних слухачів
+      onKeyDownCapture={trapKeysInsidePanel}
     >
       <div className="rce-inner">
         <div className="rce-header">
@@ -103,17 +110,18 @@ export default function RightContentEditorPanel({
 
           {items.map((it) => (
             <div key={it.id} role="listitem" className="rce-item">
-              {/* Назва — на всю ширину, дозволяє пробіли */}
+              {/* Назва — на всю ширину; пробіли тепер НЕ перехоплює глобальний keydown */}
               <input
                 className="rce-inp rce-inp-title"
                 type="text"
                 value={it.label}
                 placeholder="Type section title…"
                 onChange={(e) => onChange?.(it.id, { label: e.target.value })}
-                // дублюємо локальну “ізоляцію” ще й на самому інпуті
-                onKeyDown={(e) => e.stopPropagation()}
-                onKeyUp={(e) => e.stopPropagation()}
-                onKeyPress={(e) => e.stopPropagation()}
+                onKeyDownCapture={trapKeysInsidePanel}  // дублюємо на всяк випадок
+                autoComplete="off"
+                spellCheck={false}
+                id={`toc-title-${it.id}`}
+                aria-label="Section title"
               />
 
               {/* Другий рядок: чекбокс Section, сторінка, Go, Delete */}
@@ -139,9 +147,7 @@ export default function RightContentEditorPanel({
                     onChange={(e) =>
                       onChange?.(it.id, { page: Number(e.target.value || 1) })
                     }
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onKeyUp={(e) => e.stopPropagation()}
-                    onKeyPress={(e) => e.stopPropagation()}
+                    aria-label="Page number"
                   />
                   <button
                     className="rce-mini"
