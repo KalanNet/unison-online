@@ -748,6 +748,12 @@ export default function PublicViewer({
               })}
             </FlipBook>
 
+            {/* підказка загнутого кутика (правий-нижній) */}
+            {ctrl.canNext && <div className="page-curl-hint" aria-hidden />}
+     
+            {ctrl.canPrev && <div className="page-curl-hint left" aria-hidden />}
+            
+
             {/* === ALWAYS-VISIBLE RAILS === */}
             {bmSorted.length > 0 && (
               <div className="bm-rails" aria-hidden={false}>
@@ -1414,6 +1420,79 @@ export default function PublicViewer({
             display: none !important;
           }
         }
+
+        /* ===== Page corner “curl” hint ===== */
+.page-curl-hint{
+  --curl-size: 62px;           /* розмір кутика */
+  position:absolute;
+  right:0; bottom:0;
+  width:var(--curl-size);
+  height:var(--curl-size);
+  pointer-events:none;         /* не блокуємо кліки по сторінці */
+  z-index:40;
+}
+
+/* сам “загнутий” трикутник */
+.page-curl-hint::before{
+  content:"";
+  position:absolute; inset:0;
+  /* білий “низ” сторінки + тонка діагональна рисочка-край */
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.92) 0 49%, rgba(255,255,255,0) 51%),
+    linear-gradient(135deg, rgba(0,0,0,.18) 0 49%, rgba(0,0,0,0) 51%);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%); /* трикутник */
+  transform-origin: 100% 100%;
+  filter: drop-shadow(-2px -2px 2px rgba(0,0,0,.25));
+  animation: curl-peek 3.2s ease-in-out 1.2s infinite;
+}
+
+/* м’яка тінь під “піднятим” кутом */
+.page-curl-hint::after{
+  content:"";
+  position:absolute; inset:-6% -6% 0 0;
+  background: radial-gradient(70% 70% at 100% 100%, rgba(0,0,0,.35), transparent 70%);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  transform-origin: 100% 100%;
+  animation: curl-shadow 3.2s ease-in-out 1.2s infinite;
+}
+
+/* варіант для лівого нижнього кута */
+.page-curl-hint.left{
+  right:auto; left:0;
+  transform: scaleX(-1); /* віддзеркалити */
+}
+
+/* зупиняємо під час взаємодії, щоб не відволікало */
+.page-curl-hint:hover,
+.page-curl-hint:active,
+.page-curl-hint:focus,
+.viewer:hover .page-curl-hint{
+  animation-play-state: paused;
+}
+.page-curl-hint:hover::before,
+.page-curl-hint:hover::after{
+  animation-play-state: paused;
+}
+
+/* менше руху — без анімацій */
+@media (prefers-reduced-motion: reduce){
+  .page-curl-hint, .page-curl-hint::before, .page-curl-hint::after{
+    animation: none !important;
+  }
+}
+
+/* ===== keyframes ===== */
+@keyframes curl-peek{
+  0%, 60%, 100% { transform: translate(0,0) rotate(0deg) scale(1); opacity:.75; }
+  18%           { transform: translate(-6px,-6px) rotate(-10deg) scale(1.02); opacity:1; }
+  32%           { transform: translate(-4px,-4px) rotate(-6deg)  scale(1.01); opacity:.95; }
+  46%           { transform: translate(-2px,-2px) rotate(-3deg)  scale(1.00); opacity:.85; }
+}
+@keyframes curl-shadow{
+  0%, 60%, 100% { opacity:0; transform: translate(0,0); }
+  18%, 46%      { opacity:.55; transform: translate(-2px,-2px); }
+}
+
       `}</style>
     </div>
   );
