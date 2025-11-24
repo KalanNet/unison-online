@@ -181,7 +181,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         ref={listRef}
         onKeyDown={onKeyList}
       >
-        <div className="rc-title" aria-hidden>Content Table</div>
+        <div className="rc-title" aria-hidden>CONTENT TABLE</div>
 
         {loading && <div style={{padding:"8px 12px", color:"#9aa4b2"}}>Loading…</div>}
         {!loading && toc.length === 0 && (
@@ -274,10 +274,13 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           opacity: .9;
         }
 
+        /* ===== ITEM (база) =====
+           3 колонки: крапка • назва • номер сторінки
+           Для правильного ellipsis — minmax(0,1fr). */
         .rc-item {
           position: relative;
           display: grid;
-          grid-template-columns: 18px 1fr auto;
+          grid-template-columns: 18px minmax(0,1fr) auto;
           align-items: center;
           column-gap: 10px;
           padding: 10px 12px 10px 8px;
@@ -308,7 +311,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
 
         /* ===== РОЗДІЛИ ===== */
         .rc-item.is-section {
-          grid-template-columns: 18px 1fr auto;
+          grid-template-columns: 18px minmax(0,1fr) auto;
           padding-left: 8px;
         }
         .rc-item.is-section .rc-label {
@@ -324,12 +327,11 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
 
         /* ===== ЗВИЧАЙНІ ПУНКТИ ===== */
         .rc-item.is-page {
-          padding-left: 28px; /* індентація лишається */
+          grid-template-columns: minmax(0,1fr) auto; /* без лівої колонки */
+          padding-left: 28px; /* індентація зберігається візуально */
         }
-        /* прибираємо крапку в звичайних пунктів */
-        .rc-item.is-page .rc-dot {
-          display: none;
-        }
+        /* прибираємо крапку у звичайних пунктів */
+        .rc-item.is-page .rc-dot { display: none; }
 
         .rc-dot { width: 10px; height: 10px; border-radius: 50%; }
 
@@ -340,15 +342,19 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
+          min-width: 0; /* критично для ellipsis всередині grid */
         }
 
-        /* Номери сторінок — тим же шрифтом і кольором, що й звичайний текст */
+        /* Номери сторінок — тим же шрифтом/кольором, що й текст;
+           вирівняні праворуч, не “з’їдають” ширину заголовка. */
         .rc-page {
           font: inherit;
           font-size: 14px;
           font-weight: 400;
           color: inherit;
           letter-spacing: normal;
+          justify-self: end;
+          white-space: nowrap;
         }
 
         @media (prefers-reduced-motion: reduce) {
