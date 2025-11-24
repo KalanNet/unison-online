@@ -1423,64 +1423,60 @@ export default function PublicViewer({
 
         /* ===== Page corner “curl” hint — Realistic Peel ===== */
 .page-curl-hint {
-  --curl-max: 90px;     /* Максимальний розмір загину */
+  --curl-max: 90px;
   position: absolute;
   right: 0; bottom: 0;
   width: var(--curl-max);
   height: var(--curl-max);
   pointer-events: none;
   z-index: 80;
-  /* Контейнер обмежує область, щоб ми не вилазили за межі */
   overflow: visible; 
 }
 
-/* «Пелюстка» (зворотна сторона сторінки) */
+/* «Пелюстка» */
 .page-curl-hint::before {
   content: "";
   position: absolute;
-  right: 0; bottom: 0; /* Прив'язка до самого кутика */
+  right: 0; bottom: 0;
   
-  /* Початковий стан (маленький натяк на загин) */
-  width: 20px; 
-  height: 20px;
+  width: 0; /* Початковий стан — приховано */
+  height: 0;
   
-  /* Градієнт створює візуальний трикутник (білий папір + тінь у згині) */
   background: linear-gradient(
     135deg,
-    #ffffff 45%,               /* Основний колір звороту */
-    #f0f0f0 50%,               /* Легке затемнення перед згином */
-    #d9d9d9 55%,               /* Тінь самого згину */
-    transparent 56%            /* Прозора частина (відрізаємо зайве) */
+    #ffffff 45%,
+    #f0f0f0 50%,
+    #d9d9d9 55%,
+    transparent 56%
   );
   
-  /* Тінь, що падає від загнутого кутика на сторінку під ним */
   box-shadow: -4px -4px 12px rgba(0, 0, 0, 0.3);
+  border-bottom-right-radius: 0;
+  border-top-left-radius: 100px;
   
-  /* Робимо кутик згину трохи заокругленим (реалістичність паперу) */
-  border-bottom-right-radius: 0; /* Гострий кут внизу */
-  border-top-left-radius: 100px; /* М'який згин вгорі */
-  
-  /* Анімація пульсації розміру */
-  animation: curlPulse 3s ease-in-out infinite;
+  /* ЗМІНА ТУТ: 
+     Загальний цикл 7 секунд. 
+     З них ~2.5 сек — рух, ~4.5 сек — пауза. */
+  animation: curlPulse 7s ease-in-out infinite;
 }
 
-/* Стрілка-підказка */
+/* Стрілка */
 .page-curl-hint::after {
   content: "";
   position: absolute;
   z-index: 81;
-  right: 4px; bottom: 4px; /* Прив'язка до кута */
+  right: 4px; bottom: 4px;
   width: 12px; height: 12px;
   
   border-right: 3px solid rgba(0,0,0,0.6);
   border-top: 3px solid rgba(0,0,0,0.6);
-  transform: rotate(45deg); /* Стрілка вказує в центр */
+  transform: rotate(45deg);
   
-  opacity: 0; /* Спочатку невидима */
-  animation: arrowMove 3s ease-in-out infinite;
+  opacity: 0;
+  /* ЗМІНА ТУТ: теж 7 секунд, щоб синхронізуватися */
+  animation: arrowMove 7s ease-in-out infinite;
 }
 
-/* ВАРІАНТ ДЛЯ ЛІВОГО КУТА (дзеркально) */
 .page-curl-hint.left {
   right: auto; left: 0;
   transform: scaleX(-1);
@@ -1492,44 +1488,58 @@ export default function PublicViewer({
 .viewer:hover .page-curl-hint::before,
 .viewer:hover .page-curl-hint::after {
   animation-play-state: paused;
-  /* При паузі показуємо розгорнутий стан */
   width: var(--curl-max);
   height: var(--curl-max);
   opacity: 1;
-  transition: width 0.3s, height 0.3s; /* Щоб плавно зупинилось */
+  transition: width 0.3s, height 0.3s;
 }
 
-/* ===== KEYFRAMES ===== */
+/* ===== ОНОВЛЕНІ KEYFRAMES ===== */
 
-/* Анімація самого аркуша: зміна розміру від 0 до максимуму */
 @keyframes curlPulse {
-  0%, 100% {
+  /* 0% - 40%: Активна фаза (приблизно 2.8 сек) */
+  0% {
     width: 0; 
     height: 0;
     border-top-left-radius: 0;
   }
-  50% {
+  20% { /* Пік анімації */
     width: var(--curl-max); 
     height: var(--curl-max);
-    border-top-left-radius: 50px; /* Більший радіус при більшому загині */
+    border-top-left-radius: 50px;
+  }
+  40% { /* Повернення назад */
+    width: 0; 
+    height: 0;
+    border-top-left-radius: 0;
+  }
+  /* 40% - 100%: Пауза (нічого не відбувається до кінця 7-ї секунди) */
+  100% {
+    width: 0; 
+    height: 0;
+    border-top-left-radius: 0;
   }
 }
 
-/* Анімація стрілки: вона з'являється і рухається разом із загином */
 @keyframes arrowMove {
-  0%, 100% {
+  /* Синхронізовано з curlPulse */
+  0% {
     transform: translate(0, 0) rotate(45deg);
     opacity: 0;
   }
-  20% {
-    opacity: 1; /* З'являється швидко */
+  10% { /* З'являється трохи швидше */
+    opacity: 1;
   }
-  50% {
-    /* Рухається вглиб разом з розширенням кутика */
+  20% { /* Пік руху */
     transform: translate(-30px, -30px) rotate(45deg);
     opacity: 0.6;
   }
-  80% {
+  35% { /* Зникає трохи раніше, ніж закриється кут */
+    opacity: 0;
+  }
+  /* Пауза */
+  100% {
+    transform: translate(0, 0) rotate(45deg);
     opacity: 0;
   }
 }
@@ -1538,7 +1548,7 @@ export default function PublicViewer({
 @media (prefers-reduced-motion: reduce) {
   .page-curl-hint::before, .page-curl-hint::after {
     animation: none !important;
-    width: 40px; height: 40px; /* Статичний маленький загин */
+    width: 40px; height: 40px;
     opacity: 1;
   }
 }
