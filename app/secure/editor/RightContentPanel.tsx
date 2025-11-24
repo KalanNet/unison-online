@@ -181,7 +181,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         ref={listRef}
         onKeyDown={onKeyList}
       >
-        <div className="rc-title" aria-hidden>CONTENT TABLE</div>
+        <div className="rc-title" aria-hidden>TABLE of CONTENTS</div>
 
         {loading && <div style={{padding:"8px 12px", color:"#9aa4b2"}}>Loading…</div>}
         {!loading && toc.length === 0 && (
