@@ -1,15 +1,15 @@
+// app/secure/editor/RightContentEditorPanel.tsx
 "use client";
 
 import React from "react";
 import type { TocItem } from "./useEditorController";
 
 type Props = {
-  /** Залишено для сумісності з існуючим викликом у Viewer.tsx (не використовується) */
-  autoCollapsed?: boolean;
+  autoCollapsed?: boolean; // not used
   items: TocItem[];
   currentPage: number;
   onGotoPage?: (p: number) => void;
-  onAddCurrent?: () => void; // використовується як “+ Add”
+  onAddCurrent?: () => void;
   onChange?: (id: string, patch: Partial<TocItem>) => void;
   onRemove?: (id: string) => void;
   onSave?: () => Promise<void>;
@@ -17,7 +17,7 @@ type Props = {
 };
 
 export default function RightContentEditorPanel({
-  autoCollapsed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  autoCollapsed: _,
   items,
   currentPage,
   onGotoPage,
@@ -29,9 +29,64 @@ export default function RightContentEditorPanel({
 }: Props) {
   const [saving, setSaving] = React.useState(false);
 
-  // === ВАЖЛИВО ===
-  // Перехоплюємо натискання клавіш усередині панелі на capture-фазі
-  // і блокуємо подальше спливання (щоб глобальні шорткати не заважали набирати текст).
+  /* ───────────────────── 1) ДВОРІВНЕВЕ СОРТУВАННЯ ─────────────────────
+     1) page ASC (невизначені/невалідні сторінки – внизу)
+     2) label ASC (case-insensitive) усередині однакових сторінок
+  */
+  const sorted = React.useMemo(() => {
+    const normPage = (v: any) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : Number.POSITIVE_INFINITY;
+    };
+    const normLabel = (s: any) => String(s ?? "").trim();
+    return [...items].sort((a, b) => {
+      const pa = normPage(a.page as any);
+      const pb = normPage(b.page as any);
+      if (pa !== pb) return pa - pb;
+      const la = normLabel(a.label);
+      const lb = normLabel(b.label);
+      // secondary: by label (case-insensitive, stable)
+      const c = la.localeCompare(lb, undefined, { sensitivity: "base" });
+      return c !== 0 ? c : 0;
+    });
+  }, [items]);
+
+  /* ─────────────── 2) FLIP-анімація при зміні порядку ─────────────── */
+  const itemRefs = React.useRef(new Map<string, HTMLDivElement>());
+  const prevRects = React.useRef(new Map<string, DOMRect>());
+
+  const setItemRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) itemRefs.current.set(id, el);
+    else itemRefs.current.delete(id);
+  };
+
+  React.useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+    sorted.forEach((it) => {
+      const el = itemRefs.current.get(it.id);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      nextRects.set(it.id, rect);
+
+      const prev = prevRects.current.get(it.id);
+      if (!prev) return;
+
+      const dy = prev.top - rect.top;
+      if (dy !== 0) {
+        // FLIP: з позиції "де було" → "де стало"
+        el.style.transform = `translateY(${dy}px)`;
+        el.style.transition = "transform 0s";
+        // наступний кадр — плавно до 0
+        requestAnimationFrame(() => {
+          el.style.transition = "transform 240ms cubic-bezier(.22,.61,.36,1)";
+          el.style.transform = "translateY(0)";
+        });
+      }
+    });
+    prevRects.current = nextRects;
+  }, [sorted]);
+
+  /* ──────────────── 3) Пастка клавіш усередині панелі ──────────────── */
   const trapKeysInsidePanel = React.useCallback((e: React.KeyboardEvent) => {
     const el = e.target as HTMLElement | null;
     const tag = el?.tagName;
@@ -41,26 +96,49 @@ export default function RightContentEditorPanel({
         tag === "INPUT" ||
         tag === "TEXTAREA" ||
         tag === "SELECT" ||
-        !!el.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="textbox"]'));
+        !!el.closest(
+          'input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="textbox"]'
+        ));
 
     if (!isEditable) return;
 
     const k = e.key;
-    // даємо працювати дефолту (вставка пробілу тощо),
-    // але зупиняємо *спливання*, щоб не спрацювали глобальні обробники
+    // Дозволяємо дефолт (пробіл, стрілки, Enter тощо), але блокуємо спливання
     if (
-      k === " " || k === "Space" || k === "Spacebar" ||
+      k === " " ||
+      k === "Space" ||
+      k === "Spacebar" ||
       k.startsWith("Arrow") ||
-      k === "Home" || k === "End" ||
-      k === "PageUp" || k === "PageDown" ||
-      k === "Enter" || k === "Tab"
+      k === "Home" ||
+      k === "End" ||
+      k === "PageUp" ||
+      k === "PageDown" ||
+      k === "Enter" ||
+      k === "Tab"
     ) {
       e.stopPropagation();
-      // @ts-ignore – nativeEvent існує у React SyntheticEvent
+      // @ts-ignore
       e.nativeEvent?.stopImmediatePropagation?.();
     }
   }, []);
 
+  /* ──────────────── 4) Автофокус на першій "незаповненій" ─────────────── */
+  const titleInputRefs = React.useRef(new Map<string, HTMLInputElement>());
+  const focusedOnce = React.useRef<Set<string>>(new Set());
+  React.useEffect(() => {
+    const invalid = sorted.find((it) => isInvalid(it));
+    if (!invalid) return;
+    if (focusedOnce.current.has(invalid.id)) return;
+    const inp = titleInputRefs.current.get(invalid.id);
+    if (inp) {
+      try {
+        inp.focus();
+        focusedOnce.current.add(invalid.id);
+      } catch {}
+    }
+  }, [sorted]);
+
+  /* ─────────────────────── 5) Збереження ─────────────────────── */
   async function handleSave() {
     if (!onSave || !canSave) return;
     try {
@@ -71,11 +149,18 @@ export default function RightContentEditorPanel({
     }
   }
 
+  /* ─────────────────────── helpers ─────────────────────── */
+  const isInvalid = (it: TocItem) => {
+    const nameEmpty = !String(it.label ?? "").trim();
+    const pageNum = Number((it as any).page);
+    const pageEmpty = !Number.isFinite(pageNum) || pageNum <= 0;
+    return nameEmpty || pageEmpty;
+  };
+
   return (
     <aside
       className="rce"
       aria-label="Content editor"
-      // <-- КЛЮЧОВЕ: перехоплюємо клавіші ще до глобальних слухачів
       onKeyDownCapture={trapKeysInsidePanel}
     >
       <div className="rce-inner">
@@ -95,7 +180,9 @@ export default function RightContentEditorPanel({
             <button
               className="rce-btn primary"
               disabled={!canSave || saving}
-              title={canSave ? "Save content.json" : "Publish meta first to get a slug"}
+              title={
+                canSave ? "Save content.json" : "Publish meta first to get a slug"
+              }
               onClick={handleSave}
             >
               {saving ? "Saving…" : "Save"}
@@ -104,70 +191,101 @@ export default function RightContentEditorPanel({
         </div>
 
         <div className="rce-list" role="list">
-          {items.length === 0 && (
+          {sorted.length === 0 && (
             <div className="rce-empty">No items yet — press “+ Add”.</div>
           )}
 
-          {items.map((it) => (
-            <div key={it.id} role="listitem" className="rce-item">
-              {/* Назва — на всю ширину; пробіли тепер НЕ перехоплює глобальний keydown */}
-              <input
-                className="rce-inp rce-inp-title"
-                type="text"
-                value={it.label}
-                placeholder="Type section title…"
-                onChange={(e) => onChange?.(it.id, { label: e.target.value })}
-                onKeyDownCapture={trapKeysInsidePanel}  // дублюємо на всяк випадок
-                autoComplete="off"
-                spellCheck={false}
-                id={`toc-title-${it.id}`}
-                aria-label="Section title"
-              />
+          {sorted.map((it) => {
+            const pageStr =
+              (it as any).page === undefined || (it as any).page === null
+                ? ""
+                : String(it.page);
+            const invalid = isInvalid(it);
 
-              {/* Другий рядок: чекбокс Section, сторінка, Go, Delete */}
-              <div className="rce-row">
-                <label className="rce-chk">
-                  <input
-                    type="checkbox"
-                    checked={!!it.isSection}
-                    onChange={(e) =>
-                      onChange?.(it.id, { isSection: e.target.checked })
-                    }
-                  />
-                  Section
-                </label>
+            return (
+              <div
+                key={it.id}
+                role="listitem"
+                className="rce-item"
+                data-invalid={invalid ? "true" : "false"}
+                ref={setItemRef(it.id)}
+                aria-invalid={invalid || undefined}
+              >
+                {/* Назва */}
+                <input
+                  className="rce-inp rce-inp-title"
+                  type="text"
+                  value={it.label}
+                  placeholder="Type section title…"
+                  onChange={(e) =>
+                    onChange?.(it.id, { label: e.target.value })
+                  }
+                  onKeyDownCapture={trapKeysInsidePanel}
+                  autoComplete="off"
+                  spellCheck={false}
+                  id={`toc-title-${it.id}`}
+                  aria-label="Section title"
+                  ref={(el) => {
+                    if (el) titleInputRefs.current.set(it.id, el);
+                    else titleInputRefs.current.delete(it.id);
+                  }}
+                />
 
-                <div className="rce-page">
-                  <span className="rce-sublab">Page</span>
-                  <input
-                    className="rce-inp rce-inp-num"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={String(it.page)}
-                    onChange={(e) =>
-                      onChange?.(it.id, { page: Number(e.target.value || 1) })
-                    }
-                    aria-label="Page number"
-                  />
+                {/* Другий рядок */}
+                <div className="rce-row">
+                  <label className="rce-chk">
+                    <input
+                      type="checkbox"
+                      checked={!!it.isSection}
+                      onChange={(e) =>
+                        onChange?.(it.id, { isSection: e.target.checked })
+                      }
+                    />
+                    Section
+                  </label>
+
+                  <div className="rce-page">
+                    <span className="rce-sublab">Page</span>
+                    <input
+                      className="rce-inp rce-inp-num"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={pageStr}
+                      placeholder="—"
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw.trim() === "") {
+                          // даємо можливість тримати порожнє
+                          onChange?.(it.id, { page: undefined as any });
+                        } else {
+                          onChange?.(it.id, { page: Number(raw) as any });
+                        }
+                      }}
+                      aria-label="Page number"
+                    />
+                    <button
+                      className="rce-mini"
+                      title={`Go to p.${pageStr || "?"}`}
+                      onClick={() => {
+                        const n = Number(pageStr);
+                        if (Number.isFinite(n) && n > 0) onGotoPage?.(n);
+                      }}
+                    >
+                      Go
+                    </button>
+                  </div>
+
                   <button
-                    className="rce-mini"
-                    title={`Go to p.${it.page}`}
-                    onClick={() => onGotoPage?.(it.page)}
+                    className="rce-mini danger"
+                    title="Delete"
+                    onClick={() => onRemove?.(it.id)}
                   >
-                    Go
+                    Delete
                   </button>
                 </div>
-
-                <button
-                  className="rce-mini danger"
-                  title="Delete"
-                  onClick={() => onRemove?.(it.id)}
-                >
-                  Delete
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -254,6 +372,7 @@ export default function RightContentEditorPanel({
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 14px;
           padding: 12px;
+          will-change: transform;
         }
 
         .rce-inp {
@@ -264,6 +383,10 @@ export default function RightContentEditorPanel({
           border-radius: 10px;
           padding: 10px 12px;
           font-size: 14px;
+        }
+        .rce-inp::placeholder {
+          color: #8f98a6;
+          opacity: 0.8;
         }
         .rce-inp-title {
           font-weight: 800;
@@ -314,10 +437,29 @@ export default function RightContentEditorPanel({
           background: #7a2d2d;
         }
 
+        /* Підсвітка незаповнених елементів */
+        .rce-item[data-invalid="true"] {
+          border-color: #c85151;
+          box-shadow: 0 0 0 2px rgba(200, 81, 81, 0.25);
+          animation: rcePulse 1150ms ease-in-out infinite;
+        }
+        @keyframes rcePulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(200, 81, 81, 0.22);
+          }
+          50% {
+            box-shadow: 0 0 0 4px rgba(200, 81, 81, 0.1);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(200, 81, 81, 0.22);
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .rce,
           .rce-item {
-            transition: none;
+            transition: none !important;
+            animation: none !important;
           }
         }
       `}</style>
