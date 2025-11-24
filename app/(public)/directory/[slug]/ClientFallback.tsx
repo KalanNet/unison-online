@@ -1,40 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const PublicViewer = dynamic(() => import("app/public/PublicViewer"), { ssr: false });
 
+/* ───── Types ───── */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
-type AdSlot    = { id: string; imageUrl: string; href?: string | null; label?: string | null; seq?: number | null };
-type TocItem   = { id: string; label: string; page: number; isSection?: boolean };
+type AdSlot = { id: string; imageUrl: string; href?: string | null; label?: string | null; seq?: number | null };
+type TocItem = { id: string; label: string; page: number; isSection?: boolean };
 
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
   file?: string;
   publishedAt?: string;
-  bookmarks?: Bookmark[];
-  ads?: AdSlot[];
-  /** нове: справжні пункти змісту з content.json */
+  bookmarks?: unknown;
+  ads?: unknown;
   content?: unknown;
   toc?: unknown;
   tableOfContents?: unknown;
 };
 
+const PDF_URL_RE = /^https?:\/\/.+\.pdf(\?.*)?$/i;
+
+/* ───── Sanitizers ───── */
 function sanitizeBookmarks(input: unknown): Bookmark[] {
   if (!Array.isArray(input)) return [];
   const out: Bookmark[] = [];
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
-    const anyIt = it as Record<string, unknown>;
-    const id = String(anyIt.id ?? "");
-    const pageNum = Number(anyIt.page);
-    const page = Number.isFinite(pageNum) ? Math.max(1, pageNum) : 1;
-    const label = String(anyIt.label ?? "");
-    const colorRaw = anyIt.color;
-    const color = typeof colorRaw === "string" && colorRaw.trim().length > 0 ? colorRaw : null;
-    if (label.length > 0) out.push({ id, page, label, color });
+    const o = it as Record<string, unknown>;
+    const id = String(o.id ?? "");
+    const n = Number(o.page);
+    const page = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+    const label = String(o.label ?? "").trim();
+    const colorVal = typeof o.color === "string" && o.color.trim() ? o.color : null;
+    if (!label) continue;
+    out.push({ id, page, label, color: colorVal });
   }
   return JSON.parse(JSON.stringify(out));
 }
@@ -44,31 +47,24 @@ function sanitizeAds(input: unknown): AdSlot[] {
   const out: AdSlot[] = [];
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
-    const anyIt = it as Record<string, unknown>;
-    const id = String(anyIt.id ?? "");
-    const imageUrl = String(
-      (anyIt.imageUrl as any) ??
-      (anyIt.url as any) ??
-      (anyIt.image as any) ??
-      (anyIt.img as any) ??
-      ""
-    ).trim();
+    const o = it as Record<string, unknown>;
+    const imageUrl = String((o.imageUrl ?? o.url ?? o.image ?? o.img) ?? "").trim();
     if (!imageUrl) continue;
-    const href   = anyIt.href   == null ? null : String(anyIt.href).trim() || null;
-    const label  = anyIt.label  == null ? null : String(anyIt.label).trim() || null;
-    const seqNum = Number(anyIt.seq);
-    const seq    = Number.isFinite(seqNum) ? (seqNum as number) : null;
+    const id = String(o.id ?? `${o.label ?? "ad"}-${imageUrl}`);
+    const href = o.href == null ? null : String(o.href).trim() || null;
+    const label = o.label == null ? null : String(o.label).trim() || null;
+    const seqN = Number(o.seq);
+    const seq = Number.isFinite(seqN) ? seqN : null;
     out.push({ id, imageUrl, href, label, seq });
   }
-  return out.sort((a,b)=>(a.seq ?? 999)-(b.seq ?? 999)).slice(0,5);
+  return out.sort((a, b) => (a.seq ?? 999) - (b.seq ?? 999)).slice(0, 5);
 }
 
-/** sanitize content.json → RightContentPanel items */
 function sanitizeContent(input: unknown): TocItem[] {
   if (!Array.isArray(input)) return [];
   const out: TocItem[] = [];
 
-  const normPage = (v: any) => {
+  const normPage = (v: unknown) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : Number.POSITIVE_INFINITY;
   };
@@ -76,27 +72,21 @@ function sanitizeContent(input: unknown): TocItem[] {
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
     const o = it as Record<string, unknown>;
+    const label = String((o.label ?? o.title ?? o.name) ?? "").trim();
+    if (!label) continue;
 
-    const rawLabel = (o.label ?? o.title ?? o.name) as unknown;
-    const rawPage  = (o.page ?? o.p ?? o.pageNumber) as unknown;
-    const rawSec   = (o.isSection ?? o.section ?? o.isHeader ?? (o.type === "section")) as unknown;
-
-    const label = String(rawLabel ?? "").trim();
-    const pageN = normPage(rawPage);
-    if (!label) continue; // без назви не показуємо
-
-    // стабільний id
+    const pageN = normPage(o.page ?? o.p ?? o.pageNumber);
+    const isSection = Boolean(o.isSection ?? o.section ?? o.isHeader ?? (o.type === "section"));
     const id = String(o.id ?? `${label}:${pageN}`);
 
     out.push({
       id,
       label,
       page: pageN === Number.POSITIVE_INFINITY ? 1 : pageN,
-      isSection: Boolean(rawSec),
+      isSection,
     });
   }
 
-  // сортування: page ASC (∞ — внизу), далі label ASC (case-insensitive)
   out.sort((a, b) => {
     const pa = Number.isFinite(a.page) && a.page > 0 ? a.page : Number.POSITIVE_INFINITY;
     const pb = Number.isFinite(b.page) && b.page > 0 ? b.page : Number.POSITIVE_INFINITY;
@@ -104,78 +94,93 @@ function sanitizeContent(input: unknown): TocItem[] {
     return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
   });
 
+  // унікалізуємо id (на випадок дублів у джерелі)
+  const seen = new Set<string>();
+  for (let i = 0; i < out.length; i++) {
+    let id = out[i].id;
+    if (!id || seen.has(id)) {
+      let j = 1;
+      while (seen.has(`${out[i].label}:${out[i].page}:${j}`)) j++;
+      id = `${out[i].label}:${out[i].page}:${j}`;
+      out[i] = { ...out[i], id };
+    }
+    seen.add(id);
+  }
+
   return JSON.parse(JSON.stringify(out));
 }
 
-const PDF_URL_RE = /^https?:\/\/.+\.pdf(\?.*)?$/i;
-
+/* ───── Component ───── */
 export default function ClientFallback() {
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  const [ready, setReady] = useState<{
+  const slug = React.useMemo(() => pathname?.match(/\/directory\/([^/?#]+)/i)?.[1] ?? null, [pathname]);
+  const fileOverride = React.useMemo(() => sp.get("file") ?? undefined, [sp]);
+
+  const [state, setState] = React.useState<{
     file: string;
     title?: string;
     bookmarks: Bookmark[];
     ads: AdSlot[];
     content: TocItem[];
-  } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+    error?: string | null;
+  }>({ file: "", bookmarks: [], ads: [], content: [], error: null });
 
-  const slug = useMemo(() => {
-    const m = pathname?.match(/\/directory\/([^/?#]+)/i);
-    return m?.[1] ?? null;
-  }, [pathname]);
-
-  useEffect(() => {
+  React.useEffect(() => {
     if (!slug) {
-      setErr("Missing slug in /directory/[slug].");
+      setState((s) => ({ ...s, error: "Missing slug in /directory/[slug]." }));
       return;
     }
-    let cancelled = false;
+
+    const ctrl = new AbortController();
+    const reqId = Symbol("req");
+    let activeReq = reqId;
 
     (async () => {
       try {
-        const r = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
-        let meta: MetaPayload | null = null;
-        if (r.ok) meta = (await r.json()) as MetaPayload;
+        const res = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const fileFromMeta  = meta?.file;
-        const fileFromQuery = sp.get("file") ?? undefined;
-        const file = (fileFromMeta || fileFromQuery || "").trim();
-
-        if (!file) {
-          if (!cancelled) setErr(`Expected meta at /api/directory/${slug} or ?file= param.`);
-          return;
-        }
-        if (!PDF_URL_RE.test(file)) {
-          if (!cancelled) setErr("Invalid PDF url. Expected public https://…/*.pdf");
-          return;
-        }
+        const meta = (await res.json()) as MetaPayload;
+        const file = (meta?.file || fileOverride || "").trim();
+        if (!file) throw new Error(`Expected meta at /api/directory/${slug} or ?file= param.`);
+        if (!PDF_URL_RE.test(file)) throw new Error("Invalid PDF url. Expected public https://…/*.pdf");
 
         const bookmarks = sanitizeBookmarks(meta?.bookmarks);
-        const ads       = sanitizeAds(meta?.ads);
-        const rawContent = (meta as any)?.content ?? (meta as any)?.toc ?? (meta as any)?.tableOfContents;
-        const content   = sanitizeContent(rawContent);
-        const title     = meta?.meta?.title || slug;
+        const ads = sanitizeAds(meta?.ads);
+        const rawContent = meta?.content ?? meta?.toc ?? meta?.tableOfContents;
+        const content = sanitizeContent(rawContent);
+        const title = meta?.meta?.title || slug;
 
-        if (!cancelled) setReady({ file, title, bookmarks, ads, content });
+        if (activeReq === reqId) {
+          setState({ file, title, bookmarks, ads, content, error: null });
+        }
       } catch (e: any) {
-        if (!cancelled) setErr(String(e?.message || e));
+        if (e?.name === "AbortError") return;
+        if (activeReq === reqId) {
+          setState((s) => ({ ...s, error: String(e?.message || e) }));
+        }
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [slug, sp]);
+    return () => {
+      activeReq = Symbol("cancelled");
+      ctrl.abort();
+    };
+  }, [slug, fileOverride]);
 
-  if (ready) {
+  if (state.file && !state.error) {
     return (
       <PublicViewer
-        file={ready.file}
-        title={ready.title}
-        bookmarks={ready.bookmarks}
-        ads={ready.ads}
-        content={ready.content}
+        file={state.file}
+        title={state.title}
+        bookmarks={state.bookmarks}
+        ads={state.ads}
+        content={state.content}
       />
     );
   }
@@ -183,7 +188,7 @@ export default function ClientFallback() {
   return (
     <div style={{ padding: 24 }}>
       <h2>Not found</h2>
-      <p>{err ?? "Loading…"}</p>
+      <p>{state.error ?? "Loading…"}</p>
     </div>
   );
 }
