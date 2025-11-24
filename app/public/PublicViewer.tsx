@@ -1421,147 +1421,127 @@ export default function PublicViewer({
           }
         }
 
-        /* ===== Покращена 3D page corner "curl" анімація ===== */
+        /* ===== Page corner “curl” hint — Realistic Peel ===== */
 .page-curl-hint {
-  --curl-size: 100px;              /* Збільшено для кращої видимості */
+  --curl-max: 90px;     /* Максимальний розмір загину */
   position: absolute;
   right: 0; bottom: 0;
-  width: var(--curl-size);
-  height: var(--curl-size);
+  width: var(--curl-max);
+  height: var(--curl-max);
   pointer-events: none;
   z-index: 80;
+  /* Контейнер обмежує область, щоб ми не вилазили за межі */
+  overflow: visible; 
 }
 
-/* Основна "пелюстка" з багатошаровим градієнтом та динамічною тінню */
+/* «Пелюстка» (зворотна сторона сторінки) */
 .page-curl-hint::before {
   content: "";
-  position: absolute; 
-  inset: 0;
-  background:
-    /* Крива кромка згину з рефлексами */
-    radial-gradient(circle at 0% 100%, rgba(0,0,0,.75) 0 30%, rgba(0,0,0,.4) 40%, transparent 60%),
-    /* Біла виворіт сторінки з текстурою */
-    radial-gradient(circle at 50% 20%, rgba(255,255,255,.95) 0 45%, rgba(240,240,240,.9) 50%, #ffffff 70%),
-    /* Об'ємна тінь під кутом + динамічне освітлення */
-    radial-gradient(circle at 100% 100%, rgba(0,0,0,.65) 0 55%, transparent 75%),
-    /* Додаткова м'яка тінь для глибини */
-    radial-gradient(farthest-side at 100% 100%, rgba(0,0,0,.3) 0 40%, transparent 70%);
+  position: absolute;
+  right: 0; bottom: 0; /* Прив'язка до самого кутика */
   
-  /* Трикутник з м'якими краями */
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  border-radius: 0 0 0 12px;       /* Кривизна для реалістичності */
+  /* Початковий стан (маленький натяк на загин) */
+  width: 20px; 
+  height: 20px;
   
-  transform-origin: 100% 100%;
-  transform-style: preserve-3d;
+  /* Градієнт створює візуальний трикутник (білий папір + тінь у згині) */
+  background: linear-gradient(
+    135deg,
+    #ffffff 45%,               /* Основний колір звороту */
+    #f0f0f0 50%,               /* Легке затемнення перед згином */
+    #d9d9d9 55%,               /* Тінь самого згину */
+    transparent 56%            /* Прозора частина (відрізаємо зайве) */
+  );
   
-  /* Багатошарова динамічна тінь */
-  filter: 
-    drop-shadow(-6px -6px 8px rgba(0,0,0,.45))
-    drop-shadow(2px 2px 4px rgba(0,0,0,.25));
+  /* Тінь, що падає від загнутого кутика на сторінку під ним */
+  box-shadow: -4px -4px 12px rgba(0, 0, 0, 0.3);
   
-  /* Плавніша анімація 3.5s з реалістичним підйомом */
-  animation: curlRealistic 3.5s cubic-bezier(0.23, 1, 0.32, 1) .6s infinite;
+  /* Робимо кутик згину трохи заокругленим (реалістичність паперу) */
+  border-bottom-right-radius: 0; /* Гострий кут внизу */
+  border-top-left-radius: 100px; /* М'який згин вгорі */
+  
+  /* Анімація пульсації розміру */
+  animation: curlPulse 3s ease-in-out infinite;
 }
 
-/* Стрілка з реалістичним "підняттям" */
+/* Стрілка-підказка */
 .page-curl-hint::after {
   content: "";
   position: absolute;
-  right: 18px; bottom: 20px;
-  width: 24px; height: 24px;
-  border-right: 6px solid rgba(40,40,40,.9);
-  border-top: 6px solid rgba(40,40,40,.9);
-  transform: rotate(45deg) translateZ(2px);  /* Легкий підйом */
-  opacity: .6;
-  border-radius: 2px;                       /* М'які кути */
-  filter: 
-    drop-shadow(0 2px 1px rgba(0,0,0,.4))
-    drop-shadow(0 0 2px rgba(255,255,255,.7));
-  animation: curlIconRealistic 3.5s cubic-bezier(0.23, 1, 0.32, 1) .6s infinite;
+  z-index: 81;
+  right: 4px; bottom: 4px; /* Прив'язка до кута */
+  width: 12px; height: 12px;
+  
+  border-right: 3px solid rgba(0,0,0,0.6);
+  border-top: 3px solid rgba(0,0,0,0.6);
+  transform: rotate(45deg); /* Стрілка вказує в центр */
+  
+  opacity: 0; /* Спочатку невидима */
+  animation: arrowMove 3s ease-in-out infinite;
 }
 
-/* Для лівого нижнього кута */
+/* ВАРІАНТ ДЛЯ ЛІВОГО КУТА (дзеркально) */
 .page-curl-hint.left {
   right: auto; left: 0;
   transform: scaleX(-1);
 }
 
-/* Пауза при взаємодії */
-.page-curl-hint:hover,
-.page-curl-hint:active,
-.page-curl-hint:focus,
-.viewer:hover .page-curl-hint,
+/* Зупинка при наведенні */
 .page-curl-hint:hover::before,
-.page-curl-hint:hover::after {
-  animation-play-state: paused !important;
+.page-curl-hint:hover::after,
+.viewer:hover .page-curl-hint::before,
+.viewer:hover .page-curl-hint::after {
+  animation-play-state: paused;
+  /* При паузі показуємо розгорнутий стан */
+  width: var(--curl-max);
+  height: var(--curl-max);
+  opacity: 1;
+  transition: width 0.3s, height 0.3s; /* Щоб плавно зупинилось */
+}
+
+/* ===== KEYFRAMES ===== */
+
+/* Анімація самого аркуша: зміна розміру від 0 до максимуму */
+@keyframes curlPulse {
+  0%, 100% {
+    width: 0; 
+    height: 0;
+    border-top-left-radius: 0;
+  }
+  50% {
+    width: var(--curl-max); 
+    height: var(--curl-max);
+    border-top-left-radius: 50px; /* Більший радіус при більшому загині */
+  }
+}
+
+/* Анімація стрілки: вона з'являється і рухається разом із загином */
+@keyframes arrowMove {
+  0%, 100% {
+    transform: translate(0, 0) rotate(45deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1; /* З'являється швидко */
+  }
+  50% {
+    /* Рухається вглиб разом з розширенням кутика */
+    transform: translate(-30px, -30px) rotate(45deg);
+    opacity: 0.6;
+  }
+  80% {
+    opacity: 0;
+  }
 }
 
 /* Доступність */
 @media (prefers-reduced-motion: reduce) {
-  .page-curl-hint, 
-  .page-curl-hint::before, 
-  .page-curl-hint::after {
+  .page-curl-hint::before, .page-curl-hint::after {
     animation: none !important;
+    width: 40px; height: 40px; /* Статичний маленький загин */
+    opacity: 1;
   }
 }
-
-/* ===== Покращені keyframes з реалістичною траєкторією ===== */
-/* Більш природний підйом: повільний старт → швидкий пік → м'яке падіння */
-@keyframes curlRealistic {
-  0%, 60%, 100% { 
-    transform: 
-      perspective(1000px) 
-      rotateX(0deg) rotateY(0deg) 
-      translate3d(0, 0, 0) scale3d(1, 1, 1); 
-  }
-  
-  18% { 
-    transform: 
-      perspective(1000px) 
-      rotateX(48deg) rotateY(-22deg) 
-      translate3d(-16px, -16px, 8px) 
-      scale3d(1.02, 0.98, 1.05); 
-  }
-  
-  35% { 
-    transform: 
-      perspective(1000px) 
-      rotateX(32deg) rotateY(-15deg) 
-      translate3d(-10px, -10px, 5px) 
-      scale3d(1.01, 0.99, 1.03); 
-  }
-  
-  48% { 
-    transform: 
-      perspective(1000px) 
-      rotateX(22deg) rotateY(-8deg) 
-      translate3d(-6px, -6px, 2px) 
-      scale3d(1, 1, 1.01); 
-  }
-}
-
-@keyframes curlIconRealistic {
-  0%, 60%, 100% { 
-    transform: translate3d(0, 0, 0) rotate(45deg); 
-    opacity: .6; 
-  }
-  
-  18% { 
-    transform: translate3d(-8px, -8px, 4px) rotate(45deg); 
-    opacity: .95; 
-  }
-  
-  35% { 
-    transform: translate3d(-5px, -5px, 2px) rotate(45deg); 
-    opacity: .75; 
-  }
-  
-  48% { 
-    transform: translate3d(-3px, -3px, 1px) rotate(45deg); 
-    opacity: .65; 
-  }
-}
-
 
 
       `}</style>
