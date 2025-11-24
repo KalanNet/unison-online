@@ -9,7 +9,7 @@ type Props = {
   items: TocItem[];
   currentPage: number;
   onGotoPage?: (p: number) => void;
-  onAddCurrent?: () => void;
+  onAddCurrent?: () => void;               // існуючий callback додавання
   onChange?: (id: string, patch: Partial<TocItem>) => void;
   onRemove?: (id: string) => void;
   onSave?: () => Promise<void>;
@@ -29,10 +29,15 @@ export default function RightContentEditorPanel({
 }: Props) {
   const [saving, setSaving] = React.useState(false);
 
-  /* ───────────────────── 1) ДВОРІВНЕВЕ СОРТУВАННЯ ─────────────────────
-     1) page ASC (невизначені/невалідні сторінки – внизу)
-     2) label ASC (case-insensitive) усередині однакових сторінок
-  */
+  /* ───────────────────── 0) Helpers ───────────────────── */
+  const isInvalid = (it: TocItem) => {
+    const nameEmpty = !String(it.label ?? "").trim();
+    const pageNum = Number((it as any).page);
+    const pageEmpty = !Number.isFinite(pageNum) || pageNum <= 0;
+    return nameEmpty || pageEmpty;
+  };
+
+  /* ───────────────────── 1) ДВОРІВНЕВЕ СОРТУВАННЯ ───────────────────── */
   const sorted = React.useMemo(() => {
     const normPage = (v: any) => {
       const n = Number(v);
@@ -45,9 +50,7 @@ export default function RightContentEditorPanel({
       if (pa !== pb) return pa - pb;
       const la = normLabel(a.label);
       const lb = normLabel(b.label);
-      // secondary: by label (case-insensitive, stable)
-      const c = la.localeCompare(lb, undefined, { sensitivity: "base" });
-      return c !== 0 ? c : 0;
+      return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
   }, [items]);
 
@@ -73,10 +76,8 @@ export default function RightContentEditorPanel({
 
       const dy = prev.top - rect.top;
       if (dy !== 0) {
-        // FLIP: з позиції "де було" → "де стало"
         el.style.transform = `translateY(${dy}px)`;
         el.style.transition = "transform 0s";
-        // наступний кадр — плавно до 0
         requestAnimationFrame(() => {
           el.style.transition = "transform 240ms cubic-bezier(.22,.61,.36,1)";
           el.style.transform = "translateY(0)";
@@ -86,7 +87,7 @@ export default function RightContentEditorPanel({
     prevRects.current = nextRects;
   }, [sorted]);
 
-  /* ──────────────── 3) Пастка клавіш усередині панелі ──────────────── */
+  /* ───────────── 3) Пастка клавіш всередині панелі (щоб пробіл працював) ───────────── */
   const trapKeysInsidePanel = React.useCallback((e: React.KeyboardEvent) => {
     const el = e.target as HTMLElement | null;
     const tag = el?.tagName;
@@ -103,7 +104,6 @@ export default function RightContentEditorPanel({
     if (!isEditable) return;
 
     const k = e.key;
-    // Дозволяємо дефолт (пробіл, стрілки, Enter тощо), але блокуємо спливання
     if (
       k === " " ||
       k === "Space" ||
@@ -122,23 +122,46 @@ export default function RightContentEditorPanel({
     }
   }, []);
 
-  /* ──────────────── 4) Автофокус на першій "незаповненій" ─────────────── */
+  /* ───────────── 4) Додавання “порожнього” елемента поверх існуючого onAddCurrent ─────────────
+     Батьківський onAddCurrent додає item із дефолтами (Page N, page N).
+     Ми перехоплюємо факт додавання, знаходимо новий id і відразу очищаємо label та page.
+  */
+  const pendingAddIdsSnapshot = React.useRef<Set<string> | null>(null);
+  const pendingAdd = React.useRef(false);
   const titleInputRefs = React.useRef(new Map<string, HTMLInputElement>());
-  const focusedOnce = React.useRef<Set<string>>(new Set());
-  React.useEffect(() => {
-    const invalid = sorted.find((it) => isInvalid(it));
-    if (!invalid) return;
-    if (focusedOnce.current.has(invalid.id)) return;
-    const inp = titleInputRefs.current.get(invalid.id);
-    if (inp) {
-      try {
-        inp.focus();
-        focusedOnce.current.add(invalid.id);
-      } catch {}
-    }
-  }, [sorted]);
 
-  /* ─────────────────────── 5) Збереження ─────────────────────── */
+  const handleAddEmpty = React.useCallback(() => {
+    if (!onAddCurrent) return;
+    // знімаємо “зріз” поточних id, щоб потім знайти нові
+    pendingAddIdsSnapshot.current = new Set(items.map((i) => i.id));
+    pendingAdd.current = true;
+    onAddCurrent();
+  }, [items, onAddCurrent]);
+
+  React.useEffect(() => {
+    if (!pendingAdd.current || !pendingAddIdsSnapshot.current) return;
+    const prev = pendingAddIdsSnapshot.current;
+
+    const newlyAdded = items.filter((it) => !prev.has(it.id));
+    if (newlyAdded.length === 0) return;
+
+    // очищаємо всі нові (на випадок швидких кількох кліків)
+    newlyAdded.forEach((it) => {
+      onChange?.(it.id, { label: "", page: undefined as any });
+      // сфокусуємо назву — зручно одразу вводити
+      const input = titleInputRefs.current.get(it.id);
+      if (input) {
+        try {
+          input.focus();
+        } catch {}
+      }
+    });
+
+    pendingAdd.current = false;
+    pendingAddIdsSnapshot.current = null;
+  }, [items, onChange]);
+
+  /* ───────────────────── 5) Збереження ───────────────────── */
   async function handleSave() {
     if (!onSave || !canSave) return;
     try {
@@ -148,14 +171,6 @@ export default function RightContentEditorPanel({
       setSaving(false);
     }
   }
-
-  /* ─────────────────────── helpers ─────────────────────── */
-  const isInvalid = (it: TocItem) => {
-    const nameEmpty = !String(it.label ?? "").trim();
-    const pageNum = Number((it as any).page);
-    const pageEmpty = !Number.isFinite(pageNum) || pageNum <= 0;
-    return nameEmpty || pageEmpty;
-  };
 
   return (
     <aside
@@ -170,7 +185,7 @@ export default function RightContentEditorPanel({
             <button
               className="rce-btn"
               title={`Add item (current page: ${currentPage})`}
-              onClick={onAddCurrent}
+              onClick={handleAddEmpty}
             >
               <span className="plus" aria-hidden>
                 +
@@ -255,7 +270,6 @@ export default function RightContentEditorPanel({
                       onChange={(e) => {
                         const raw = e.target.value;
                         if (raw.trim() === "") {
-                          // даємо можливість тримати порожнє
                           onChange?.(it.id, { page: undefined as any });
                         } else {
                           onChange?.(it.id, { page: Number(raw) as any });
@@ -444,15 +458,9 @@ export default function RightContentEditorPanel({
           animation: rcePulse 1150ms ease-in-out infinite;
         }
         @keyframes rcePulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(200, 81, 81, 0.22);
-          }
-          50% {
-            box-shadow: 0 0 0 4px rgba(200, 81, 81, 0.1);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(200, 81, 81, 0.22);
-          }
+          0% { box-shadow: 0 0 0 0 rgba(200,81,81,.22); }
+          50% { box-shadow: 0 0 0 4px rgba(200,81,81,.10); }
+          100% { box-shadow: 0 0 0 0 rgba(200,81,81,.22); }
         }
 
         @media (prefers-reduced-motion: reduce) {
