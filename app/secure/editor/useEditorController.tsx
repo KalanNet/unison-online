@@ -1025,11 +1025,8 @@ function updateTocItem(id: string, patch: Partial<TocItem>) {
           next.page = Math.max(1, Math.min(max, Number.isFinite(v) ? v : it.page));
         }
 
-        if (patch.label !== undefined) {
-          next.label = normalizeLabel(patch.label as string); // ← зберігаємо пробіли
-        } else {
-          next.label = normalizeLabel(next.label);            // ← і при інших апдейтах теж
-        }
+        // ВАЖЛИВО: не чіпаємо next.label — залишаємо як набирає користувач (з проміжними пробілами в кінці)
+        // Будь-яку “гігієну” робимо тільки при збереженні (saveToc -> sanitizeToc).
 
         next.isSection = !!next.isSection;
         return next;
@@ -1037,6 +1034,7 @@ function updateTocItem(id: string, patch: Partial<TocItem>) {
       .sort((a, b) => a.page - b.page);
   });
 }
+
 
 
 function removeTocItem(id: string) {
