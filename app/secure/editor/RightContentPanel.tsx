@@ -5,17 +5,14 @@ import React from "react";
 
 export type TocItem = {
   id: string;
-  label: string;
-  page: number;        // 1-based
-  isSection?: boolean; // лише для стилю (розділ)
+  label: string;      // не показуємо порожні
+  page: number;       // 1-based, > 0
+  isSection?: boolean;
 };
 
 type Props = {
-  /** Зовнішній прапорець: чи має панель бути згорнута */
   autoCollapsed?: boolean;
-  /** Список пунктів змісту */
   items?: TocItem[] | null | undefined;
-  /** Клік по пункту → перехід на сторінку (1-based) */
   onGotoPage?: (page: number) => void;
 };
 
@@ -23,32 +20,29 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const [collapsed, setCollapsed] = React.useState(false);
 
+  // ✅ ТІЛЬКИ РЕАЛЬНІ ДАНІ. ЖОДНИХ ПЛЕЙСХОЛДЕРІВ.
   const toc: TocItem[] = React.useMemo(() => {
     const src = Array.isArray(items) ? items : [];
     const norm = src
       .map((x) => ({
-        id: String(x?.id ?? ""),
-        label: String(x?.label ?? "").trim() || "Untitled",
-        page: Number.isFinite(x?.page as any) ? Math.max(1, Math.floor(x!.page as number)) : 1,
+        id: String(x?.id ?? "").trim(),
+        label: String(x?.label ?? "").trim(),
+        page: Number.isFinite((x as any)?.page) ? Math.max(1, Math.floor((x as any).page)) : NaN,
         isSection: !!x?.isSection,
       }))
-      .filter((x) => x.id.length > 0)
-      .sort((a, b) => a.page - b.page);
+      // фільтруємо сміття
+      .filter((x) => x.id.length > 0 && x.label.length > 0 && Number.isFinite(x.page))
+      // сортування: спершу сторінка, далі — назва (case-insensitive)
+      .sort((a, b) => (a.page - b.page) || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 
-    return norm.length
-      ? norm
-      : [
-          { id: "ph-1", label: "Introduction", page: 1, isSection: true },
-          { id: "ph-2", label: "Getting Started", page: 2 },
-          { id: "ph-3", label: "Contacts & Help", page: 3 },
-        ];
+    return norm; // без фолбеків
   }, [items]);
 
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Клавіатурна навігація по списку
+  // Клавіатура
   const onKeyList = (e: React.KeyboardEvent) => {
     const root = listRef.current;
     if (!root) return;
@@ -64,11 +58,8 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
   };
 
   return (
-    <aside
-      className={`rc-rightpanel${collapsed ? " is-collapsed" : ""}`}
-      aria-label="Contents"
-    >
-      {/* Ручка-стрілка (праворуч, стрілка назовні) */}
+    <aside className={`rc-rightpanel${collapsed ? " is-collapsed" : ""}`} aria-label="Contents">
+      {/* ручка-стрілка */}
       <button
         type="button"
         className="rc-toggle"
@@ -77,38 +68,34 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         onClick={() => setCollapsed((v) => !v)}
       />
 
-      <div
-        className="rc-inner"
-        role="list"
-        ref={listRef}
-        onKeyDown={onKeyList}
-      >
+      <div className="rc-inner" role="list" ref={listRef} onKeyDown={onKeyList}>
         <div className="rc-title" aria-hidden>Content Table</div>
 
-        {toc.map((it, i) => {
-          const isSection = !!it.isSection;
-          return (
-            <button
-              key={it.id}
-              type="button"
-              role="listitem"
-              className={`rc-item${isSection ? " is-section" : " is-page"}`}
-              onClick={() => onGotoPage?.(it.page)}
-              aria-label={`${it.label}, page ${it.page}`}
-              title={`${it.label} — page ${it.page}`}
-            >
-              {/* маркер */}
-              <span className="rc-dot" aria-hidden />
-              {/* підпис */}
-              <span className="rc-label">{it.label}</span>
-              {/* номер сторінки */}
-              <span className="rc-page">p.{it.page}</span>
-
-              {/* м’який дільник між рядками (не показуємо перед першим) */}
-              {i > 0 ? <span className="rc-sep" aria-hidden /> : null}
-            </button>
-          );
-        })}
+        {toc.length === 0 ? (
+          <div className="rc-empty" role="note" aria-live="polite">
+            No items yet.
+          </div>
+        ) : (
+          toc.map((it, i) => {
+            const isSection = !!it.isSection;
+            return (
+              <button
+                key={it.id}
+                type="button"
+                role="listitem"
+                className={`rc-item${isSection ? " is-section" : " is-page"}`}
+                onClick={() => onGotoPage?.(it.page)}
+                aria-label={`${it.label}, page ${it.page}`}
+                title={`${it.label} — page ${it.page}`}
+              >
+                <span className="rc-dot" aria-hidden />
+                <span className="rc-label">{it.label}</span>
+                <span className="rc-page">p.{it.page}</span>
+                {i > 0 ? <span className="rc-sep" aria-hidden /> : null}
+              </button>
+            );
+          })
+        )}
       </div>
 
       <style jsx>{`
@@ -160,10 +147,8 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 0; /* дільники малюєм окремо */
+          gap: 0;
           outline: none;
-
-          /* ховаємо смуги прокрутки */
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
@@ -178,27 +163,28 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           opacity: .9;
         }
 
-        /* ====== ITEM (без контурів за замовчуванням) ====== */
+        .rc-empty {
+          color: #b9c2cf;
+          opacity: .9;
+          padding: 10px 12px;
+          font-size: 14px;
+        }
+
         .rc-item {
           position: relative;
           display: grid;
           grid-template-columns: 18px 1fr auto;
           align-items: center;
           column-gap: 10px;
-
-          /* базові відступи */
           padding: 10px 12px 10px 8px;
           background: transparent;
           border: 0;
           color: #d2d7e0;
           text-align: left;
           cursor: pointer;
-
           transition: background .16s ease, transform .06s ease, box-shadow .16s ease;
-          border-radius: 12px; /* стане помітним лише на hover/focus */
+          border-radius: 12px;
         }
-
-        /* Плавний hover/focus — тільки підсвічуємо фон */
         .rc-item:hover,
         .rc-item:focus-visible {
           background: rgba(255,255,255,.06);
@@ -206,7 +192,6 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         }
         .rc-item:active { transform: translateY(1px); }
 
-        /* Дільник між пунктами (тонкий) */
         .rc-sep {
           position: absolute;
           left: 8px;
@@ -217,38 +202,15 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           pointer-events: none;
         }
 
-        /* ====== РОЗДІЛ ====== */
-        .rc-item.is-section {
-          grid-template-columns: 18px 1fr auto;
-          padding-left: 8px; /* повна ширина (без додаткового відступу) */
-        }
-        .rc-item.is-section .rc-label {
-          font-weight: 800;
-          font-size: 15px;
-          letter-spacing: .01em;
-        }
-        .rc-item.is-section .rc-dot {
-          background: #f4ce69;
-          box-shadow: 0 0 0 3px rgba(244, 206, 105, .15);
-        }
+        .rc-item.is-section { padding-left: 8px; }
+        .rc-item.is-section .rc-label { font-weight: 800; font-size: 15px; letter-spacing: .01em; }
+        .rc-item.is-section .rc-dot { background: #f4ce69; box-shadow: 0 0 0 3px rgba(244,206,105,.15); }
 
-        /* ====== ЗВИЧАЙНА СТОРІНКА (відступ вправо, правило абзацу) ====== */
-        .rc-item.is-page {
-          padding-left: 28px; /* індентація */
-        }
-        .rc-item.is-page .rc-dot {
-          background: #9aa4b2;
-          opacity: .9;
-        }
+        .rc-item.is-page { padding-left: 28px; }
+        .rc-item.is-page .rc-dot { background: #9aa4b2; opacity: .9; }
 
-        /* Маркер */
-        .rc-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-        }
+        .rc-dot { width: 10px; height: 10px; border-radius: 50%; }
 
-        /* Підпис */
         .rc-label {
           font-size: 14px;
           line-height: 1.25;
@@ -258,15 +220,8 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           max-width: 100%;
         }
 
-        /* Номер сторінки — завжди видимий акцент */
-        .rc-page {
-          font-weight: 900;
-          font-size: 12px;
-          color: #f4ce69;
-          letter-spacing: .02em;
-        }
+        .rc-page { font-weight: 900; font-size: 12px; color: #f4ce69; letter-spacing: .02em; }
 
-        /* Менше анімацій, якщо користувач цього бажає */
         @media (prefers-reduced-motion: reduce) {
           .rc-rightpanel, .rc-item { transition: none !important; }
         }
