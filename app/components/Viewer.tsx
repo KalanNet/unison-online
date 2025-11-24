@@ -6,6 +6,8 @@ import { useViewerController } from "app/secure/editor/useEditorController";
 import EditorHeader from "app/secure/editor/EditorHeader";
 import ViewerFooter from "app/secure/editor/EditorFooter";
 import { prepareWebP200k } from "app/lib/imageWebp";
+import RightContentEditorPanel from "app/secure/editor/RightContentEditorPanel";
+
 
 type InitMeta = {
   title: string;

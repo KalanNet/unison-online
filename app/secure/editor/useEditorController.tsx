@@ -25,12 +25,23 @@ type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
 
 export type SearchBox = { x: number; y: number; w: number; h: number };
 export type SearchHit = { id: string; page: number; box: SearchBox; snippet: string };
+
+// ↓↓↓ ДОДАЙ ОЦЕ
+export type TocItem = {
+  id: string;
+  label: string;
+  page: number;
+  isSection?: boolean;
+};
+// ↑↑↑ ДОДАЙ ОЦЕ
+
 type PageBmp = {
   url: string;
   w: number;
   h: number;
   links: Array<{ x: number; y: number; w: number; h: number; href?: string; dest?: any }>;
 };
+
 
 function genId() {
   try {
@@ -957,6 +968,83 @@ function goToBookmark(id: string) {
 /* ---------- bookmarks & meta ---------- */
 // …(існуючий код цієї секції вище не чіпаємо)
 
+/* ---------- CONTENT (TOC) ---------- */
+const [toc, setToc] = useState<TocItem[]>([]);
+
+function sanitizeToc(list: unknown, maxPage = pdfDoc?.numPages ?? 1): TocItem[] {
+  if (!Array.isArray(list)) return [];
+  const out: TocItem[] = [];
+  for (const it of list) {
+    if (!it || typeof it !== "object") continue;
+    const any = it as any;
+    const id = String(any.id ?? genId()).trim();
+    const label = String(any.label ?? "").trim();
+    const pageRaw = Number(any.page);
+    const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(maxPage, Math.trunc(pageRaw))) : 1;
+    const isSection = !!any.isSection;
+    if (id && label) out.push({ id, label, page, isSection });
+  }
+  return out.sort((a, b) => (a.page - b.page) || a.label.localeCompare(b.label));
+}
+
+function addTocItem(init?: { page?: number; label?: string; isSection?: boolean }) {
+  const p = init?.page ?? (currentIndex + 1);
+  const safe = pdfDoc ? Math.max(1, Math.min(pdfDoc.numPages, p)) : Math.max(1, p || 1);
+  const label = (init?.label ?? `Page ${safe}`).trim() || `Page ${safe}`;
+  setToc(list =>
+    [...list, { id: genId(), label, page: safe, isSection: !!init?.isSection }]
+      .sort((a,b)=>a.page-b.page)
+  );
+}
+
+function updateTocItem(id: string, patch: Partial<TocItem>) {
+  setToc(list => {
+    const max = pdfDoc?.numPages ?? 1;
+    return list
+      .map(it => {
+        if (it.id !== id) return it;
+        const next: TocItem = { ...it, ...patch };
+        if (patch.page != null) next.page = Math.max(1, Math.min(max, Number(patch.page) || it.page));
+        next.label = String(next.label || "").trim();
+        next.isSection = !!next.isSection;
+        return next;
+      })
+      .sort((a,b)=>a.page-b.page);
+  });
+}
+
+function removeTocItem(id: string) {
+  setToc(list => list.filter(it => it.id !== id));
+}
+
+async function loadTocBySlug(slug?: string) {
+  if (!slug) { setToc([]); return; }
+  try {
+    const r = await fetch(`/api/directory/${encodeURIComponent(slug)}/content`, { cache: "no-store" });
+    if (!r.ok) { setToc([]); return; }
+    const j = await r.json().catch(() => []);
+    setToc(sanitizeToc(j));
+  } catch {
+    setToc([]);
+  }
+}
+
+async function saveToc(): Promise<{ ok: boolean; saved: number }> {
+  const slug = (meta?.slug || "").trim();
+  if (!slug) throw new Error("Publish meta first to get a slug.");
+  const items = sanitizeToc(toc);
+  const r = await fetch(`/api/directory/${encodeURIComponent(slug)}/content`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error || "Save failed");
+  return { ok: true, saved: items.length };
+}
+
+/* автозавантаження TOC при появі slug або зміні pdfDoc */
+useEffect(() => { void loadTocBySlug(meta?.slug); }, [meta?.slug, pdfDoc]);
 
 /* ---------- publish: meta + bookmarks ---------- */
 async function publishMetaAndBookmarks(): Promise<{
@@ -1133,10 +1221,15 @@ async function publishMetaAndBookmarks(): Promise<{
     globalCss,
     bookmarks, setBookmarks, updateBookmark, addBookmark, removeBookmark, goToBookmark,
   meta, setMeta, setFeatured,
-  ads, setAds, addAdSlot, updateAdSlot, removeAdSlot,
+    ads, setAds, addAdSlot, updateAdSlot, removeAdSlot,
+
+  // TOC
+  toc, setToc, addTocItem, updateTocItem, removeTocItem, loadTocBySlug, saveToc,
+
   publishMetaAndBookmarks,
 
   title: title || file || "",
 
   };
 }
+
