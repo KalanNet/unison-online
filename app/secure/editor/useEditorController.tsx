@@ -35,6 +35,15 @@ export type TocItem = {
 };
 // ↑↑↑ ДОДАЙ ОЦЕ
 
+// ——— TOC label helpers (зберігаємо пробіли) ———
+function normalizeLabel(raw: string): string {
+  return String(raw ?? "")
+    .replace(/\u00A0/g, " ")  // NBSP -> звичайний пробіл
+    .replace(/\s+/g, " ")     // кілька пробілів -> один
+    .trim();
+}
+
+
 type PageBmp = {
   url: string;
   w: number;
@@ -978,24 +987,30 @@ function sanitizeToc(list: unknown, maxPage = pdfDoc?.numPages ?? 1): TocItem[] 
     if (!it || typeof it !== "object") continue;
     const any = it as any;
     const id = String(any.id ?? genId()).trim();
-    const label = String(any.label ?? "").trim();
+    const label = normalizeLabel(any.label ?? ""); // ← зберігаємо пробіли
     const pageRaw = Number(any.page);
-    const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(maxPage, Math.trunc(pageRaw))) : 1;
+    const page = Number.isFinite(pageRaw)
+      ? Math.max(1, Math.min(maxPage, Math.trunc(pageRaw)))
+      : 1;
     const isSection = !!any.isSection;
     if (id && label) out.push({ id, label, page, isSection });
   }
   return out.sort((a, b) => (a.page - b.page) || a.label.localeCompare(b.label));
 }
 
+
 function addTocItem(init?: { page?: number; label?: string; isSection?: boolean }) {
   const p = init?.page ?? (currentIndex + 1);
-  const safe = pdfDoc ? Math.max(1, Math.min(pdfDoc.numPages, p)) : Math.max(1, p || 1);
-  const label = (init?.label ?? `Page ${safe}`).trim() || `Page ${safe}`;
+  const safe = pdfDoc
+    ? Math.max(1, Math.min(pdfDoc.numPages, Number(p) || 1))
+    : Math.max(1, Number(p) || 1);
+  const label = normalizeLabel(init?.label ?? `Page ${safe}`); // ← з пробілами
   setToc(list =>
     [...list, { id: genId(), label, page: safe, isSection: !!init?.isSection }]
-      .sort((a,b)=>a.page-b.page)
+      .sort((a, b) => a.page - b.page)
   );
 }
+
 
 function updateTocItem(id: string, patch: Partial<TocItem>) {
   setToc(list => {
@@ -1004,14 +1019,25 @@ function updateTocItem(id: string, patch: Partial<TocItem>) {
       .map(it => {
         if (it.id !== id) return it;
         const next: TocItem = { ...it, ...patch };
-        if (patch.page != null) next.page = Math.max(1, Math.min(max, Number(patch.page) || it.page));
-        next.label = String(next.label || "").trim();
+
+        if (patch.page != null) {
+          const v = Math.trunc(Number(patch.page));
+          next.page = Math.max(1, Math.min(max, Number.isFinite(v) ? v : it.page));
+        }
+
+        if (patch.label !== undefined) {
+          next.label = normalizeLabel(patch.label as string); // ← зберігаємо пробіли
+        } else {
+          next.label = normalizeLabel(next.label);            // ← і при інших апдейтах теж
+        }
+
         next.isSection = !!next.isSection;
         return next;
       })
-      .sort((a,b)=>a.page-b.page);
+      .sort((a, b) => a.page - b.page);
   });
 }
+
 
 function removeTocItem(id: string) {
   setToc(list => list.filter(it => it.id !== id));
