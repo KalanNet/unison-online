@@ -30,6 +30,27 @@ export default function RightContentEditorPanel({
 }: Props) {
   const [saving, setSaving] = React.useState(false);
 
+  // === НОВЕ: локально глушимо глобальні хоткеї фліпбука/документа,
+  // щоб пробіл/стрілки не перехоплювались поза інпутом ===
+  const stopHotkeys: React.KeyboardEventHandler = (e) => {
+    const t = e.target as HTMLElement | null;
+    const tag = t?.tagName?.toLowerCase();
+    const editable =
+      tag === "input" || tag === "textarea" || t?.getAttribute("contenteditable") === "true";
+    if (!editable) return;
+
+    const k = e.key;
+    if (
+      k === " " || k === "Space" || k === "Spacebar" ||
+      k === "ArrowLeft" || k === "ArrowRight" ||
+      k === "PageUp" || k === "PageDown" ||
+      k === "Home" || k === "End"
+    ) {
+      // не заважаємо вводу символів — лише зупиняємо розповсюдження
+      e.stopPropagation();
+    }
+  };
+
   async function handleSave() {
     if (!onSave || !canSave) return;
     try {
@@ -41,7 +62,15 @@ export default function RightContentEditorPanel({
   }
 
   return (
-    <aside className="rce" aria-label="Content editor">
+    <aside
+      className="rce"
+      aria-label="Content editor"
+      // важливо: блокуємо як на capture, так і на bubble
+      onKeyDownCapture={stopHotkeys}
+      onKeyDown={stopHotkeys}
+      onKeyUp={stopHotkeys}
+      onKeyPress={stopHotkeys as any}
+    >
       <div className="rce-inner">
         <div className="rce-header">
           <div className="rce-title">CONTENT TABLE</div>
@@ -81,6 +110,10 @@ export default function RightContentEditorPanel({
                 value={it.label}
                 placeholder="Type section title…"
                 onChange={(e) => onChange?.(it.id, { label: e.target.value })}
+                // дублюємо локальну “ізоляцію” ще й на самому інпуті
+                onKeyDown={(e) => e.stopPropagation()}
+                onKeyUp={(e) => e.stopPropagation()}
+                onKeyPress={(e) => e.stopPropagation()}
               />
 
               {/* Другий рядок: чекбокс Section, сторінка, Go, Delete */}
@@ -106,6 +139,9 @@ export default function RightContentEditorPanel({
                     onChange={(e) =>
                       onChange?.(it.id, { page: Number(e.target.value || 1) })
                     }
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyUp={(e) => e.stopPropagation()}
+                    onKeyPress={(e) => e.stopPropagation()}
                   />
                   <button
                     className="rce-mini"
