@@ -1,4 +1,3 @@
-// app/(public)/directory/[slug]/page.tsx
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
@@ -7,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 /* ---------- Types ---------- */
 type Bookmark = { id: string; page: number; label: string; color: string | null };
-
 type AdSlot = {
   id: string;
   imageUrl: string;
@@ -15,6 +13,7 @@ type AdSlot = {
   label?: string | null;
   seq?: number | null;
 };
+type TocItem = { id: string; label: string; page: number; isSection?: boolean };
 
 type MetaPayload = {
   meta?: { title?: string; description?: string; featuredUrl?: string | null; slug?: string };
@@ -22,6 +21,10 @@ type MetaPayload = {
   publishedAt?: string;
   bookmarks?: Bookmark[];
   ads?: AdSlot[];
+  /** нове: контент */
+  content?: unknown;
+  toc?: unknown;
+  tableOfContents?: unknown;
 };
 
 /* ---------- Constants ---------- */
@@ -76,7 +79,6 @@ function sanitizeAds(input: unknown): AdSlot[] {
     if (!it || typeof it !== "object") continue;
     const anyIt = it as Record<string, unknown>;
 
-    // 👇 підтримуємо різні назви полів від бекенду
     const rawImg =
       (anyIt.imageUrl as unknown) ??
       (anyIt.url as unknown) ??
@@ -84,14 +86,12 @@ function sanitizeAds(input: unknown): AdSlot[] {
       (anyIt.img as unknown);
 
     const imageUrl = String(rawImg ?? "").trim();
-    if (!imageUrl) continue; // без картинки — пропускаємо
+    if (!imageUrl) continue;
 
-    const id =
-      String(
-        (anyIt.id as unknown) ??
-          // запасний варіант, щоб key був стабільним
-          `${(anyIt.label as string | undefined) || "ad"}-${imageUrl}`
-      );
+    const id = String(
+      (anyIt.id as unknown) ??
+        `${(anyIt.label as string | undefined) || "ad"}-${imageUrl}`
+    );
 
     const hrefVal =
       anyIt.href == null ? null : (String(anyIt.href).trim() || null);
@@ -110,6 +110,48 @@ function sanitizeAds(input: unknown): AdSlot[] {
     .map((a, i) => ({ ...a, seq: a.seq ?? i }));
 
   return JSON.parse(JSON.stringify(sorted));
+}
+
+/** Санітаризація content.json → список для RightContentPanel */
+function sanitizeContent(input: unknown): TocItem[] {
+  if (!Array.isArray(input)) return [];
+  const out: TocItem[] = [];
+
+  const normPage = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : Number.POSITIVE_INFINITY;
+  };
+
+  for (const it of input) {
+    if (!it || typeof it !== "object") continue;
+    const o = it as Record<string, unknown>;
+
+    const rawLabel = (o.label ?? o.title ?? o.name) as unknown;
+    const rawPage  = (o.page ?? o.p ?? o.pageNumber) as unknown;
+    const rawSec   = (o.isSection ?? o.section ?? o.isHeader ?? (o.type === "section")) as unknown;
+
+    const label = String(rawLabel ?? "").trim();
+    const pageN = normPage(rawPage);
+    if (!label) continue;
+
+    const id = String(o.id ?? `${label}:${pageN}`);
+
+    out.push({
+      id,
+      label,
+      page: pageN === Number.POSITIVE_INFINITY ? 1 : pageN,
+      isSection: Boolean(rawSec),
+    });
+  }
+
+  out.sort((a, b) => {
+    const pa = Number.isFinite(a.page) && a.page > 0 ? a.page : Number.POSITIVE_INFINITY;
+    const pb = Number.isFinite(b.page) && b.page > 0 ? b.page : Number.POSITIVE_INFINITY;
+    if (pa !== pb) return pa - pb;
+    return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  });
+
+  return JSON.parse(JSON.stringify(out));
 }
 
 /* ---------- Metadata ---------- */
@@ -145,6 +187,10 @@ export default async function Page({
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const data = slug ? await getMeta(slug) : null;
 
+  const rawContent =
+    (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
+  const content = sanitizeContent(rawContent);
+
   // Фолбек: якщо meta немає — дозволяємо прямий перегляд через ?file=
   if (!data?.file) {
     const fileParam = typeof searchParams.file === "string" ? searchParams.file : "";
@@ -157,12 +203,8 @@ export default async function Page({
           title={title}
           bookmarks={sanitizeBookmarks(data?.bookmarks)}
           ads={sanitizeAds((data as any)?.ads)}
-        content={[
-    { id: "t1", label: "About Unison", page: 2,  isSection: true },
-    { id: "t2", label: "Services",     page: 6 },
-    { id: "t3", label: "Housing",      page: 38, isSection: true },
-  ]}
-/>
+          content={content}
+        />
       );
     }
     const ClientFallback =
@@ -179,11 +221,7 @@ export default async function Page({
       title={title}
       bookmarks={sanitizeBookmarks(data.bookmarks)}
       ads={sanitizeAds(data.ads)}
-      content={[
-    { id: "t1", label: "About Unison", page: 2,  isSection: true },
-    { id: "t2", label: "Services",     page: 6 },
-    { id: "t3", label: "Housing",      page: 38, isSection: true },
-  ]}
-/>
+      content={content}
+    />
   );
 }
