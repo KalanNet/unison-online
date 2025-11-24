@@ -1421,39 +1421,47 @@ export default function PublicViewer({
           }
         }
 
-        /* ===== Page corner “curl” hint ===== */
+        /* ===== Page corner “curl” hint (high-contrast) ===== */
 .page-curl-hint{
-  --curl-size: 62px;           /* розмір кутика */
+  --curl-size: 92px;            /* більший розмір для кращої видимості */
   position:absolute;
   right:0; bottom:0;
   width:var(--curl-size);
   height:var(--curl-size);
-  pointer-events:none;         /* не блокуємо кліки по сторінці */
-  z-index:40;
+  pointer-events:none;          /* не блокує кліки */
+  z-index:80;
 }
 
-/* сам “загнутий” трикутник */
+/* сам загнутий трикутник + виразна кромка + тінь (усе в одному шарі) */
 .page-curl-hint::before{
   content:"";
   position:absolute; inset:0;
-  /* білий “низ” сторінки + тонка діагональна рисочка-край */
+  /* Порядок шарів: кромка → біла площина → тінь */
   background:
-    linear-gradient(135deg, rgba(255,255,255,.92) 0 49%, rgba(255,255,255,0) 51%),
-    linear-gradient(135deg, rgba(0,0,0,.18) 0 49%, rgba(0,0,0,0) 51%);
+    /* кромка (товстіша й темніша) */
+    linear-gradient(135deg, rgba(0,0,0,.55) 0 49%, rgba(0,0,0,0) 51%),
+    /* біла площина кута */
+    linear-gradient(135deg, #ffffff 0 49%, rgba(255,255,255,0) 51%),
+    /* м’яка тінь під кутом */
+    radial-gradient(78% 78% at 100% 100%, rgba(0,0,0,.55) 0 62%, rgba(0,0,0,0) 70%);
   clip-path: polygon(100% 0, 100% 100%, 0 100%); /* трикутник */
   transform-origin: 100% 100%;
-  filter: drop-shadow(-2px -2px 2px rgba(0,0,0,.25));
-  animation: curl-peek 3.2s ease-in-out 1.2s infinite;
+  filter: drop-shadow(-3px -3px 3px rgba(0,0,0,.35));
+  animation: curl-peek 2.6s ease-in-out .8s infinite;
 }
 
-/* м’яка тінь під “піднятим” кутом */
+/* підказка-іконка “стрілочка” всередині кута */
 .page-curl-hint::after{
   content:"";
-  position:absolute; inset:-6% -6% 0 0;
-  background: radial-gradient(70% 70% at 100% 100%, rgba(0,0,0,.35), transparent 70%);
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  transform-origin: 100% 100%;
-  animation: curl-shadow 3.2s ease-in-out 1.2s infinite;
+  position:absolute;
+  right:12px; bottom:14px;
+  width:20px; height:20px;
+  border-right:4px solid rgba(0,0,0,.85);
+  border-top:4px solid rgba(0,0,0,.85);
+  transform: rotate(45deg);
+  opacity:.95;
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,.55)); /* легка світла окантовка */
+  animation: curl-icon 2.6s ease-in-out .8s infinite;
 }
 
 /* варіант для лівого нижнього кута */
@@ -1483,15 +1491,19 @@ export default function PublicViewer({
 
 /* ===== keyframes ===== */
 @keyframes curl-peek{
-  0%, 60%, 100% { transform: translate(0,0) rotate(0deg) scale(1); opacity:.75; }
-  18%           { transform: translate(-6px,-6px) rotate(-10deg) scale(1.02); opacity:1; }
-  32%           { transform: translate(-4px,-4px) rotate(-6deg)  scale(1.01); opacity:.95; }
-  46%           { transform: translate(-2px,-2px) rotate(-3deg)  scale(1.00); opacity:.85; }
+  0%, 65%, 100% { transform: translate(0,0) rotate(0deg)  scale(1);    opacity:.95; }
+  18%           { transform: translate(-12px,-12px) rotate(-14deg) scale(1.04); opacity:1; }
+  36%           { transform: translate(-8px,-8px)   rotate(-10deg) scale(1.03); opacity:.98; }
+  52%           { transform: translate(-5px,-5px)   rotate(-6deg)  scale(1.02); opacity:.96; }
 }
-@keyframes curl-shadow{
-  0%, 60%, 100% { opacity:0; transform: translate(0,0); }
-  18%, 46%      { opacity:.55; transform: translate(-2px,-2px); }
+
+@keyframes curl-icon{
+  0%, 65%, 100% { transform: translate(0,0) rotate(45deg) scale(1);   opacity:.95; }
+  18%           { transform: translate(-6px,-6px) rotate(45deg) scale(1.08); opacity:1; }
+  36%           { transform: translate(-4px,-4px) rotate(45deg) scale(1.06); opacity:.98; }
+  52%           { transform: translate(-2px,-2px) rotate(45deg) scale(1.04); opacity:.96; }
 }
+
 
       `}</style>
     </div>
