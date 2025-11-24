@@ -5,14 +5,17 @@ import React from "react";
 
 export type TocItem = {
   id: string;
-  label: string;      // не показуємо порожні
-  page: number;       // 1-based, > 0
-  isSection?: boolean;
+  label: string;
+  page: number;        // 1-based
+  isSection?: boolean; // лише для стилю (розділ)
 };
 
 type Props = {
+  /** Зовнішній прапорець: чи має панель бути згорнута */
   autoCollapsed?: boolean;
+  /** Список пунктів змісту (якщо приходить — використовуємо його, без дод. фетчів) */
   items?: TocItem[] | null | undefined;
+  /** Клік по пункту → перехід на сторінку (1-based) */
   onGotoPage?: (page: number) => void;
 };
 
@@ -20,29 +23,137 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const [collapsed, setCollapsed] = React.useState(false);
 
-  // ✅ ТІЛЬКИ РЕАЛЬНІ ДАНІ. ЖОДНИХ ПЛЕЙСХОЛДЕРІВ.
-  const toc: TocItem[] = React.useMemo(() => {
-    const src = Array.isArray(items) ? items : [];
-    const norm = src
-      .map((x) => ({
-        id: String(x?.id ?? "").trim(),
-        label: String(x?.label ?? "").trim(),
-        page: Number.isFinite((x as any)?.page) ? Math.max(1, Math.floor((x as any).page)) : NaN,
-        isSection: !!x?.isSection,
-      }))
-      // фільтруємо сміття
-      .filter((x) => x.id.length > 0 && x.label.length > 0 && Number.isFinite(x.page))
-      // сортування: спершу сторінка, далі — назва (case-insensitive)
-      .sort((a, b) => (a.page - b.page) || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  /* ---------- helpers ---------- */
+  const sortToc = React.useCallback((arr: TocItem[]) => {
+    return [...arr].sort((a, b) => {
+      const pa = Number.isFinite(a.page) && a.page > 0 ? a.page : Number.POSITIVE_INFINITY;
+      const pb = Number.isFinite(b.page) && b.page > 0 ? b.page : Number.POSITIVE_INFINITY;
+      if (pa !== pb) return pa - pb;
+      return String(a.label ?? "").localeCompare(String(b.label ?? ""), undefined, { sensitivity: "base" });
+    });
+  }, []);
 
-    return norm; // без фолбеків
-  }, [items]);
+  const sanitizeContent = React.useCallback((input: unknown): TocItem[] => {
+    if (!Array.isArray(input)) return [];
+    const normPage = (v: any) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : Number.POSITIVE_INFINITY;
+    };
+    const out: TocItem[] = [];
+    for (const it of input) {
+      if (!it || typeof it !== "object") continue;
+      const o = it as Record<string, unknown>;
+      const rawLabel = (o.label ?? o.title ?? o.name) as unknown;
+      const rawPage  = (o.page ?? o.p ?? o.pageNumber) as unknown;
+      const rawSec   = (o.isSection ?? o.section ?? o.isHeader ?? (o.type === "section")) as unknown;
+
+      const label = String(rawLabel ?? "").trim();
+      if (!label) continue;
+
+      const pageN = normPage(rawPage);
+      const id    = String(o.id ?? `${label}:${pageN}`);
+
+      out.push({
+        id,
+        label,
+        page: pageN === Number.POSITIVE_INFINITY ? 1 : pageN,
+        isSection: Boolean(rawSec),
+      });
+    }
+    return sortToc(out);
+  }, [sortToc]);
+
+  const [fetched, setFetched] = React.useState<TocItem[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  // Якщо пропів немає або вони порожні — самі фетчимо content.json по slug із URL
+  React.useEffect(() => {
+    if (Array.isArray(items) && items.length > 0) {
+      setFetched(null);
+      return;
+    }
+
+    const m = typeof window !== "undefined"
+      ? window.location.pathname.match(/\/directory\/([^/?#]+)/i)
+      : null;
+    const slug = m?.[1];
+    if (!slug) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+
+        // 1) /api/directory/[slug]/content
+        const try1 = await fetch(`/api/directory/${encodeURIComponent(slug)}/content`, { cache: "no-store" });
+        if (!cancelled && try1.ok) {
+          const data = await try1.json();
+          const list = sanitizeContent((data as any) ?? (data as any)?.items);
+          if (list.length) {
+            console.info("[RightContentPanel] content via /content", list.length);
+            setFetched(list);
+            return;
+          }
+        }
+
+        // 2) /api/directory/[slug]?fields=content
+        const try2 = await fetch(`/api/directory/${encodeURIComponent(slug)}?fields=content`, { cache: "no-store" });
+        if (!cancelled && try2.ok) {
+          const data = await try2.json();
+          const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
+          const list = sanitizeContent(raw);
+          if (list.length) {
+            console.info("[RightContentPanel] content via ?fields=content", list.length);
+            setFetched(list);
+            return;
+          }
+        }
+
+        // 3) /api/directory/[slug] (повний мета-ендпоінт) і дістаємо поле content/toc/...
+        const try3 = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
+        if (!cancelled && try3.ok) {
+          const data = await try3.json();
+          const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
+          const list = sanitizeContent(raw);
+          console.info("[RightContentPanel] content via meta", list.length);
+          setFetched(list);
+          return;
+        }
+
+        if (!cancelled) setFetched([]);
+      } catch (e) {
+        if (!cancelled) {
+          console.warn("[RightContentPanel] content fetch failed:", e);
+          setFetched([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [items, sanitizeContent]);
+
+  // Вибираємо дані пріоритетно: пропи > фетч
+  const toc: TocItem[] = React.useMemo(() => {
+    const src = Array.isArray(items) && items.length > 0 ? items : (fetched ?? []);
+    return sortToc(
+      (src ?? [])
+        .map((x) => ({
+          id: String(x?.id ?? ""),
+          label: String(x?.label ?? "").trim(),
+          page: Number.isFinite(x?.page as any) ? Math.max(1, Math.floor(x!.page as number)) : 1,
+          isSection: !!x?.isSection,
+        }))
+        .filter((x) => x.id.length > 0 && x.label.length > 0)
+    );
+  }, [items, fetched, sortToc]);
 
   React.useEffect(() => {
     if (typeof autoCollapsed === "boolean") setCollapsed(autoCollapsed);
   }, [autoCollapsed]);
 
-  // Клавіатура
+  // Клавіатурна навігація по списку
   const onKeyList = (e: React.KeyboardEvent) => {
     const root = listRef.current;
     if (!root) return;
@@ -58,8 +169,10 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
   };
 
   return (
-    <aside className={`rc-rightpanel${collapsed ? " is-collapsed" : ""}`} aria-label="Contents">
-      {/* ручка-стрілка */}
+    <aside
+      className={`rc-rightpanel${collapsed ? " is-collapsed" : ""}`}
+      aria-label="Contents"
+    >
       <button
         type="button"
         className="rc-toggle"
@@ -68,34 +181,38 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         onClick={() => setCollapsed((v) => !v)}
       />
 
-      <div className="rc-inner" role="list" ref={listRef} onKeyDown={onKeyList}>
+      <div
+        className="rc-inner"
+        role="list"
+        ref={listRef}
+        onKeyDown={onKeyList}
+      >
         <div className="rc-title" aria-hidden>Content Table</div>
 
-        {toc.length === 0 ? (
-          <div className="rc-empty" role="note" aria-live="polite">
-            No items yet.
-          </div>
-        ) : (
-          toc.map((it, i) => {
-            const isSection = !!it.isSection;
-            return (
-              <button
-                key={it.id}
-                type="button"
-                role="listitem"
-                className={`rc-item${isSection ? " is-section" : " is-page"}`}
-                onClick={() => onGotoPage?.(it.page)}
-                aria-label={`${it.label}, page ${it.page}`}
-                title={`${it.label} — page ${it.page}`}
-              >
-                <span className="rc-dot" aria-hidden />
-                <span className="rc-label">{it.label}</span>
-                <span className="rc-page">p.{it.page}</span>
-                {i > 0 ? <span className="rc-sep" aria-hidden /> : null}
-              </button>
-            );
-          })
+        {loading && <div style={{padding:"8px 12px", color:"#9aa4b2"}}>Loading…</div>}
+        {!loading && toc.length === 0 && (
+          <div style={{padding:"8px 12px", color:"#9aa4b2"}}>No items yet.</div>
         )}
+
+        {toc.map((it, i) => {
+          const isSection = !!it.isSection;
+          return (
+            <button
+              key={it.id}
+              type="button"
+              role="listitem"
+              className={`rc-item${isSection ? " is-section" : " is-page"}`}
+              onClick={() => onGotoPage?.(it.page)}
+              aria-label={`${it.label}, page ${it.page}`}
+              title={`${it.label} — page ${it.page}`}
+            >
+              <span className="rc-dot" aria-hidden />
+              <span className="rc-label">{it.label}</span>
+              <span className="rc-page">p.{it.page}</span>
+              {i > 0 ? <span className="rc-sep" aria-hidden /> : null}
+            </button>
+          );
+        })}
       </div>
 
       <style jsx>{`
@@ -163,13 +280,6 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           opacity: .9;
         }
 
-        .rc-empty {
-          color: #b9c2cf;
-          opacity: .9;
-          padding: 10px 12px;
-          font-size: 14px;
-        }
-
         .rc-item {
           position: relative;
           display: grid;
@@ -202,12 +312,27 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           pointer-events: none;
         }
 
-        .rc-item.is-section { padding-left: 8px; }
-        .rc-item.is-section .rc-label { font-weight: 800; font-size: 15px; letter-spacing: .01em; }
-        .rc-item.is-section .rc-dot { background: #f4ce69; box-shadow: 0 0 0 3px rgba(244,206,105,.15); }
+        .rc-item.is-section {
+          grid-template-columns: 18px 1fr auto;
+          padding-left: 8px;
+        }
+        .rc-item.is-section .rc-label {
+          font-weight: 800;
+          font-size: 15px;
+          letter-spacing: .01em;
+        }
+        .rc-item.is-section .rc-dot {
+          background: #f4ce69;
+          box-shadow: 0 0 0 3px rgba(244, 206, 105, .15);
+        }
 
-        .rc-item.is-page { padding-left: 28px; }
-        .rc-item.is-page .rc-dot { background: #9aa4b2; opacity: .9; }
+        .rc-item.is-page {
+          padding-left: 28px;
+        }
+        .rc-item.is-page .rc-dot {
+          background: #9aa4b2;
+          opacity: .9;
+        }
 
         .rc-dot { width: 10px; height: 10px; border-radius: 50%; }
 
@@ -220,7 +345,12 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           max-width: 100%;
         }
 
-        .rc-page { font-weight: 900; font-size: 12px; color: #f4ce69; letter-spacing: .02em; }
+        .rc-page {
+          font-weight: 900;
+          font-size: 12px;
+          color: #f4ce69;
+          letter-spacing: .02em;
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .rc-rightpanel, .rc-item { transition: none !important; }
