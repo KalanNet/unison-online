@@ -627,6 +627,24 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
         }}
       />
 
+<RightContentEditorPanel
+  /* автоховається всюди, крім титульної сторінки */
+  autoCollapsed={ctrl.currentIndex !== 0}
+
+  /* дані та керування */
+  items={ctrl.toc}
+  currentPage={ctrl.currentIndex + 1}
+  onGotoPage={ctrl.goToPage}
+  onAddCurrent={() => ctrl.addTocItem({ page: ctrl.currentIndex + 1 })}
+  onChange={(id, patch) => ctrl.updateTocItem(id, patch)}
+  onRemove={(id) => ctrl.removeTocItem(id)}
+
+  /* збереження у /api/directory/[slug]/content */
+  onSave={async () => { await ctrl.saveToc(); }}
+
+  /* кнопка Save активна лише після публікації meta (коли є slug) */
+  canSave={Boolean(ctrl.meta?.slug)}
+/>
 
 
       {/* Стікі панель зліва (overlay, не впливає на контейнери) */}
