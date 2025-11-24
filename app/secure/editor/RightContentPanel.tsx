@@ -90,7 +90,6 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           const data = await try1.json();
           const list = sanitizeContent((data as any) ?? (data as any)?.items);
           if (list.length) {
-            console.info("[RightContentPanel] content via /content", list.length);
             setFetched(list);
             return;
           }
@@ -103,29 +102,24 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
           const list = sanitizeContent(raw);
           if (list.length) {
-            console.info("[RightContentPanel] content via ?fields=content", list.length);
             setFetched(list);
             return;
           }
         }
 
-        // 3) /api/directory/[slug] (повний мета-ендпоінт) і дістаємо поле content/toc/...
+        // 3) /api/directory/[slug] (повний мета-ендпоінт)
         const try3 = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
         if (!cancelled && try3.ok) {
           const data = await try3.json();
           const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
           const list = sanitizeContent(raw);
-          console.info("[RightContentPanel] content via meta", list.length);
           setFetched(list);
           return;
         }
 
         if (!cancelled) setFetched([]);
-      } catch (e) {
-        if (!cancelled) {
-          console.warn("[RightContentPanel] content fetch failed:", e);
-          setFetched([]);
-        }
+      } catch {
+        if (!cancelled) setFetched([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -312,6 +306,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           pointer-events: none;
         }
 
+        /* ===== РОЗДІЛИ ===== */
         .rc-item.is-section {
           grid-template-columns: 18px 1fr auto;
           padding-left: 8px;
@@ -321,17 +316,19 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           font-size: 15px;
           letter-spacing: .01em;
         }
+        /* нейтрально-сіра крапка для розділів */
         .rc-item.is-section .rc-dot {
-          background: #f4ce69;
-          box-shadow: 0 0 0 3px rgba(244, 206, 105, .15);
+          background: #9aa4b2;
+          box-shadow: 0 0 0 3px rgba(154,164,178,.18);
         }
 
+        /* ===== ЗВИЧАЙНІ ПУНКТИ ===== */
         .rc-item.is-page {
-          padding-left: 28px;
+          padding-left: 28px; /* індентація лишається */
         }
+        /* прибираємо крапку в звичайних пунктів */
         .rc-item.is-page .rc-dot {
-          background: #9aa4b2;
-          opacity: .9;
+          display: none;
         }
 
         .rc-dot { width: 10px; height: 10px; border-radius: 50%; }
@@ -345,11 +342,13 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
           max-width: 100%;
         }
 
+        /* Номери сторінок — тим же шрифтом і кольором, що й звичайний текст */
         .rc-page {
-          font-weight: 900;
-          font-size: 12px;
-          color: #f4ce69;
-          letter-spacing: .02em;
+          font: inherit;
+          font-size: 14px;
+          font-weight: 400;
+          color: inherit;
+          letter-spacing: normal;
         }
 
         @media (prefers-reduced-motion: reduce) {
