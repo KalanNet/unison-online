@@ -180,7 +180,7 @@ export default function RightContentEditorPanel({
     >
       <div className="rce-inner">
         <div className="rce-header">
-          <div className="rce-title">CONTENT TABLE</div>
+          <div className="rce-title">TABLE of CONTENTS</div>
           <div className="rce-actions">
             <button
               className="rce-btn"

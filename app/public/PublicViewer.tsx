@@ -54,27 +54,32 @@ export default function PublicViewer({
   const initPageRef = React.useRef<number | null>(null);
   const suppressNavRef = React.useRef<boolean>(false);
 
+   // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
+  const isMobile = useIsMobile(980);
+
   // 🔇 локальний мут
   const [soundMuted, setSoundMuted] = React.useState(false);
   const toggleSound = React.useCallback(() => setSoundMuted((v) => !v), []);
 
   // 🔊 один-єдиний audio-об’єкт
   const flipAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  // 2. 👇 ДОДАЄМО ПЕРЕВІРКУ В playFlip
   const playFlip = React.useCallback(() => {
+    if (isMobile) return; // <--- 🔕 Блокуємо звук на мобайлі
     if (soundMuted) return;
+    
     const a = flipAudioRef.current;
     if (!a) return;
     try {
       a.currentTime = 0;
       void a.play();
     } catch {}
-  }, [soundMuted]);
+  }, [soundMuted, isMobile]); // <--- додаємо isMobile в залежності
 
   // 1) ХУК КОНТРОЛЕРА
   const ctrl = useViewerController({ file, title });
 
-  // 2) ВИКЛИК ХУКА ДЛЯ МОБІЛЬНОГО — ДО БУДЬ-ЯКИХ РАННІХ return
-  const isMobile = useIsMobile(980);
+ 
 
   // --- FOOTER API WRAPPER: звук ДО переходу ---
   const footerApi = React.useMemo(() => {
