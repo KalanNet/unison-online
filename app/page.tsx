@@ -58,6 +58,11 @@ export default function Home() {
     ],
   };
 
+  // Розрахунок року: поточна дата + 5 днів
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + 5);
+  const displayYear = targetDate.getFullYear();
+
   return (
     <>
       <script
@@ -175,7 +180,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ===== DIRECTORY (без Reveal/lazy) ===== */}
+        {/* ===== DIRECTORY (Merged Single Card) ===== */}
         <section className="dir-wrap">
           <div className="container">
             <h2 className="dir-title">Unison Annual Directory</h2>
@@ -186,44 +191,32 @@ export default function Home() {
               Southern Alberta.
             </p>
 
-            <div className="cards-dark">
-              {/* 2026 */}
-              <article className="card-dark">
-                <span className="year">2026</span>
+            {/* Використовуємо один блок для суцільного шейпа */}
+            <div className="cards-dark" style={{ display: "block" }}>
+              <a
+                href="https://unisonalberta.online/unison-directory/services-and-housing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="card-dark"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textDecoration: "none",
+                }}
+              >
+                <span className="year">{displayYear}</span>
                 <div className="ctitle">
-                  Services &amp; Housing Directory 2026
+                  Services &amp; Housing Directory
                 </div>
                 <p>
-                  Discover what’s new in the 2026 edition – an updated
-                  Interactive Directory Catalogue for seniors.
+                  Explore our Interactive Directory Catalogue – a comprehensive
+                  informational resource for older adults, family members, and
+                  agencies regarding housing and services.
                 </p>
                 <p style={{ marginTop: 12 }}>
-                  {/* не-клік, стилізовано як Explore */}
-                  <span className="link-light link-disabled">Coming soon →</span>
+                  <span className="link-light">Explore →</span>
                 </p>
-              </article>
-
-              {/* 2025 */}
-              <article className="card-dark">
-                <span className="year">2025</span>
-                <div className="ctitle">
-                  Services &amp; Housing Directory 2025
-                </div>
-                <p>
-                  Explore our Interactive Directory Catalogue – a 170-page
-                  informational resource for older adults.
-                </p>
-                <p style={{ marginTop: 12 }}>
-                  <a
-                    className="link-light"
-                    href="https://unisonalberta.online/directory/services-and-housing-directory-2025"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Explore →
-                  </a>
-                </p>
-              </article>
+              </a>
             </div>
           </div>
         </section>
