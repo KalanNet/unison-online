@@ -520,6 +520,7 @@ function warmPagesAround(idx0: number) {
   // допоміжний пошук по конкретному терміну (точний includes)
   // допоміжний пошук по конкретному терміну (точний includes)
   // допоміжний пошук по конкретному терміну (точний includes)
+  // допоміжний пошук по конкретному терміну (точний includes)
   async function runExactSearch(
     term: string
   ): Promise<{ hits: SearchHit[]; map: Map<number, HighlightBox[]> }> {
@@ -547,16 +548,18 @@ function warmPagesAround(idx0: number) {
 
           const hitIndex = nextHits.length;
 
-          // --- FIX FOR CANVA PDFS (V2 - Stronger adjustment) ---
-          // 1. Зсуваємо початок хайлайту вниз значно сильніше (майже 40% висоти)
-          const offsetY = h * 0.38; 
+          // --- FIX FOR CANVA PDFS (Aggressive) ---
+          // 1. Зсув вниз: 0.50 (половина висоти рядка)
+          // Це значно опустить "дах" хайлайту
+          const offsetY = h * 0.50; 
           
-          // 2. Зменшуємо висоту до 80%, щоб компенсувати зсув і не зачіпати нижні рядки
-          const adjustedH = h * 0.80;
+          // 2. Висота: 0.75 (3/4 від оригінальної)
+          // Підрізаємо знизу, щоб через сильний зсув воно не налізло на рядок нижче
+          const adjustedH = h * 0.75;
 
           // top у пікселях від ВЕРХУ сторінки viewport:
-          // Стандартна формула: vp.height - (yBaseline + h)
-          // Додаємо offsetY, щоб "притиснути" хайлайт до тексту
+          // vp.height - (yBaseline + h) = це математичний ВЕРХ тексту.
+          // Ми додаємо offsetY, щоб точка початку малювання пішла ВНИЗ.
           const yTopCssPx = vp.height - (yBaseline + h) + offsetY;
 
           // нормалізований бокс для нашого оверлею
