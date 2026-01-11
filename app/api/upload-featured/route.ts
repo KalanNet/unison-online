@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
       return err("Only image/* allowed", 415);
     }
 
-    // бажаний таргет: directory/<slug>/...
+    // бажаний таргет: unison-directory/<slug>/... (ЗМІНЕНО directory -> unison-directory)
     const slug = (form.get("slug") as string | null)?.trim() || null;
-    const dir = slug ? `directory/${slug}` : ((form.get("dir") as string | null) || null);
+    const dir = slug ? `unison-directory/${slug}` : ((form.get("dir") as string | null) || null);
 
     const key = joinKey(dir, safeName("featured", image.name || image.type));
     const arr = await image.arrayBuffer();

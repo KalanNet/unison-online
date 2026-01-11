@@ -1,3 +1,4 @@
+// app/secure/editor/ClientEditor.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,10 +10,12 @@ import { useSearchParams } from "next/navigation";
 function getSlugFromPublicUrl(href: string): string | null {
   try {
     const u = new URL(href);
-    const m = u.pathname.match(/\/directory\/([^\/?#]+)/);
+    // ЗМІНЕНО regex: шукаємо unison-directory
+    const m = u.pathname.match(/\/unison-directory\/([^\/?#]+)/);
     return m ? decodeURIComponent(m[1]) : null;
   } catch {
-    const m = href.match(/\/directory\/([^\/?#]+)/);
+    // ЗМІНЕНО regex: шукаємо unison-directory
+    const m = href.match(/\/unison-directory\/([^\/?#]+)/);
     return m ? decodeURIComponent(m[1]) : null;
   }
 }

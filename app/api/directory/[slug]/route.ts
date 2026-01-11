@@ -1,3 +1,4 @@
+// app/api/directory/[slug]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
@@ -41,7 +42,8 @@ const err = (error: string, code = 400) => NextResponse.json({ error }, { status
 
 async function readPrev(slug: string): Promise<MetaJson | null> {
   try {
-    const r = await fetch(`${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`, { cache: "no-store" });
+    // ЗМІНЕНО directory -> unison-directory
+    const r = await fetch(`${R2_PUBLIC}/unison-directory/${encodeURIComponent(slug)}/meta.json`, { cache: "no-store" });
     if (!r.ok) return null;
     return (await r.json()) as MetaJson;
   } catch { return null; }
@@ -103,7 +105,8 @@ export async function GET(
   if (!slug) return err("Missing slug", 422);
 
   try {
-    const url = `${R2_PUBLIC}/directory/${encodeURIComponent(slug)}/meta.json`;
+    // ЗМІНЕНО directory -> unison-directory
+    const url = `${R2_PUBLIC}/unison-directory/${encodeURIComponent(slug)}/meta.json`;
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) return err("Not found", 404);
     const j = await r.json();
@@ -157,7 +160,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     // 4) запис у R2
     await s3.send(new PutObjectCommand({
       Bucket: R2_BUCKET,
-      Key: `directory/${encodeURIComponent(slug)}/meta.json`,
+      // ЗМІНЕНО directory -> unison-directory
+      Key: `unison-directory/${encodeURIComponent(slug)}/meta.json`,
       Body: new TextEncoder().encode(JSON.stringify(next, null, 2)),
       ContentType: "application/json; charset=utf-8",
       CacheControl: "no-cache",
@@ -183,7 +187,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       }),
     }).catch(() => null);
 
-    return ok({ ok: true, slug, urlPath: `/directory/${slug}`, meta: next });
+    // ЗМІНЕНО directory -> unison-directory у відповіді
+    return ok({ ok: true, slug, urlPath: `/unison-directory/${slug}`, meta: next });
   } catch (e: any) {
     return err(String(e?.message || e), 500);
   }

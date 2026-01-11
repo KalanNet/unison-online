@@ -1120,7 +1120,7 @@ async function publishMetaAndBookmarks(): Promise<{
   // намагаємось дістати slug/url із відповіді API
   const slugFromApi: string | undefined = out?.stored?.slug || out?.slug || payload.meta.slug;
   const urlPath: string | undefined =
-    out?.urlPath || (slugFromApi ? `/directory/${slugFromApi}` : undefined);
+  out?.urlPath || (slugFromApi ? `/unison-directory/${slugFromApi}` : undefined);
 
 
   const publicUrl =

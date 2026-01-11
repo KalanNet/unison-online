@@ -596,7 +596,7 @@ const [ads, setAds] = React.useState<InitAd[]>(() => initialAds);
           j?.publicUrl ||
           (j?.urlPath
             ? `${SITE_URL}${j.urlPath}`
-            : `${SITE_URL}/directory/${initialMeta.slug}`);
+            : `${SITE_URL}/unison-directory/${initialMeta.slug}`);
         if (full) setPub({ url: full });
         return;
       }

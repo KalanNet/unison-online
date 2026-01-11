@@ -121,7 +121,6 @@ export async function POST(req: NextRequest) {
     if (!slug) return err("Missing slug", 422);
 
     // 3) Метадані оголошення з КІЛЬКОХ можливих імен полів
-    //    (щоб працювало незалежно від того, як названі інпути на формі)
     let label =
       readField(form, ["label", "name", "title", "ad_label", "ads[label]", "adsLabel", "ads_label"]) ||
       null;
@@ -139,8 +138,8 @@ export async function POST(req: NextRequest) {
     if (href  == null && jsonMeta.href  != null) href  = jsonMeta.href;
     if (seq   == null && jsonMeta.seq   != null) seq   = jsonMeta.seq;
 
-    // 4) Шлях у R2: directory/<slug>/ads/<ім'я>
-    const dir = `directory/${encodeURIComponent(slug)}/ads`;
+    // 4) Шлях у R2: unison-directory/<slug>/ads/<ім'я> (ЗМІНЕНО)
+    const dir = `unison-directory/${encodeURIComponent(slug)}/ads`;
     const key = joinKey(dir, safeName("ad", image.name || image.type));
 
     // 5) Запис у R2
