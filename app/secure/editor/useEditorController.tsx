@@ -520,7 +520,6 @@ function warmPagesAround(idx0: number) {
   // допоміжний пошук по конкретному терміну (точний includes)
   // допоміжний пошук по конкретному терміну (точний includes)
   // допоміжний пошук по конкретному терміну (точний includes)
-  // допоміжний пошук по конкретному терміну (точний includes)
   async function runExactSearch(
     term: string
   ): Promise<{ hits: SearchHit[]; map: Map<number, HighlightBox[]> }> {
@@ -548,20 +547,16 @@ function warmPagesAround(idx0: number) {
 
           const hitIndex = nextHits.length;
 
-          // --- FIX FOR CANVA PDFS (Aggressive V3) ---
-          // Проблема: малі шрифти дають малий зсув у пікселях при % розрахунку.
-          // Рішення: дуже сильний зсув вниз (65% від висоти) і зменшення висоти самого боксу.
+          // --- FIX FOR CANVA PDFS (V2 - Stronger adjustment) ---
+          // 1. Зсуваємо початок хайлайту вниз значно сильніше (майже 40% висоти)
+          const offsetY = h * 0.80; 
           
-          // 1. Зсуваємо вниз на 65% висоти літери. 
-          // Якщо шрифт 12px, це буде ~8px вниз (помітно).
-          const offsetY = h * 0.65; 
-          
-          // 2. Висота хайлайту = 75% від оригіналу, щоб не наїжджати на рядок знизу
-          const adjustedH = h * 0.75;
+          // 2. Зменшуємо висоту до 80%, щоб компенсувати зсув і не зачіпати нижні рядки
+          const adjustedH = h * 0.90;
 
           // top у пікселях від ВЕРХУ сторінки viewport:
-          // vp.height - (yBaseline + h) = це математичний ВЕРХ тексту.
-          // Додаємо offsetY, щоб "притиснути" хайлайт вниз.
+          // Стандартна формула: vp.height - (yBaseline + h)
+          // Додаємо offsetY, щоб "притиснути" хайлайт до тексту
           const yTopCssPx = vp.height - (yBaseline + h) + offsetY;
 
           // нормалізований бокс для нашого оверлею
