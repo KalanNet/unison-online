@@ -518,6 +518,7 @@ function warmPagesAround(idx0: number) {
   }
 
   // допоміжний пошук по конкретному терміну (точний includes)
+  // допоміжний пошук по конкретному терміну (точний includes)
   async function runExactSearch(
     term: string
   ): Promise<{ hits: SearchHit[]; map: Map<number, HighlightBox[]> }> {
@@ -531,9 +532,11 @@ function warmPagesAround(idx0: number) {
       const page = await pdfDoc.getPage(p);
       const vp = page.getViewport({ scale: 1 });
       const text = await page.getTextContent();
+      
       for (const item of text.items as any[]) {
         const str: string = item.str ?? "";
         if (!str) continue;
+        
         if (str.toLowerCase().includes(ql)) {
           const tr = item.transform as number[];
           const x = tr[4]; // ліва межа
@@ -543,11 +546,14 @@ function warmPagesAround(idx0: number) {
 
           const hitIndex = nextHits.length;
 
-          // top у пікселях від ВЕРХУ сторінки viewport:
-          const yTopCssPx = vp.height - (yBaseline + h);
+          // --- FIX FOR CANVA PDFS ---
+          const offsetY = h * 0.20; 
+          // 2. Трохи підрізаємо загальну висоту хайлайту (наприклад до 90%), щоб він не був занадто великим
+          const adjustedH = h * 0.90;
 
-          // нормалізований бокс для нашого оверлею
-          const box = normBox(x, yTopCssPx, w, h, vp.width, vp.height);
+          const yTopCssPx = vp.height - (yBaseline + h) + offsetY;
+
+          const box = normBox(x, yTopCssPx, w, adjustedH, vp.width, vp.height);
 
           const hit: SearchHit = {
             id: genId(),
