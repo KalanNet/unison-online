@@ -141,7 +141,7 @@ export default function LeftRailPanel({ autoCollapsed, items }: LeftRailProps) {
           left: 0;
           top: var(--hdr, 56px);
           bottom: var(--ftr, 64px);
-          width: 400px;
+          width: 360px;
           background: linear-gradient(180deg, #23272f, #171a20);
           padding: 18px 14px;
           z-index: 1050;
