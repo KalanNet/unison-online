@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
     const finalSlug = slugify(rawSlug || titleForSlug);
     if (!/^[a-z0-9-]+$/.test(finalSlug)) return err("Invalid slug", 422);
 
-    const basePrefix = `directory/${finalSlug}`;
+    // ВИПРАВЛЕНО: directory -> unison-directory
+    const basePrefix = `unison-directory/${finalSlug}`;
     const metaJsonKey = `${basePrefix}/meta.json`;
 
     let featuredPublicUrl = meta?.featuredUrl || null;
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
       }),
     );
 
-    /* --- оновити directory/index.json (Edge-safe) --- */
+    /* --- оновити unison-directory/index.json (через виклик list-published API) --- */
     try {
       const origin = new URL(req.url).origin;
       await fetch(`${origin}/api/list-published`, {
@@ -210,7 +211,6 @@ export async function POST(req: NextRequest) {
           file: metaPayload.file,
           publishedAt: metaPayload.publishedAt,
           bookmarks: metaPayload.bookmarks,
-          // prev можна додати у майбутньому для точнішого diff закладок
         }),
       }).catch(() => null);
     } catch {

@@ -184,7 +184,7 @@ export default async function Page({
         />
       );
     }
-    const ClientFallback = (await import("app/(public)/directory/[slug]/ClientFallback")).default;
+    const ClientFallback = (await import("app/(public)/unison-directory/[slug]/ClientFallback")).default;
     return <ClientFallback />;
   }
 

@@ -1,3 +1,4 @@
+// app/(public)/unison-directory/[slug]/ClientFallback.tsx
 "use client";
 
 import * as React from "react";
@@ -94,7 +95,7 @@ function sanitizeContent(input: unknown): TocItem[] {
     return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
   });
 
-  // унікалізуємо id (на випадок дублів у джерелі)
+  // унікалізація id
   const seen = new Set<string>();
   for (let i = 0; i < out.length; i++) {
     let id = out[i].id;
@@ -115,7 +116,8 @@ export default function ClientFallback() {
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  const slug = React.useMemo(() => pathname?.match(/\/directory\/([^/?#]+)/i)?.[1] ?? null, [pathname]);
+  // ВИПРАВЛЕНО: тепер шукаємо unison-directory
+  const slug = React.useMemo(() => pathname?.match(/\/unison-directory\/([^/?#]+)/i)?.[1] ?? null, [pathname]);
   const fileOverride = React.useMemo(() => sp.get("file") ?? undefined, [sp]);
 
   const [state, setState] = React.useState<{
@@ -129,7 +131,8 @@ export default function ClientFallback() {
 
   React.useEffect(() => {
     if (!slug) {
-      setState((s) => ({ ...s, error: "Missing slug in /directory/[slug]." }));
+      // Тут можна або показати помилку, або нічого не робити, якщо це просто перехід
+      // setState((s) => ({ ...s, error: "Missing slug in /unison-directory/[slug]." }));
       return;
     }
 
@@ -139,6 +142,7 @@ export default function ClientFallback() {
 
     (async () => {
       try {
+        // API шлях залишається старим (/api/directory/...), це нормально
         const res = await fetch(`/api/directory/${encodeURIComponent(slug)}`, {
           cache: "no-store",
           signal: ctrl.signal,

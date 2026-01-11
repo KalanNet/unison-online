@@ -1,10 +1,11 @@
+// app/api/directory/[slug]/content/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-/* ---------- R2 config (ідентично до meta/upload-featured) ---------- */
+/* ---------- R2 config ---------- */
 const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://cdn.unisonalberta.online";
 const R2_BUCKET = process.env.R2_BUCKET || "unison-catalog";
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -24,8 +25,9 @@ type TocItem = { id: string; label: string; page: number; isSection?: boolean };
 const ok  = (data: unknown, code = 200) => NextResponse.json(data, { status: code });
 const err = (error: string, code = 400) => NextResponse.json({ error }, { status: code });
 
+// ВИПРАВЛЕНО: directory -> unison-directory
 function keyOf(slug: string) {
-  return `directory/${encodeURIComponent(slug)}/content.json`;
+  return `unison-directory/${encodeURIComponent(slug)}/content.json`;
 }
 
 async function readPrevContent(slug: string): Promise<TocItem[] | null> {
@@ -57,12 +59,11 @@ function sanitizeContent(input: unknown): TocItem[] {
     if (id && label) out.push({ id, label, page, isSection });
   }
 
-  // стабільний порядок
   out.sort((a, b) => (a.page - b.page) || a.label.localeCompare(b.label));
   return out;
 }
 
-/* ---------- GET: віддати content.json ---------- */
+/* ---------- GET ---------- */
 export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ slug: string }> }
@@ -75,7 +76,6 @@ export async function GET(
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) return err("Not found", 404);
 
-    // повертаємо як є, але через санітизацію не зашкодить
     const data = await r.json().catch(() => []);
     return ok(sanitizeContent(data), 200);
   } catch (e: any) {
@@ -83,7 +83,7 @@ export async function GET(
   }
 }
 
-/* ---------- POST: створити/оновити content.json ---------- */
+/* ---------- POST ---------- */
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ slug: string }> }
@@ -93,8 +93,6 @@ export async function POST(
 
   try {
     const body = (await req.json().catch(() => null)) as unknown;
-
-    // Якщо body не передали — візьмемо попередній файл (no-op)
     const prev = (await readPrevContent(slug)) ?? [];
 
     const items =

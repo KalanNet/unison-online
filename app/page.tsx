@@ -53,7 +53,7 @@ export default function Home() {
       {
         "@type": "Organization",
         name: "Unison Alberta Directory",
-        url: "https://unisonalberta.online/directory/2025",
+        url: "https://unisonalberta.online/unison-directory/services-and-housing",
       },
     ],
   };
