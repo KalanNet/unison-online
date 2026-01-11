@@ -224,8 +224,8 @@ export async function POST(req: NextRequest) {
         metaJsonUrl: `${R2_PUBLIC_URL}/${metaJsonKey}`,
         featuredUrl: featuredPublicUrl,
       },
-      urlPath: `/directory/${finalSlug}`,
-      publicUrl: `${SITE_URL}/directory/${finalSlug}`,
+      urlPath: `/unison-directory/${finalSlug}`,
+      publicUrl: `${SITE_URL}/unison-directory/${finalSlug}`,
     });
   } catch (e: any) {
     return err(String(e?.message || e), 500);

@@ -30,7 +30,7 @@ const R2_PUBLIC =
 async function fetchDirectorySlugs(): Promise<
   { slug: string; lastModified?: string | Date }[]
 > {
-  const INDEX_URL = `${R2_PUBLIC}/directory/index.json`;
+  const INDEX_URL = `${R2_PUBLIC}/unison-directory/index.json`;
 
   const r = await fetch(INDEX_URL, {
     next: { revalidate: SITEMAP_REVALIDATE },
@@ -121,7 +121,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const entries = await fetchDirectorySlugs();
 
     for (const { slug, lastModified } of entries) {
-      const url = `${SITE}/directory/${encodeURIComponent(slug)}`;
+      const url = `${SITE}/uniso-directory/${encodeURIComponent(slug)}`;
       items.push({
         url,
         changeFrequency: "weekly",

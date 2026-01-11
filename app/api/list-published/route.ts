@@ -49,7 +49,7 @@ type IndexItem = {
 
 type IndexJson = { generatedAt: string; items: IndexItem[] };
 
-const INDEX_KEY = "directory/index.json";
+const INDEX_KEY = "unison-directory/index.json";
 
 /* ---------- helpers ---------- */
 const ok  = (data: unknown, code = 200) => NextResponse.json(data, { status: code });
@@ -106,7 +106,7 @@ function bookmarksChanged(
 function buildLinks(index: IndexJson, base: string) {
   const b = base.replace(/\/+$/g, "");
   return index.items
-    .map((it) => `${b}${it.urlPath || `/directory/${encodeURIComponent(it.slug)}`}`)
+    .map((it) => `${b}${it.urlPath || `/unison-directory/${encodeURIComponent(it.slug)}`}`)
     .sort((a, c) => a.localeCompare(c));
 }
 
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
         title: nextTitle,
         description: nextDesc,
         featuredUrl: nextFeatured ?? null,
-        urlPath: `/directory/${slug}`,
+        urlPath: `/unison-directory/${slug}`,
         file: nextFile,
         publishedAt,
         updatedAt: now,
