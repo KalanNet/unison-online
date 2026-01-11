@@ -73,19 +73,28 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
       return;
     }
 
+    // ВИПРАВЛЕНО: шукаємо 'unison-directory' замість 'directory'
     const m = typeof window !== "undefined"
-      ? window.location.pathname.match(/\/directory\/([^/?#]+)/i)
+      ? window.location.pathname.match(/\/unison-directory\/([^/?#]+)/i)
       : null;
     const slug = m?.[1];
-    if (!slug) return;
+    
+    // Якщо не знайшли в URL, пробуємо fallback для редактора (де slug в query params)
+    const querySlug = typeof window !== "undefined" 
+      ? new URLSearchParams(window.location.search).get("slug") 
+      : null;
+
+    const finalSlug = slug || querySlug;
+
+    if (!finalSlug) return;
 
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
 
-        // 1) /api/directory/[slug]/content
-        const try1 = await fetch(`/api/directory/${encodeURIComponent(slug)}/content`, { cache: "no-store" });
+        // 1) /api/directory/[slug]/content (API шлях не змінювався)
+        const try1 = await fetch(`/api/directory/${encodeURIComponent(finalSlug)}/content`, { cache: "no-store" });
         if (!cancelled && try1.ok) {
           const data = await try1.json();
           const list = sanitizeContent((data as any) ?? (data as any)?.items);
@@ -96,7 +105,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         }
 
         // 2) /api/directory/[slug]?fields=content
-        const try2 = await fetch(`/api/directory/${encodeURIComponent(slug)}?fields=content`, { cache: "no-store" });
+        const try2 = await fetch(`/api/directory/${encodeURIComponent(finalSlug)}?fields=content`, { cache: "no-store" });
         if (!cancelled && try2.ok) {
           const data = await try2.json();
           const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
@@ -108,7 +117,7 @@ export default function RightContentPanel({ autoCollapsed, items, onGotoPage }: 
         }
 
         // 3) /api/directory/[slug] (повний мета-ендпоінт)
-        const try3 = await fetch(`/api/directory/${encodeURIComponent(slug)}`, { cache: "no-store" });
+        const try3 = await fetch(`/api/directory/${encodeURIComponent(finalSlug)}`, { cache: "no-store" });
         if (!cancelled && try3.ok) {
           const data = await try3.json();
           const raw  = (data as any)?.content ?? (data as any)?.toc ?? (data as any)?.tableOfContents;
