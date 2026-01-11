@@ -552,7 +552,7 @@ function warmPagesAround(idx0: number) {
           const offsetY = h * 1.00; 
           
           // 2. Зменшуємо висоту до 80%, щоб компенсувати зсув і не зачіпати нижні рядки
-          const adjustedH = h * 0.95;
+          const adjustedH = h * 0.50;
 
           // top у пікселях від ВЕРХУ сторінки viewport:
           // Стандартна формула: vp.height - (yBaseline + h)
