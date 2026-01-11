@@ -191,7 +191,7 @@ export default function Home() {
               Southern Alberta.
             </p>
 
-            {/* Використовуємо один блок для суцільного шейпа */}
+            {/* Використовуємо один блок для test суцільного шейпа */}
             <div className="cards-dark" style={{ display: "block" }}>
               <a
                 href="https://unisonalberta.online/unison-directory/services-and-housing"

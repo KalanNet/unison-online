@@ -71,7 +71,7 @@ export const viewport: Viewport = {
   ],
 };
 
-/* ---------- Root Layout ---------- */
+/* ---------- Root Layout test ---------- */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
