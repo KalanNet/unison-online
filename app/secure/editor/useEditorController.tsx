@@ -549,7 +549,7 @@ function warmPagesAround(idx0: number) {
 
           // --- FIX FOR CANVA PDFS (V2 - Stronger adjustment) ---
           // 1. Зсуваємо початок хайлайту вниз значно сильніше (майже 40% висоти)
-          const offsetY = h * 1.05; 
+          const offsetY = h * 1.00; 
           
           // 2. Зменшуємо висоту до 80%, щоб компенсувати зсув і не зачіпати нижні рядки
           const adjustedH = h * 1.20;
