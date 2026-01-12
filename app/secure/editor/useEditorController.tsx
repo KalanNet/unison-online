@@ -26,14 +26,12 @@ type PDFDocumentProxy = import("pdfjs-dist").PDFDocumentProxy;
 export type SearchBox = { x: number; y: number; w: number; h: number };
 export type SearchHit = { id: string; page: number; box: SearchBox; snippet: string };
 
-// ↓↓↓ ДОДАЙ ОЦЕ
 export type TocItem = {
   id: string;
   label: string;
   page: number;
   isSection?: boolean;
 };
-// ↑↑↑ ДОДАЙ ОЦЕ
 
 // ——— TOC label helpers (зберігаємо пробіли) ———
 function normalizeLabel(raw: string): string {
@@ -209,90 +207,103 @@ export function useViewerController({
 
 
 
-  /* ---------- глобальна висота + fullscreen ---------- */
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const cls = "viewer-hide-global-footer";
-    document.documentElement.classList.add(cls);
+  /* ---------- глобальна висота + fullscreen ---------- */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const cls = "viewer-hide-global-footer";
+    document.documentElement.classList.add(cls);
 
 
-    const setAppH = () => {
-      const h = window.visualViewport?.height || window.innerHeight;
-      document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
-    };
-    setAppH();
+    const setAppH = () => {
+      const h = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
+    };
+    setAppH();
 
 
-    const schedule = () => {
-      setAppH();
-      try { bookRef.current?.pageFlip?.().update(); } catch {}
-      void calcFitScale(); setTimeout(() => void calcFitScale(), 80);
-    };
+    const schedule = () => {
+      setAppH();
+      try { bookRef.current?.pageFlip?.().update(); } catch {}
+      void calcFitScale(); setTimeout(() => void calcFitScale(), 80);
+    };
 
 
-    window.addEventListener("resize", schedule, { passive: true });
-    if (window.visualViewport) window.visualViewport.addEventListener("resize", schedule as any, { passive: true } as any);
-    const onFsChange = () => setIsFs(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFsChange);
+    window.addEventListener("resize", schedule, { passive: true });
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", schedule as any, { passive: true } as any);
+    const onFsChange = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
 
 
-    return () => {
-      document.documentElement.classList.remove(cls);
-      window.removeEventListener("resize", schedule);
-      if (window.visualViewport) window.visualViewport.removeEventListener("resize", schedule as any);
-      document.removeEventListener("fullscreenchange", onFsChange);
-    };
-  }, []);
+    return () => {
+      document.documentElement.classList.remove(cls);
+      window.removeEventListener("resize", schedule);
+      if (window.visualViewport) window.visualViewport.removeEventListener("resize", schedule as any);
+      document.removeEventListener("fullscreenchange", onFsChange);
+    };
+  }, []);
 
 
-  /* ---------- fit scale ---------- */
-  async function calcFitScale() {
-    if (!pdfDoc || !stageRef.current) return;
-    const page = await pdfDoc.getPage(1);
-    const rotation = page.rotate || 0;
-    const vp = page.getViewport({ scale: 1, rotation });
+  /* ---------- fit scale ---------- */
+  async function calcFitScale() {
+    if (!pdfDoc || !stageRef.current) return;
+    const page = await pdfDoc.getPage(1);
+    const rotation = page.rotate || 0;
+    const vp = page.getViewport({ scale: 1, rotation });
 
 
-    const rect = stageRef.current.getBoundingClientRect();
-    const pad = 16;
-    const availW = Math.max(0, rect.width - pad * 2);
-    const availH = Math.max(0, rect.height - pad * 2);
+    const rect = stageRef.current.getBoundingClientRect();
+    
+    // FIX 1: Збільшено pad з 16 до 60, щоб врахувати бокові "рейки" (закладки)
+    // CSS має var(--rail) ~48px. 60px — це безпечний запас.
+    const pad = 60; 
+    
+    const availW = Math.max(0, rect.width - pad * 2);
+    const availH = Math.max(0, rect.height - pad * 2);
 
 
-    const gap = single ? 0 : 12;
-    const neededW = single ? vp.width : vp.width * 2 + gap;
+    const gap = single ? 0 : 12;
+    const neededW = single ? vp.width : vp.width * 2 + gap;
 
 
-    const sW = availW / neededW;
-    const sH = availH / vp.height;
-    setFitScale(Math.max(0.1, Math.min(sW, sH)));
+    const sW = availW / neededW;
+    const sH = availH / vp.height;
+    
+    // Встановлюємо масштаб, але НЕ викликаємо update() тут синхронно
+    setFitScale(Math.max(0.1, Math.min(sW, sH)));
+  }
+
+  // FIX 2: Окремий ефект для оновлення фліпбука ПІСЛЯ зміни масштабу
+  useEffect(() => {
+    if (!bookRef.current) return;
+    // Невелика затримка (50мс), щоб дати React час оновити ширину/висоту в DOM
+    const t = setTimeout(() => {
+      try { bookRef.current?.pageFlip?.().update(); } catch {}
+    }, 50);
+    return () => clearTimeout(t);
+  }, [fitScale, single]); // Перераховуємо при зміні масштабу або режиму сторінки
 
 
-    try { bookRef.current?.pageFlip?.().update(); } catch {}
-  }
+  useEffect(() => {
+    if (!pdfDoc || !stageRef.current) return;
+    let raf = 0;
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { void calcFitScale(); setTimeout(() => void calcFitScale(), 120); });
+    };
+    const roStage = new ResizeObserver(schedule); roStage.observe(stageRef.current);
+    const roHeader = localHeaderRef.current ? new ResizeObserver(schedule) : null; roHeader?.observe(localHeaderRef.current!);
+    const roToolbar = toolbarRef.current ? new ResizeObserver(schedule) : null; roToolbar?.observe(toolbarRef.current!);
+    const roBody = new ResizeObserver(schedule); roBody.observe(document.body);
+    window.addEventListener("orientationchange", schedule, { passive: true });
 
 
-  useEffect(() => {
-    if (!pdfDoc || !stageRef.current) return;
-    let raf = 0;
-    const schedule = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => { void calcFitScale(); setTimeout(() => void calcFitScale(), 120); });
-    };
-    const roStage = new ResizeObserver(schedule); roStage.observe(stageRef.current);
-    const roHeader = localHeaderRef.current ? new ResizeObserver(schedule) : null; roHeader?.observe(localHeaderRef.current!);
-    const roToolbar = toolbarRef.current ? new ResizeObserver(schedule) : null; roToolbar?.observe(toolbarRef.current!);
-    const roBody = new ResizeObserver(schedule); roBody.observe(document.body);
-    window.addEventListener("orientationchange", schedule, { passive: true });
-
-
-    schedule();
-    return () => {
-      cancelAnimationFrame(raf);
-      roStage.disconnect(); roHeader?.disconnect(); roToolbar?.disconnect(); roBody.disconnect();
-      window.removeEventListener("orientationchange", schedule);
-    };
-  }, [pdfDoc, single, isNarrow]);
+    schedule();
+    return () => {
+      cancelAnimationFrame(raf);
+      roStage.disconnect(); roHeader?.disconnect(); roToolbar?.disconnect(); roBody.disconnect();
+      window.removeEventListener("orientationchange", schedule);
+    };
+  }, [pdfDoc, single, isNarrow]);
 
 
 /* ---------- render page → image ---------- */
@@ -518,8 +529,6 @@ function warmPagesAround(idx0: number) {
   }
 
   // допоміжний пошук по конкретному терміну (точний includes)
-  // допоміжний пошук по конкретному терміну (точний includes)
-  // допоміжний пошук по конкретному терміну (точний includes)
   async function runExactSearch(
     term: string
   ): Promise<{ hits: SearchHit[]; map: Map<number, HighlightBox[]> }> {
@@ -547,16 +556,20 @@ function warmPagesAround(idx0: number) {
 
           const hitIndex = nextHits.length;
 
-          // --- FIX FOR CANVA PDFS (V2 - Stronger adjustment) ---
-          // 1. Зсуваємо початок хайлайту вниз значно сильніше (майже 40% висоти)
-          const offsetY = h * 0.80; 
+          // --- FIX FOR CANVA PDFS (Aggressive V3) ---
+          // Проблема: малі шрифти дають малий зсув у пікселях при % розрахунку.
+          // Рішення: дуже сильний зсув вниз (65% від висоти) і зменшення висоти самого боксу.
           
-          // 2. Зменшуємо висоту до 80%, щоб компенсувати зсув і не зачіпати нижні рядки
-          const adjustedH = h * 1.30;
+          // 1. Зсуваємо вниз на 65% висоти літери. 
+          // Якщо шрифт 12px, це буде ~8px вниз (помітно).
+          const offsetY = h * 0.65; 
+          
+          // 2. Висота хайлайту = 75% від оригіналу, щоб не наїжджати на рядок знизу
+          const adjustedH = h * 0.75;
 
           // top у пікселях від ВЕРХУ сторінки viewport:
-          // Стандартна формула: vp.height - (yBaseline + h)
-          // Додаємо offsetY, щоб "притиснути" хайлайт до тексту
+          // vp.height - (yBaseline + h) = це математичний ВЕРХ тексту.
+          // Додаємо offsetY, щоб "притиснути" хайлайт вниз.
           const yTopCssPx = vp.height - (yBaseline + h) + offsetY;
 
           // нормалізований бокс для нашого оверлею
@@ -799,85 +812,85 @@ function submitJump() {
 
 
 
-  /* ---------- loupe (desktop only) ---------- */
-  const [loupeOn, setLoupeOn] = useState(false);
-  type LoupeState = {
-    visible: boolean; page: number; clientX: number; clientY: number; imgRect: DOMRect | null;
-    contentW: number; contentH: number; offsetX: number; offsetY: number; url: string;
-  };
-  const [loupe, setLoupe] = useState<LoupeState>({
-    visible: false, page: 0, clientX: 0, clientY: 0, imgRect: null, contentW: 0, contentH: 0, offsetX: 0, offsetY: 0, url: "",
-  });
-  const LOUPE_SIZE = 340;
-  const LOUPE_ZOOM = 1.6;
+  /* ---------- loupe (desktop only) ---------- */
+  const [loupeOn, setLoupeOn] = useState(false);
+  type LoupeState = {
+    visible: boolean; page: number; clientX: number; clientY: number; imgRect: DOMRect | null;
+    contentW: number; contentH: number; offsetX: number; offsetY: number; url: string;
+  };
+  const [loupe, setLoupe] = useState<LoupeState>({
+    visible: false, page: 0, clientX: 0, clientY: 0, imgRect: null, contentW: 0, contentH: 0, offsetX: 0, offsetY: 0, url: "",
+  });
+  const LOUPE_SIZE = 340;
+  const LOUPE_ZOOM = 1.6;
 
 
-  function handlePageMouseMove(e: React.MouseEvent<HTMLDivElement>, pageNum: number) {
-    if (!loupeOn || isNarrow) return;
-    const container = e.currentTarget;
-    const imgEl = container.querySelector<HTMLImageElement>("img[data-page-img='true']");
-    if (!imgEl) return;
-    const imgRect = imgEl.getBoundingClientRect();
-    const bmp = cacheRef.current.get(pageNum);
-    if (!bmp) return;
+  function handlePageMouseMove(e: React.MouseEvent<HTMLDivElement>, pageNum: number) {
+    if (!loupeOn || isNarrow) return;
+    const container = e.currentTarget;
+    const imgEl = container.querySelector<HTMLImageElement>("img[data-page-img='true']");
+    if (!imgEl) return;
+    const imgRect = imgEl.getBoundingClientRect();
+    const bmp = cacheRef.current.get(pageNum);
+    if (!bmp) return;
 
 
-    const scale = Math.min(imgRect.width / bmp.w, imgRect.height / bmp.h);
-    const contentW = bmp.w * scale;
-    const contentH = bmp.h * scale;
-    const offsetX = (imgRect.width - contentW) / 2;
-    const offsetY = (imgRect.height - contentH) / 2;
+    const scale = Math.min(imgRect.width / bmp.w, imgRect.height / bmp.h);
+    const contentW = bmp.w * scale;
+    const contentH = bmp.h * scale;
+    const offsetX = (imgRect.width - contentW) / 2;
+    const offsetY = (imgRect.height - contentH) / 2;
 
 
-    const { clientX, clientY } = e;
-    const inBmp =
-      clientX >= imgRect.left + offsetX &&
-      clientX <= imgRect.left + offsetX + contentW &&
-      clientY >= imgRect.top + offsetY &&
-      clientY <= imgRect.top + offsetY + contentH;
+    const { clientX, clientY } = e;
+    const inBmp =
+      clientX >= imgRect.left + offsetX &&
+      clientX <= imgRect.left + offsetX + contentW &&
+      clientY >= imgRect.top + offsetY &&
+      clientY <= imgRect.top + offsetY + contentH;
 
 
-    if (!inBmp) {
-      if (loupe.visible) setLoupe((s) => ({ ...s, visible: false }));
-      return;
-    }
+    if (!inBmp) {
+      if (loupe.visible) setLoupe((s) => ({ ...s, visible: false }));
+      return;
+    }
 
 
-    setLoupe({
-      visible: true,
-      page: pageNum,
-      clientX,
-      clientY,
-      imgRect,
-      contentW,
-      contentH,
-      offsetX,
-      offsetY,
-      url: bmp.url,
-    });
-  }
-  function handlePageMouseLeave() { if (!loupeOn) return; setLoupe((s) => ({ ...s, visible: false })); }
+    setLoupe({
+      visible: true,
+      page: pageNum,
+      clientX,
+      clientY,
+      imgRect,
+      contentW,
+      contentH,
+      offsetX,
+      offsetY,
+      url: bmp.url,
+    });
+  }
+  function handlePageMouseLeave() { if (!loupeOn) return; setLoupe((s) => ({ ...s, visible: false })); }
 
 
-  /* ---------- fullscreen (desktop) ---------- */
-  async function toggleFullscreen() {
-    if (isNarrow) return;
-    try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
-    } catch {}
-  }
+  /* ---------- fullscreen (desktop) ---------- */
+  async function toggleFullscreen() {
+    if (isNarrow) return;
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch {}
+  }
 
 
-  /* ---------- share ---------- */
-  async function handleShare() {
-    try {
-      const shareData = { title: title || "Unison Catalog", text: "View this directory", url: window.location.href };
-      // @ts-ignore
-      if (navigator.share) { await navigator.share(shareData); }
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(window.location.href); setShareHint("Link copied"); setTimeout(()=>setShareHint(""), 1500); }
-    } catch {}
-  }
+  /* ---------- share ---------- */
+  async function handleShare() {
+    try {
+      const shareData = { title: title || "Unison Catalog", text: "View this directory", url: window.location.href };
+      // @ts-ignore
+      if (navigator.share) { await navigator.share(shareData); }
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(window.location.href); setShareHint("Link copied"); setTimeout(()=>setShareHint(""), 1500); }
+    } catch {}
+  }
 
 
 /* ---------- bookmarks & meta ---------- */
@@ -895,24 +908,24 @@ const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 const [ads, setAds] = useState<AdSlot[]>([]);
 
 const [meta, setMetaState] = useState<{
-  title: string;
-  description: string;
-  slug?: string;                 // ← додано
-  featuredUrl?: string | null;
+  title: string;
+  description: string;
+  slug?: string;                 // ← додано
+  featuredUrl?: string | null;
 }>({
-  title: (title || "").trim(),
-  description: "",
-  slug: "",                      // ← додано
-  featuredUrl: null,
+  title: (title || "").trim(),
+  description: "",
+  slug: "",                      // ← додано
+  featuredUrl: null,
 });
 
 
 // helpers
 function setMeta(next: Partial<typeof meta>) {
-  setMetaState((m) => ({ ...m, ...next }));
+  setMetaState((m) => ({ ...m, ...next }));
 }
 function setFeatured(url?: string | null) {
-  setMetaState((m) => ({ ...m, featuredUrl: url ?? null }));
+  setMetaState((m) => ({ ...m, featuredUrl: url ?? null }));
 }
 
 function addAdSlot(input: { imageUrl: string; href?: string | null; label?: string | null }) {
@@ -931,58 +944,58 @@ function removeAdSlot(id: string) {
 
 
 function addBookmark(
-  arg?: number | { page?: number; label?: string; color?: string | null },
-  labelMaybe?: string
+  arg?: number | { page?: number; label?: string; color?: string | null },
+  labelMaybe?: string
 ) {
-  const fromObj = typeof arg === "object" && arg !== null ? arg : undefined;
-  const pageRaw =
-    typeof arg === "number" ? arg :
-    fromObj?.page ?? (currentIndex + 1);
+  const fromObj = typeof arg === "object" && arg !== null ? arg : undefined;
+  const pageRaw =
+    typeof arg === "number" ? arg :
+    fromObj?.page ?? (currentIndex + 1);
 
 
-  const safePage = pdfDoc
-    ? Math.max(1, Math.min(pdfDoc.numPages, Number(pageRaw) || 1))
-    : Number(pageRaw) || 1;
+  const safePage = pdfDoc
+    ? Math.max(1, Math.min(pdfDoc.numPages, Number(pageRaw) || 1))
+    : Number(pageRaw) || 1;
 
 
-  const label =
-    (typeof arg === "number" ? labelMaybe : fromObj?.label) ||
-    `Page ${safePage}`;
+  const label =
+    (typeof arg === "number" ? labelMaybe : fromObj?.label) ||
+    `Page ${safePage}`;
 
 
-  const color =
-    (typeof arg === "object" ? arg?.color : undefined) ?? null;
+  const color =
+    (typeof arg === "object" ? arg?.color : undefined) ?? null;
 
 
-  setBookmarks((list) => [
-    ...list,
-    { id: genId(), page: safePage, label: String(label).trim(), color },
-  ]);
+  setBookmarks((list) => [
+    ...list,
+    { id: genId(), page: safePage, label: String(label).trim(), color },
+  ]);
 }
 
 
 function updateBookmark(id: string, patch: Partial<Bookmark>) {
-  setBookmarks((list) =>
-    list.map((b) => {
-      if (b.id !== id) return b;
-      const next: Bookmark = { ...b, ...patch };
-      if (patch.page != null && pdfDoc) {
-        next.page = Math.max(1, Math.min(pdfDoc.numPages, Number(patch.page) || b.page));
-      }
-      return next;
-    })
-  );
+  setBookmarks((list) =>
+    list.map((b) => {
+      if (b.id !== id) return b;
+      const next: Bookmark = { ...b, ...patch };
+      if (patch.page != null && pdfDoc) {
+        next.page = Math.max(1, Math.min(pdfDoc.numPages, Number(patch.page) || b.page));
+      }
+      return next;
+    })
+  );
 }
 
 
 function removeBookmark(id: string) {
-  setBookmarks((list) => list.filter((b) => b.id !== id));
+  setBookmarks((list) => list.filter((b) => b.id !== id));
 }
 
 
 function goToBookmark(id: string) {
-  const b = bookmarks.find((x) => x.id === id);
-  if (b) goToPage(b.page);
+  const b = bookmarks.find((x) => x.id === id);
+  if (b) goToPage(b.page);
 }
 
 
@@ -1085,12 +1098,12 @@ useEffect(() => { void loadTocBySlug(meta?.slug); }, [meta?.slug, pdfDoc]);
 
 /* ---------- publish: meta + bookmarks ---------- */
 async function publishMetaAndBookmarks(): Promise<{
-  slug?: string;
-  urlPath?: string;
-  publicUrl?: string;
-  metaJsonUrl?: string;
+  slug?: string;
+  urlPath?: string;
+  publicUrl?: string;
+  metaJsonUrl?: string;
 }> {
-  // готуємо тіло запиту — як і раніше, але тепер чекаємо відповідь
+  // готуємо тіло запиту — як і раніше, але тепер чекаємо відповідь
   const payload = {
     file,
     meta: {
@@ -1119,89 +1132,89 @@ async function publishMetaAndBookmarks(): Promise<{
 
 
 
-  const res = await fetch("/api/publish", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const res = await fetch("/api/publish", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
 
-  const out = await res.json().catch(() => ({} as any));
-  if (!res.ok) throw new Error(out?.error || "Publish failed");
+  const out = await res.json().catch(() => ({} as any));
+  if (!res.ok) throw new Error(out?.error || "Publish failed");
 
 
-  // намагаємось дістати slug/url із відповіді API
-  const slugFromApi: string | undefined = out?.stored?.slug || out?.slug || payload.meta.slug;
-  const urlPath: string | undefined =
-  out?.urlPath || (slugFromApi ? `/unison-directory/${slugFromApi}` : undefined);
+  // намагаємось дістати slug/url із відповіді API
+  const slugFromApi: string | undefined = out?.stored?.slug || out?.slug || payload.meta.slug;
+  const urlPath: string | undefined =
+    out?.urlPath || (slugFromApi ? `/unison-directory/${slugFromApi}` : undefined);
 
 
-  const publicUrl =
-    typeof window !== "undefined" && urlPath
-      ? new URL(urlPath, window.location.origin).href
-      : undefined;
+  const publicUrl =
+    typeof window !== "undefined" && urlPath
+      ? new URL(urlPath, window.location.origin).href
+      : undefined;
 
 
-  // невеликий "хінт", як і раніше
-  setShareHint("Published");
-  setTimeout(() => setShareHint(""), 1800);
+  // невеликий "хінт", як і раніше
+  setShareHint("Published");
+  setTimeout(() => setShareHint(""), 1800);
 
 
-  return { slug: slugFromApi, urlPath, publicUrl, metaJsonUrl: out?.metaJsonUrl };
+  return { slug: slugFromApi, urlPath, publicUrl, metaJsonUrl: out?.metaJsonUrl };
 }
 
 
 
 
-  /* ---------- derived ---------- */
-  const totalPages = pdfDoc?.numPages ?? 0;
-  const baseSize = useMemo(() => ({ w: pageW, h: pageH }), [pageW, pageH]);
+  /* ---------- derived ---------- */
+  const totalPages = pdfDoc?.numPages ?? 0;
+  const baseSize = useMemo(() => ({ w: pageW, h: pageH }), [pageW, pageH]);
 
 
-  /* ---------- глобальні стилі (оригінал) ---------- */
-  const globalCss = `
-    :root{ --app-h: 100dvh; }
-    .viewer-root{ height: var(--app-h); background:#21353a; }
-    .viewer-hide-global-footer body > footer, .viewer-hide-global-footer .site-footer { display:none !important; }
-    .local-header{ border-bottom:1px solid #e9ede3; background:#fafbf8; padding:8px 0; }
-    .lh-title{ font-weight:900; color:#2d3018; font-size:16px; letter-spacing:.2px; }
-    .lh-search{ display:flex; align-items:center; gap:8px; margin-left:12px; }
-    .lh-inp{ width:16rem; background:#fff; border:1px solid #e7ebdf; border-radius:.7rem; padding:.45rem .65rem; color:#2d3018; }
-    .lh-btn{ background:#fff; color:#2d3018; border:1px solid #e7ebdf; padding:.45rem .7rem; border-radius:.7rem; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.06); }
-    .lh-actions{ display:flex; align-items:center; gap:8px; }
-    .lh-iconbtn{ background:#fff; border:1px solid #e7ebdf; border-radius:.65rem; padding:.42rem .6rem; line-height:0; display:inline-grid; place-items:center; color:#2d3018; box-shadow:0 4px 12px rgba(0,0,0,.06); }
-    .lh-hint{ font-size:12px; color:#2d3018; opacity:.8; margin-left:4px; }
+  /* ---------- глобальні стилі (оригінал) ---------- */
+  const globalCss = `
+    :root{ --app-h: 100dvh; }
+    .viewer-root{ height: var(--app-h); background:#21353a; }
+    .viewer-hide-global-footer body > footer, .viewer-hide-global-footer .site-footer { display:none !important; }
+    .local-header{ border-bottom:1px solid #e9ede3; background:#fafbf8; padding:8px 0; }
+    .lh-title{ font-weight:900; color:#2d3018; font-size:16px; letter-spacing:.2px; }
+    .lh-search{ display:flex; align-items:center; gap:8px; margin-left:12px; }
+    .lh-inp{ width:16rem; background:#fff; border:1px solid #e7ebdf; border-radius:.7rem; padding:.45rem .65rem; color:#2d3018; }
+    .lh-btn{ background:#fff; color:#2d3018; border:1px solid #e7ebdf; padding:.45rem .7rem; border-radius:.7rem; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.06); }
+    .lh-actions{ display:flex; align-items:center; gap:8px; }
+    .lh-iconbtn{ background:#fff; border:1px solid #e7ebdf; border-radius:.65rem; padding:.42rem .6rem; line-height:0; display:inline-grid; place-items:center; color:#2d3018; box-shadow:0 4px 12px rgba(0,0,0,.06); }
+    .lh-hint{ font-size:12px; color:#2d3018; opacity:.8; margin-left:4px; }
 
 
-    .viewer-toolbar{ background:#ffffffef; backdrop-filter: blur(6px); border-top:1px solid #ecefe7; }
-    .toolbar-inner{ max-width:980px; margin:0 auto; display:flex; gap:.5rem; align-items:center; justify-content:center; padding:8px 12px; overflow-x:auto; }
-    .toolbtn{ height:36px; min-width:36px; padding:0 .5rem; display:inline-grid; place-items:center; border:1px solid #e6eadf; background:#fff; color:#2d3018; border-radius:.65rem; box-shadow:0 4px 12px rgba(0,0,0,.06); }
-    .toolbtn.slim{ min-width:32px; height:32px; }
-    .toolbtn.disabled{ opacity:.45; cursor:not-allowed; }
-    .toolbtn.active{ outline:2px solid #8ea05a33; }
-
-
-
-
-
-    .page-jump{ display:flex; align-items:center; gap:.4rem; background:#fff; border:1px solid #e7ebdf; border-radius:.8rem; padding:.2rem .35rem; }
-    .jump-inp{ width:72px; text-align:center; font-weight:800; border:1px solid #e7ebdf; border-radius:.5rem; padding:.3rem .35rem; color:#2d3018; height:32px; }
-    .jump-total{ color:#5c6750; }
-
-
-    .panel-title{ color:#e9f0e4; font-weight:800; margin-bottom:.5rem; }
-    .viewer-panel{ background:#fff; box-shadow: inset 0 1px 0 #eef1e8; }
+    .viewer-toolbar{ background:#ffffffef; backdrop-filter: blur(6px); border-top:1px solid #ecefe7; }
+    .toolbar-inner{ max-width:980px; margin:0 auto; display:flex; gap:.5rem; align-items:center; justify-content:center; padding:8px 12px; overflow-x:auto; }
+    .toolbtn{ height:36px; min-width:36px; padding:0 .5rem; display:inline-grid; place-items:center; border:1px solid #e6eadf; background:#fff; color:#2d3018; border-radius:.65rem; box-shadow:0 4px 12px rgba(0,0,0,.06); }
+    .toolbtn.slim{ min-width:32px; height:32px; }
+    .toolbtn.disabled{ opacity:.45; cursor:not-allowed; }
+    .toolbtn.active{ outline:2px solid #8ea05a33; }
 
 
 
-    .portal-loupe{ position: fixed; z-index: 60; border-radius: 999px; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.24), inset 0 0 0 2px rgba(255,255,255,.9); pointer-events: none; background:#fff; contain: layout paint; will-change: transform; transform: translateZ(0); }
 
 
-    @media (max-width: 600px){ .tool-zoom{ display:none !important; } }
+    .page-jump{ display:flex; align-items:center; gap:.4rem; background:#fff; border:1px solid #e7ebdf; border-radius:.8rem; padding:.2rem .35rem; }
+    .jump-inp{ width:72px; text-align:center; font-weight:800; border:1px solid #e7ebdf; border-radius:.5rem; padding:.3rem .35rem; color:#2d3018; height:32px; }
+    .jump-total{ color:#5c6750; }
 
 
-    /* Mobile header on/off (мікростилі є всередині компонентів теж) */
-  `;
+    .panel-title{ color:#e9f0e4; font-weight:800; margin-bottom:.5rem; }
+    .viewer-panel{ background:#fff; box-shadow: inset 0 1px 0 #eef1e8; }
+
+
+
+    .portal-loupe{ position: fixed; z-index: 60; border-radius: 999px; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.24), inset 0 0 0 2px rgba(255,255,255,.9); pointer-events: none; background:#fff; contain: layout paint; will-change: transform; transform: translateZ(0); }
+
+
+    @media (max-width: 600px){ .tool-zoom{ display:none !important; } }
+
+
+    /* Mobile header on/off (мікростилі є всередині компонентів теж) */
+  `;
 
 
   return {
@@ -1269,4 +1282,3 @@ async function publishMetaAndBookmarks(): Promise<{
 
   };
 }
-
