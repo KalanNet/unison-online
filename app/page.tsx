@@ -209,9 +209,9 @@ export default function Home() {
                   Services &amp; Housing Directory
                 </div>
                 <p>
-                  Explore our Interactive Directory Catalogue – a comprehensive
-                  informational resource for older adults, family members, and
-                  agencies regarding housing and services.
+                  Access housing and service information through 
+                  our easy-to-navigate interactive directory catalogue –
+                  a comprehensive resource designed with seniors in mind.
                 </p>
                 <p style={{ marginTop: 12 }}>
                   <span className="link-light">Explore →</span>
