@@ -599,8 +599,8 @@ export default function PublicViewer({
                             // Якщо сторінка справа -> корінець зліва (left: 0)
                             [isLeftPage ? "right" : "left"]: 0,
                             background: isLeftPage
-                              ? "linear-gradient(to left, rgba(0,0,0,0.15) 0%, transparent 100%)"
-                              : "linear-gradient(to right, rgba(0,0,0,0.15) 0%, transparent 100%)",
+                              ? "linear-gradient(to left, rgba(58, 58, 58, 0.15) 0%, transparent 100%)"
+                              : "linear-gradient(to right, rgba(58, 58, 58, 0.15) 0%, transparent 100%)",
                           }}
                         />
                       )}
