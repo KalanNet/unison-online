@@ -21,7 +21,7 @@ type MetaPayload = {
 };
 
 const DEFAULT_OG_IMAGE = "/og-featured-home.jpg";
-const SOCIAL_TITLE_2025 = "Services and Housing Directory 2025";
+const SOCIAL_TITLE_2025 = "Services and Housing Directory 2026";
 const SOCIAL_DESC_2025 =
   "A helpful resource for seniors in Calgary to find Services and Housing all gathered in Directory Catalogue.";
 
