@@ -503,255 +503,268 @@ export default function PublicViewer({
             }}
           >
             <FlipBook
-              ref={ctrl.bookRef}
-              width={ctrl.baseSize.w}
-              height={ctrl.baseSize.h}
-              size="stretch"
-              usePortrait={ctrl.single}
-              showCover={true}
-              flippingTime={900}
-              maxShadowOpacity={0.2}
-              drawShadow
-              mobileScrollSupport
-              disableFlipByClick
-              showHint={false}
-              useMouseEvents={false}
-              clickEventForward
-              startPage={(initPageRef.current ?? 0) as number}
-              onFlip={(e: { data: number }) =>
-                ctrl!.setCurrentIndex(e.data)
-              }
-              style={{
-                width: "100%",
-                height: "100%",
-                minWidth: 0,
-                minHeight: 0,
-                aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
-              }}
-            >
-              {Array.from({ length: ctrl.totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                const bmp = ctrl!.cacheRef.current.get(pageNum);
-                const links:
-                  | Array<{
-                      x: number;
-                      y: number;
-                      w: number;
-                      h: number;
-                      href?: string;
-                      dest?: any;
-                    }>
-                  | [] = (bmp?.links as any) ?? [];
+            ref={ctrl.bookRef}
+            width={ctrl.baseSize.w}
+            height={ctrl.baseSize.h}
+            size="stretch"
+            usePortrait={ctrl.single}
+            showCover={true}
+            flippingTime={900}
+            maxShadowOpacity={0.2}
+            drawShadow
+            mobileScrollSupport
+            disableFlipByClick
+            showHint={false}
+            useMouseEvents={false}
+            clickEventForward
+            startPage={(initPageRef.current ?? 0) as number}
+            onFlip={(e: { data: number }) =>
+              ctrl!.setCurrentIndex(e.data)
+            }
+            style={{
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              aspectRatio: ctrl.baseSize.w / ctrl.baseSize.h,
+            }}
+          >
+            {Array.from({ length: ctrl.totalPages }).map((_, i) => {
+              const pageNum = i + 1;
+              const bmp = ctrl!.cacheRef.current.get(pageNum);
+              const links:
+                | Array<{
+                    x: number;
+                    y: number;
+                    w: number;
+                    h: number;
+                    href?: string;
+                    dest?: any;
+                  }>
+                | [] = (bmp?.links as any) ?? [];
 
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      background: "#fff",
-                      position: "relative",
-                    }}
-                    onMouseMove={(e) =>
-                      ctrl!.handlePageMouseMove(e, pageNum)
-                    }
-                    onMouseLeave={ctrl!.handlePageMouseLeave}
-                  >
-                    {bmp ? (
-                      <>
-                        {/* PAGE IMAGE */}
-                        <img
-                          src={bmp.url}
-                          alt={`p${pageNum}`}
-                          data-page-img="true"
-                          draggable={false}
+              // --- SHADOW LOGIC ---
+              // Непарні (1, 3...) - це ЛІВІ сторінки. Парні (2, 4...) - ПРАВІ.
+              const isLeftPage = i % 2 !== 0;
+              
+              // Показуємо тінь тільки якщо:
+              // 1. Не режим однієї сторінки (!single)
+              // 2. Це не передня обкладинка (i !== 0)
+              // 3. Це не задня обкладинка (i !== last)
+              const showShadow = !ctrl.single && i !== 0 && i !== ctrl.totalPages - 1;
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: "#fff",
+                    position: "relative",
+                  }}
+                  onMouseMove={(e) =>
+                    ctrl!.handlePageMouseMove(e, pageNum)
+                  }
+                  onMouseLeave={ctrl!.handlePageMouseLeave}
+                >
+                  {bmp ? (
+                    <>
+                      {/* PAGE IMAGE */}
+                      <img
+                        src={bmp.url}
+                        alt={`p${pageNum}`}
+                        data-page-img="true"
+                        draggable={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          pointerEvents: "none",
+                          borderRadius: 2,
+                          display: "block",
+                        }}
+                      />
+
+                      {/* === SPINE SHADOW (ТІНЬ КОРІНЦЯ) === */}
+                      {showShadow && (
+                        <div
                           style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "contain",
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            width: "35px", // Ширина градієнта тіні
+                            zIndex: 4,     // Поверх картинки, але під хайлайтами/лінками
                             pointerEvents: "none",
-                            borderRadius: 2,
-                            display: "block",
+                            // Якщо сторінка зліва -> корінець справа (right: 0)
+                            // Якщо сторінка справа -> корінець зліва (left: 0)
+                            [isLeftPage ? "right" : "left"]: 0,
+                            background: isLeftPage
+                              ? "linear-gradient(to left, rgba(0,0,0,0.15) 0%, transparent 100%)"
+                              : "linear-gradient(to right, rgba(0,0,0,0.15) 0%, transparent 100%)",
                           }}
                         />
+                      )}
 
-                        {/* === HIGHLIGHTS LAYER === */}
-                        <div className="hl-layer" aria-hidden>
-                          {(((ctrl as any).pageHighlights?.get?.(
-                            pageNum
-                          )) ?? []
-                          ).map((r: any, j: number) => {
-                            const isActive =
-                              typeof r.hitIndex === "number" &&
-                              r.hitIndex === (ctrl as any).activeHit;
-                            return (
-                              <div
-                                key={j}
-                                className={`hl${
-                                  isActive ? " is-active" : ""
-                                }`}
+                      {/* === HIGHLIGHTS LAYER === */}
+                      <div className="hl-layer" aria-hidden>
+                        {(((ctrl as any).pageHighlights?.get?.(
+                          pageNum
+                        )) ?? []
+                        ).map((r: any, j: number) => {
+                          const isActive =
+                            typeof r.hitIndex === "number" &&
+                            r.hitIndex === (ctrl as any).activeHit;
+                          
+                          // FIX FOR CANVA: offset applied here
+                          const shiftY = r.h * 0.65; 
+                          const shrinkH = 0.75;
+
+                          return (
+                            <div
+                              key={j}
+                              className={`hl${
+                                isActive ? " is-active" : ""
+                              }`}
+                              style={{
+                                position: "absolute",
+                                left: `${r.x * 100}%`,
+                                top: `${(r.y + shiftY) * 100}%`,
+                                width: `${r.w * 100}%`,
+                                height: `${(r.h * shrinkH) * 100}%`,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      {/* === /HIGHLIGHTS LAYER === */}
+
+                      {/* === BOOKMARK TABS === */}
+                      {bmSorted
+                        .filter((b) => b.page === pageNum)
+                        .map((bm) => {
+                          const i = bmIndex.get(bm.id) ?? 0;
+                          const curr = ctrl.currentIndex + 1;
+                          const leftNow = ctrl.single
+                            ? curr
+                            : curr % 2 === 0
+                            ? curr
+                            : curr - 1;
+                          const rightNow = Math.min(leftNow + 1, ctrl.totalPages);
+                          const isCurrentLeft = pageNum === leftNow;
+                          const isCurrentRight = pageNum === rightNow;
+                          const sideIsLeft = ctrl.single
+                            ? bm.page < curr
+                            : bm.page <= leftNow;
+                          const shouldAttach =
+                            (isCurrentLeft && sideIsLeft) ||
+                            (isCurrentRight && !sideIsLeft);
+
+                          if (!shouldAttach) return null;
+                          const ACTIVE_SCALE = 1.14;
+
+                          const style: React.CSSProperties = {
+                            position: "absolute",
+                            zIndex: 300,
+                            top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
+                            width: "var(--tabThickness,36px)",
+                            height: "var(--tabLength,140px)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff",
+                            fontSize: 16,
+                            fontWeight: 500,
+                            lineHeight: 1,
+                            border: "1px solid rgba(0,0,0,.18)",
+                            boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                            opacity: 0.98,
+                            pointerEvents: "auto",
+                            background: bm.color || "#f47e20",
+                            ...(isCurrentLeft
+                              ? {
+                                  left: 0,
+                                  transformOrigin: "right center",
+                                  transform: "translateZ(0.01px) translateX(var(--tabInset,-35px)) scaleX(" + ACTIVE_SCALE + ")",
+                                  borderRadius: "10px 0 0 10px",
+                                }
+                              : {
+                                  right: 0,
+                                  transformOrigin: "left center",
+                                  transform: "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px))) scaleX(" + ACTIVE_SCALE + ")",
+                                  borderRadius: "0 10px 10px 0",
+                                }),
+                          };
+
+                          return (
+                            <button
+                              key={bm.id}
+                              className={`bm-tab ${sideIsLeft ? "left" : "right"} active`}
+                              title={`${bm.label} (p.${bm.page})`}
+                              style={style}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                jumpToPdfPage(bm.page ?? 1);
+                              }}
+                            >
+                              <span className="bm-tab__label">{bm.label}</span>
+                            </button>
+                          );
+                        })}
+
+                      {/* PDF LINKS */}
+                      {links?.length
+                        ? links.map((L, idx) =>
+                            L.href ? (
+                              <a
+                                key={idx}
+                                href={L.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="pdf-link"
                                 style={{
                                   position: "absolute",
-                                  left: `${r.x * 100}%`,
-                                  top: `${r.y * 100}%`,
-                                  width: `${r.w * 100}%`,
-                                  height: `${r.h * 100}%`,
+                                  left: `${L.x * 100}%`,
+                                  top: `${L.y * 100}%`,
+                                  width: `${L.w * 100}%`,
+                                  height: `${L.h * 100}%`,
                                 }}
                               />
-                            );
-                          })}
-                        </div>
-                        {/* === /HIGHLIGHTS LAYER === */}
-
-                        {/* === BOOKMARK TABS (ONLY for current spread pages) === */}
-                        {bmSorted
-                          .filter((b) => b.page === pageNum)
-                          .map((bm) => {
-                            const i = bmIndex.get(bm.id) ?? 0;
-
-                            const curr = ctrl.currentIndex + 1;
-                            const leftNow = ctrl.single
-                              ? curr
-                              : curr % 2 === 0
-                              ? curr
-                              : curr - 1;
-                            const rightNow = Math.min(
-                              leftNow + 1,
-                              ctrl.totalPages
-                            );
-
-                            const isCurrentLeft = pageNum === leftNow;
-                            const isCurrentRight = pageNum === rightNow;
-
-                            const sideIsLeft = ctrl.single
-                              ? bm.page < curr
-                              : bm.page <= leftNow;
-
-                            const shouldAttach =
-                              (isCurrentLeft && sideIsLeft) ||
-                              (isCurrentRight && !sideIsLeft);
-
-                            if (!shouldAttach) return null;
-
-                            const ACTIVE_SCALE = 1.14;
-
-                            const style: React.CSSProperties = {
-                              position: "absolute",
-                              zIndex: 300,
-                              top: `calc(var(--tabTop,36px) + ${i} * var(--tabLength,140px) * var(--bm-step,1))`,
-                              width: "var(--tabThickness,36px)",
-                              height: "var(--tabLength,140px)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              fontSize: 16,
-                              fontWeight: 500,
-                              lineHeight: 1,
-                              border: "1px solid rgba(0,0,0,.18)",
-                              boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                              opacity: 0.98,
-                              pointerEvents: "auto",
-                              background: bm.color || "#f47e20",
-                              ...(isCurrentLeft
-                                ? {
-                                    left: 0,
-                                    transformOrigin: "right center",
-                                    transform:
-                                      "translateZ(0.01px) translateX(var(--tabInset,-35px)) scaleX(" +
-                                      ACTIVE_SCALE +
-                                      ")",
-                                    borderRadius: "10px 0 0 10px",
-                                  }
-                                : {
-                                    right: 0,
-                                    transformOrigin: "left center",
-                                    transform:
-                                      "translateZ(0.01px) translateX(calc(-1 * var(--tabInset,-35px))) scaleX(" +
-                                      ACTIVE_SCALE +
-                                      ")",
-                                    borderRadius: "0 10px 10px 0",
-                                  }),
-                            };
-
-                            return (
+                            ) : (
                               <button
-                                key={bm.id}
-                                className={`bm-tab ${
-                                  sideIsLeft ? "left" : "right"
-                                } active`}
-                                title={`${bm.label} (p.${bm.page})`}
-                                style={style}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  jumpToPdfPage(bm.page ?? 1);
+                                key={idx}
+                                className="pdf-link"
+                                title="Go to"
+                                onClick={() =>
+                                  L.dest ? (ctrl as any).goToDest?.(L.dest) : null
+                                }
+                                style={{
+                                  position: "absolute",
+                                  left: `${L.x * 100}%`,
+                                  top: `${L.y * 100}%`,
+                                  width: `${L.w * 100}%`,
+                                  height: `${L.h * 100}%`,
                                 }}
-                              >
-                                <span className="bm-tab__label">
-                                  {bm.label}
-                                </span>
-                              </button>
-                            );
-                          })}
-
-                        {/* === /BOOKMARK TABS === */}
-
-                        {/* PDF LINKS */}
-                        {links?.length
-                          ? links.map((L, idx) =>
-                              L.href ? (
-                                <a
-                                  key={idx}
-                                  href={L.href}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="pdf-link"
-                                  style={{
-                                    position: "absolute",
-                                    left: `${L.x * 100}%`,
-                                    top: `${L.y * 100}%`,
-                                    width: `${L.w * 100}%`,
-                                    height: `${L.h * 100}%`,
-                                  }}
-                                />
-                              ) : (
-                                <button
-                                  key={idx}
-                                  className="pdf-link"
-                                  title="Go to"
-                                  onClick={() =>
-                                    L.dest
-                                      ? (ctrl as any).goToDest?.(L.dest)
-                                      : null
-                                  }
-                                  style={{
-                                    position: "absolute",
-                                    left: `${L.x * 100}%`,
-                                    top: `${L.y * 100}%`,
-                                    width: `${L.w * 100}%`,
-                                    height: `${L.h * 100}%`,
-                                  }}
-                                />
-                              )
+                              />
                             )
-                          : null}
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          lineHeight: "350px",
-                          color: "#bbb",
-                        }}
-                      >
-                        Page Loading…
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </FlipBook>
+                          )
+                        : null}
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        lineHeight: "350px",
+                        color: "#bbb",
+                      }}
+                    >
+                      Page Loading…
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </FlipBook>
 
             {/* підказка загнутого кутика (правий-нижній) */}
             {ctrl.canNext && <div className="page-curl-hint" aria-hidden />}
