@@ -592,7 +592,7 @@ export default function PublicViewer({
                             position: "absolute",
                             top: 0,
                             bottom: 0,
-                            width: "35px", // Ширина градієнта тіні
+                            width: "25px", // Ширина градієнта тіні
                             zIndex: 4,     // Поверх картинки, але під хайлайтами/лінками
                             pointerEvents: "none",
                             // Якщо сторінка зліва -> корінець справа (right: 0)
