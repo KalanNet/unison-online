@@ -565,7 +565,7 @@ function warmPagesAround(idx0: number) {
           const offsetY = h * 0.80; 
           
           // 2. Висота хайлайту = 75% від оригіналу, щоб не наїжджати на рядок знизу
-          const adjustedH = h * 1.30;
+          const adjustedH = h * 1.00;
 
           // top у пікселях від ВЕРХУ сторінки viewport:
           // vp.height - (yBaseline + h) = це математичний ВЕРХ тексту.
