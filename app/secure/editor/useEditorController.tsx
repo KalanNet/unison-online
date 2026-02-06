@@ -562,7 +562,7 @@ function warmPagesAround(idx0: number) {
           
           // 1. Зсуваємо вниз на 65% висоти літери. 
           // Якщо шрифт 12px, це буде ~8px вниз (помітно).
-          const offsetY = h * 0.80; 
+          const offsetY = h * 0.95; 
           
           // 2. Висота хайлайту = 75% від оригіналу, щоб не наїжджати на рядок знизу
           const adjustedH = h * 1.00;
