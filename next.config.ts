@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { readdirSync } from "node:fs";
+import { copyFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const FINANCIAL_STATEMENTS_DIR = join(
@@ -8,8 +8,13 @@ const FINANCIAL_STATEMENTS_DIR = join(
   "documents",
   "unison-society-financial-statements"
 );
+const FINANCIAL_STATEMENTS_PUBLIC_FILE = join(
+  process.cwd(),
+  "public",
+  "unison-society-financial-statements.pdf"
+);
 
-function getFinancialStatementsPdfPath() {
+function syncFinancialStatementsPdf() {
   const pdfFiles = readdirSync(FINANCIAL_STATEMENTS_DIR, {
     withFileTypes: true,
   })
@@ -22,12 +27,13 @@ function getFinancialStatementsPdfPath() {
     );
   }
 
-  return `/documents/unison-society-financial-statements/${encodeURIComponent(
-    pdfFiles[0]
-  )}`;
+  copyFileSync(
+    join(FINANCIAL_STATEMENTS_DIR, pdfFiles[0]),
+    FINANCIAL_STATEMENTS_PUBLIC_FILE
+  );
 }
 
-const financialStatementsPdfPath = getFinancialStatementsPdfPath();
+syncFinancialStatementsPdf();
 
 const nextConfig: NextConfig = {
   async redirects() {
@@ -41,14 +47,6 @@ const nextConfig: NextConfig = {
         source: "/unison-society-financial-statements/",
         destination: "/unison-society-financial-statements.pdf",
         permanent: true,
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/unison-society-financial-statements.pdf",
-        destination: financialStatementsPdfPath,
       },
     ];
   },

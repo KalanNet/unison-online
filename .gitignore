@@ -39,3 +39,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+public/unison-society-financial-statements.pdf
