@@ -115,6 +115,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
       lastModified: new Date(),
     },
+    {
+      url: `${SITE}/unison-society-financial-statements.pdf`,
+      changeFrequency: "yearly",
+      priority: 0.5,
+      lastModified: new Date(),
+    },
   ];
 
   try {
