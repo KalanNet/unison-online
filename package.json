@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "sync:financial-statements": "node scripts/sync-financial-statements.mjs",
+    "dev": "npm run sync:financial-statements && next dev",
+    "build": "npm run sync:financial-statements && next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
